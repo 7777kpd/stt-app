@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>СТТ — Маршрут</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F5F0EB; --card: #FFFFFF;
+  --red: #8B1A1A; --yellow: #8B6914; --green: #2D5A1B;
+  --blue-light: #E8F0FE; --blue: #1a56db;
+  --text: #1a1a1a; --muted: #6b7280; --border: #e5e7eb;
+  --nav-h: 64px;
+}
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px; line-height: 1.5; min-height: 100vh;
+  padding-bottom: var(--nav-h);
+}
+
+/* HEADER */
+.header { background: var(--card); padding: 14px 16px 0; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.header-top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; }
+.header-name { font-weight: 700; font-size: 16px; }
+.header-date { font-size: 13px; color: var(--muted); }
+
+/* TABS */
+.tabs { display: flex; border-top: 1px solid var(--border); margin: 0 -16px; }
+.tab {
+  flex: 1; border: none; background: none; padding: 10px 4px 9px;
+  font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  white-space: nowrap;
+}
+.tab.active-red    { border-bottom-color: var(--red);    color: var(--red);    font-weight: 700; }
+.tab.active-yellow { border-bottom-color: var(--yellow); color: var(--yellow); font-weight: 700; }
+.tab.active-green  { border-bottom-color: var(--green);  color: var(--green);  font-weight: 700; }
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 9px; font-size: 10px; font-weight: 700; padding: 0 4px; background: #f3f4f6; color: var(--text); }
+.tab.active-red    .badge { background: #fee2e2; color: var(--red); }
+.tab.active-yellow .badge { background: #fef3c7; color: var(--yellow); }
+.tab.active-green  .badge { background: #d1fae5; color: var(--green); }
+
+/* INTENTION */
+.intention { margin: 12px 16px 4px; background: var(--blue-light); border-radius: 10px; padding: 10px 12px; }
+.intention-label { font-size: 11px; font-weight: 700; color: #1e3a8a; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.intention-text  { font-size: 13px; color: #1e3a8a; font-weight: 500; }
+
+/* CARDS */
+.cards { padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--card); border-radius: 12px; padding: 12px 14px; border-left: 3px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.card.level-red    { border-left-color: var(--red); }
+.card.level-yellow { border-left-color: var(--yellow); }
+.card.level-green  { border-left-color: var(--green); }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.card-addr { font-weight: 700; font-size: 13px; flex: 1; line-height: 1.3; }
+.card-client { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 2px; }
+.card-stt { font-weight: 900; font-size: 19px; flex-shrink: 0; line-height: 1.1; }
+.level-red    .card-stt { color: var(--red); }
+.level-yellow .card-stt { color: var(--yellow); }
+.level-green  .card-stt { color: var(--green); }
+.card-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
+
+/* VISITS */
+.visits { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.v { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.v-ok     { background: #d1fae5; color: #065f46; }
+.v-miss   { background: #fee2e2; color: #991b1b; }
+.v-future { background: #f3f4f6; color: #9ca3af; }
+.v-sep    { color: #d1d5db; font-size: 16px; margin: 0 2px; }
+
+/* HINT */
+.hint { font-size: 12px; margin-top: 7px; font-weight: 600; }
+.hint-need        { color: var(--blue); }
+.hint-done        { color: var(--green); }
+.hint-unreachable { color: var(--red); }
+
+/* CATS */
+.cats { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 8px; }
+.cat { background: var(--bg); border-radius: 8px; padding: 7px 8px; text-align: center; }
+.cat-name { font-size: 10px; color: var(--muted); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-pct  { font-size: 15px; font-weight: 800; }
+.cat-miss { font-size: 10px; margin-top: 2px; color: var(--muted); }
+.cat-miss.bad { color: var(--red); font-weight: 700; }
+.c-red    { color: var(--red); }
+.c-yellow { color: var(--yellow); }
+.c-green  { color: var(--green); }
+
+/* STT SCREEN */
+.stt-screen { padding: 16px; }
+.big-card { background: var(--card); border-radius: 16px; padding: 28px 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 12px; }
+.big-pct { font-size: 60px; font-weight: 900; line-height: 1; }
+.big-sub { font-size: 13px; color: var(--muted); margin-top: 5px; }
+.trio { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 4px; }
+.trio-item { background: var(--card); border-radius: 10px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.trio-n   { font-size: 22px; font-weight: 800; }
+.trio-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.sec-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 8px; }
+.cat-bar { background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.cat-bar-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.cat-bar-name { font-size: 13px; font-weight: 600; flex: 1; }
+.cat-bar-pct  { font-size: 15px; font-weight: 800; }
+.bar-track { height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+.bar-fill  { height: 100%; border-radius: 3px; }
+.miss-warn { font-size: 11px; color: var(--red); font-weight: 700; margin-top: 5px; }
+
+/* HISTORY */
+.hist-screen { padding: 16px; }
+.goal-bar-wrap { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.goal-bar-track { flex:1; height:6px; background:#e5e7eb; border-radius:3px; overflow:visible; position:relative; }
+.goal-bar-fill { height:100%; border-radius:3px; background:#2D5A1B; }
+.goal-marker { position:absolute; right:0; top:-4px; width:2px; height:14px; background:#2D5A1B; border-radius:1px; }
+.goal-label { font-size:11px; font-weight:700; color:#2D5A1B; white-space:nowrap; }
+.trend-banner { background: var(--blue-light); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.trend-arrow { font-size: 16px; color: var(--blue); }
+.trend-text  { font-size: 14px; font-weight: 700; color: #1e3a8a; }
+.month-card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.month-row  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.month-name { font-size: 15px; font-weight: 700; }
+.month-pct  { font-size: 19px; font-weight: 900; }
+.seg-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 1px; }
+.seg { border-radius: 0; }
+.month-leg { display: flex; gap: 12px; margin-top: 7px; }
+.leg-item  { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.leg-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* NAV */
+.nav { position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-h); background: var(--card); border-top: 1px solid var(--border); display: flex; z-index: 20; }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: none; background: none; cursor: pointer; font-size: 10px; color: var(--muted); font-weight: 500; }
+.nav-btn.active { color: var(--blue); }
+.nav-icon { font-size: 20px; }
+
+/* UTILS */
+.loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--muted); }
+.spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+.screen { display: none; }
+.screen.active { display: block; }
+.demo-bar { position: fixed; top: 0; left: 0; right: 0; background: #f59e0b; color: #fff; text-align: center; font-size: 11px; font-weight: 700; padding: 4px; z-index: 100; letter-spacing: .03em; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>
+</div>
+
+<script>
+const API = 'https://worker-production-1dfb.up.railway.app';
+const MONTHS = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function getTelegramId() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('id')) return p.get('id');
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
+    return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  return null;
+}
+
+function levelOf(pct) { return pct >= 75 ? 'green' : pct >= 50 ? 'yellow' : 'red'; }
+function colorOf(l)   { return l==='green' ? '#2D5A1B' : l==='yellow' ? '#8B6914' : '#8B1A1A'; }
+function barColor(l)  { return l==='green' ? '#4caf50' : l==='yellow' ? '#f59e0b' : '#ef4444'; }
+
+function missLabel(n) {
+  if (n === 0) return '0 пропусков';
+  if (n === 1) return '1 пропуск';
+  if (n >= 2 && n <= 4) return `${n} пропуска`;
+  return `${n} пропусков`;
+}
+
+function formatDate() {
+  const d = new Date();
+  const days = ['вс','пн','вт','ср','чт','пт','сб'];
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} · ${days[d.getDay()]}`;
+}
+
+// Normalize point from API format to internal format
+function normalizePoint(pt) {
+  // address: use tt_short if available, else tt
+  pt.address = pt.tt_short || pt.tt || '';
+  pt.visits_done = pt.passed_planned || 0;
+  pt.visits_total = pt.total_planned || 0;
+
+  // build visits array from sequence [[day, has_order], ...]
+  // sequence items: [day_number, has_order] — past visits
+  // remaining = future visits
+  if (pt.sequence) {
+    pt.visits = [];
+    for (const [day, has_order] of pt.sequence) {
+      pt.visits.push({ has_order, is_future: false });
+    }
+    for (let i = 0; i < (pt.remaining || 0); i++) {
+      pt.visits.push({ has_order: false, is_future: true });
+    }
+  }
+
+  // build hint
+  if (pt.orders >= Math.ceil(pt.total_planned * 0.75)) {
+    pt.hint = { type: 'achieved' };
+  } else if (!pt.need_75_possible) {
+    pt.hint = { type: 'unreachable', need: pt.need_75, remaining: pt.remaining };
+  } else {
+    pt.hint = { type: 'need', need: pt.need_75, remaining: pt.remaining };
+  }
+
+  // build cats array from cat_stts and cat_missed
+  if (pt.cat_stts) {
+    pt.cats = Object.entries(pt.cat_stts).map(([name, pct]) => ({
+      name,
+      pct,
+      misses: (pt.cat_missed || {})[name] || 0
+    }));
+  }
+
+  return pt;
+}
+
+function renderVisits(visits) {
+  if (!visits?.length) return '';
+  let html = '<div class="visits">';
+  let sepDone = false;
+  for (const v of visits) {
+    if (!sepDone && v.is_future) { html += '<span class="v-sep">|</span>'; sepDone = true; }
+    if (v.is_future)      html += '<span class="v v-future">·</span>';
+    else if (v.has_order) html += '<span class="v v-ok">✓</span>';
+    else                  html += '<span class="v v-miss">✕</span>';
+  }
+  return html + '</div>';
+}
+
+function renderHint(pt) {
+  if (!pt.hint) return '';
+  const h = pt.hint;
+  if (h.type === 'achieved')    return `<div class="hint hint-done">✅ 75% достигнуто</div>`;
+  if (h.type === 'unreachable') return `<div class="hint hint-unreachable">🚫 75% недостижимо — нужно ${h.need}, осталось ${h.remaining}</div>`;
+  return `<div class="hint hint-need">🎯 нужно ${h.need} из ${h.remaining} для 75%</div>`;
+}
+
+function renderCats(cats) {
+  if (!cats?.length) return '';
+  return '<div class="cats">' + cats.map(c => {
+    const lv = levelOf(c.pct);
+    const bad = c.misses > 0;
+    return `<div class="cat">
+      <div class="cat-name">${c.name}</div>
+      <div class="cat-pct c-${lv}">${c.pct}%</div>
+      <div class="cat-miss${bad?' bad':''}">${missLabel(c.misses)}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function renderCard(pt) {
+  const lv = levelOf(pt.stt);
+  return `<div class="card level-${lv}">
+    <div class="card-top">
+      <div>
+        <div class="card-addr">${pt.address}</div>
+        ${pt.client ? `<div class="card-client">${pt.client}</div>` : ''}
+      </div>
+      <div class="card-stt">${pt.stt}%</div>
+    </div>
+    <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}</div>
+    ${renderVisits(pt.visits)}
+    ${renderHint(pt)}
+    ${renderCats(pt.cats)}
+  </div>`;
+}
+
+function buildRouteScreen(data) {
+  const grouped = { red:[], yellow:[], green:[] };
+  for (const pt of (data.points||[])) {
+    normalizePoint(pt);
+    grouped[levelOf(pt.stt)].push(pt);
+  }
+  let tab = grouped.red.length ? 'red' : grouped.yellow.length ? 'yellow' : 'green';
+  const agentName = data.agent || data.agent_name || '';
+
+  function render() {
+    document.getElementById('screen-route').innerHTML = `
+      <div class="header">
+        <div class="header-top">
+          <div class="header-name">${agentName}</div>
+          <div class="header-date">${formatDate()}</div>
+        </div>
+        <div class="tabs" id="tabs">
+          <button class="tab ${tab==='red'?'active-red':''}" data-t="red">Провал<span class="badge">${grouped.red.length}</span></button>
+          <button class="tab ${tab==='yellow'?'active-yellow':''}" data-t="yellow">Потенциал<span class="badge">${grouped.yellow.length}</span></button>
+          <button class="tab ${tab==='green'?'active-green':''}" data-t="green">В системе<span class="badge">${grouped.green.length}</span></button>
+        </div>
+      </div>
+      ${data.intention ? `<div class="intention">
+        <div class="intention-label">🎯 Намерение на сегодня</div>
+        <div class="intention-text">${data.intention}</div>
+      </div>` : ''}
+      <div id="tab-content">
+        ${grouped[tab].length
+          ? `<div class="cards">${grouped[tab].map(renderCard).join('')}</div>`
+          : `<div class="empty">Точки отсутствуют</div>`}
+      </div>`;
+
+    document.getElementById('tabs').addEventListener('click', e => {
+      const btn = e.target.closest('[data-t]');
+      if (!btn) return;
+      tab = btn.dataset.t;
+      render();
+    });
+  }
+  render();
+}
+
+function buildSttScreen(data) {
+  const overallStt = data.stt || data.overall_stt || 0;
+  const lv = levelOf(overallStt);
+  const mName = data.month || MONTHS[new Date().getMonth() + 1];
+
+  // cats from cat_stts: {"Варенные": {"stt": 27, "missed": 75}, ...}
+  const catsData = data.cat_stts
+    ? Object.entries(data.cat_stts).map(([name, v]) => ({name, pct: v.stt||0, misses: v.missed||0}))
+    : (data.cats||[]);
+
+  const catHtml = catsData.map(c => {
+    const lc = levelOf(c.pct);
+    return `<div class="cat-bar">
+      <div class="cat-bar-top">
+        <span class="cat-bar-name">${c.name}</span>
+        <span class="cat-bar-pct" style="color:${colorOf(lc)}">${c.pct}%</span>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${c.pct}%;background:${barColor(lc)}"></div></div>
+      ${c.misses > 0 ? `<div class="miss-warn">⚠️ ${missLabel(c.misses)} категорийных пропусков</div>` : ''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('screen-stt').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div class="header-name">Мой СТТ</div>
+        <div class="header-date">${mName}</div>
+      </div>
+    </div>
+    <div class="stt-screen">
+      <div class="big-card">
+        <div class="big-pct" style="color:${colorOf(lv)}">${overallStt}%</div>
+        <div class="big-sub">общий СТТ за ${mName}</div>
+      </div>
+      <div class="trio">
+        <div class="trio-item"><div class="trio-n c-green">${data.green??0}</div><div class="trio-lbl">В системе</div></div>
+        <div class="trio-item"><div class="trio-n c-yellow">${data.yellow??0}</div><div class="trio-lbl">Потенциал</div></div>
+        <div class="trio-item"><div class="trio-n c-red">${data.red??0}</div><div class="trio-lbl">Провал</div></div>
+      </div>
+      <div class="sec-title">СТТ по категориям</div>
+      ${catHtml}
+    </div>`;
+}
+
+function buildHistoryScreen(data) {
+  const months = data.history || data.months || [];
+  let trendHtml = '';
+  const tr = data.trend;
+  if (tr && typeof tr === 'object') {
+    const avg = tr.avg_per_month;
+    const mtg = tr.months_to_goal;
+    const cur = tr.current_stt;
+    let arrow, avgText, goalText;
+
+    if (cur >= 75) {
+      trendHtml = `<div class="trend-banner"><span class="trend-arrow">✅</span><span class="trend-text">Цель 75% достигнута</span></div>`;
+    } else {
+      arrow = avg >= 0 ? '↗' : '↘';
+      avgText = avg >= 0 ? `+${avg}% в мес` : `${avg}% в мес`;
+      if (mtg === null || mtg === undefined) {
+        goalText = 'до цели — снижение';
+      } else if (mtg === 0) {
+        goalText = 'цель достигнута';
+      } else {
+        goalText = `до цели ${mtg} мес`;
+      }
+      // Build closed months chain label: Март → Апрель → Май
+      const closedNames = months.filter(m => !m.is_current).map(m => {
+        const parts = (m.month || '').split(' ');
+        return parts[0] || '';
+      }).reverse().join(' → ');
+      const trendSub = closedNames ? `<div style="font-size:11px;color:#3b5bdb;margin-top:2px;">тренд по закрытым: ${closedNames}</div>` : '';
+      trendHtml = `<div class="trend-banner"><span class="trend-arrow">${arrow}</span><div><div class="trend-text">${avgText} · ${goalText}</div>${trendSub}</div></div>`;
+    }
+  } else if (months.length >= 2) {
+    const diff = typeof tr === 'number' ? tr : (months[0].stt - months[months.length-1].stt);
+    const arrow = diff >= 0 ? '↗' : '↘';
+    trendHtml = `<div class="trend-banner"><span class="trend-arrow">${arrow}</span><span class="trend-text">${diff >= 0 ? '+' : ''}${diff}% за период</span></div>`;
+  }
+
+  const monthCards = months.map(mo => {
+    const lv = levelOf(mo.stt);
+    const total = (mo.total) || (mo.green||0)+(mo.yellow||0)+(mo.red||0);
+    const gn = mo.green || mo.green_n || 0;
+    const yn = mo.yellow || mo.yellow_n || 0;
+    const rn = mo.red || mo.red_n || 0;
+    const gf = total ? gn/total*100 : 0;
+    const yf = total ? yn/total*100 : 0;
+    const rf = total ? rn/total*100 : 0;
+    const mName = mo.month || MONTHS[mo.month_num] || mo.month_label || '';
+    const isCurrent = mo.is_current;
+    return `<div class="month-card">
+      <div class="month-row">
+        <div class="month-name">${mName}${isCurrent ? ' <span style="font-size:10px;color:#6b7280;font-weight:400">· в процессе</span>' : ''}</div>
+        <div class="month-pct" style="color:${colorOf(lv)}">${mo.stt}%</div>
+      </div>
+      <div class="seg-bar">
+        <div class="seg" style="flex:${gf};background:#4caf50"></div>
+        <div class="seg" style="flex:${yf};background:#f59e0b"></div>
+        <div class="seg" style="flex:${rf};background:#ef4444"></div>
+      </div>
+      <div class="month-leg">
+        <span class="leg-item"><span class="leg-dot" style="background:#4caf50"></span>${gn} в сис.</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>${yn} пот.</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>${rn} пров.</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Goal progress bar
+  const currentStt = (typeof tr === 'object' && tr) ? tr.current_stt : (months[0]?.stt || 0);
+  const goalPct = Math.min(100, Math.round(currentStt / 75 * 100));
+  const goalBarHtml = `<div class="goal-bar-wrap">
+    <div class="goal-bar-track">
+      <div class="goal-bar-fill" style="width:${goalPct}%"></div>
+      <div class="goal-marker"></div>
+    </div>
+    <div class="goal-label">цель 75%</div>
+  </div>`;
+
+  document.getElementById('screen-history').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div class="header-name">История</div>
+        <div class="header-date">4 месяца</div>
+      </div>
+    </div>
+    <div class="hist-screen">
+      ${trendHtml}
+      ${goalBarHtml}
+      ${monthCards||'<div class="empty">Данные отсутствуют</div>'}
+    </div>`;
+}
+
+function activateScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-screen="${name}"]`).classList.add('active');
+}
+
+async function main() {
+  const id = getTelegramId();
+
+  document.getElementById('app').innerHTML = `
+    <div id="screen-route" class="screen active"></div>
+    <div id="screen-stt"   class="screen"></div>
+    <div id="screen-history" class="screen"></div>
+    <nav class="nav">
+      <button class="nav-btn active" data-screen="route" onclick="activateScreen('route')">
+        <span class="nav-icon">📍</span>Маршрут
+      </button>
+      <button class="nav-btn" data-screen="stt" onclick="activateScreen('stt')">
+        <span class="nav-icon">📊</span>Мой СТТ
+      </button>
+      <button class="nav-btn" data-screen="history" onclick="activateScreen('history')">
+        <span class="nav-icon">🕐</span>История
+      </button>
+    </nav>`;
+
+  const DEMO = {
+    today: {
+      agent_name: 'Гребінник Ігор',
+      intention: 'Строго выполню маршрут без пропусков',
+      points: [
+        {
+          address: 'с. Шамраївка, вул. Центральна, Буд. 10А',
+          client: 'ЧАЛА ЛЮДМИЛА ВАЛЕНТИНІВНА',
+          stt: 25, visits_done: 2, visits_total: 8, misses: 0,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'need', need:4, remaining:6},
+          cats: [{name:'Варенные',pct:25,misses:0},{name:'Н/К',pct:25,misses:0},{name:'С/К',pct:0,misses:2}]
+        },
+        {
+          address: 'м. Богуслав, вул. Фрунзе, Буд. 99Б',
+          client: 'ФОП КОВАЛЕНКО В.С.',
+          stt: 0, visits_done: 3, visits_total: 8, misses: 3,
+          visits: [
+            {has_order:false,is_future:false},{has_order:false,is_future:false},{has_order:false,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'unreachable', need:6, remaining:5},
+          cats: [{name:'Варенные',pct:0,misses:3},{name:'Н/К',pct:0,misses:3},{name:'С/К',pct:0,misses:3}]
+        },
+        {
+          address: 'м. Богуслав, вул. Салія, Буд. 41',
+          client: 'ФОП БОНДАРЕНКО С.М.',
+          stt: 62, visits_done: 4, visits_total: 8, misses: 1,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'need', need:2, remaining:4},
+          cats: [{name:'Варенные',pct:75,misses:0},{name:'Н/К',pct:62,misses:1},{name:'С/К',pct:37,misses:2}]
+        },
+        {
+          address: 'с. Воронків, вул. Центральна, Буд. 2',
+          client: 'ФОП БОРЯК В.С.',
+          stt: 75, visits_done: 4, visits_total: 8, misses: 0,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'achieved'},
+          cats: [{name:'Варенные',pct:75,misses:0},{name:'Н/К',pct:75,misses:0},{name:'С/К',pct:75,misses:0}]
+        },
+        {
+          address: 'м. Миронівка, вул. Шевченка, Буд. 5',
+          client: 'ФОП МЕЛЬНИК О.В.',
+          stt: 87, visits_done: 4, visits_total: 8, misses: 0,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'achieved'},
+          cats: [{name:'Варенные',pct:87,misses:0},{name:'Н/К',pct:75,misses:0},{name:'С/К',pct:87,misses:0}]
+        }
+      ]
+    },
+    stt: {
+      overall_stt: 41,
+      count_green: 5, count_yellow: 8, count_red: 11,
+      cats: [
+        {name:'Варенные', pct:54, misses:18},
+        {name:'Н/К',      pct:47, misses:22},
+        {name:'С/К',      pct:28, misses:31}
+      ]
+    },
+    history: {
+      months: [
+        {month_num:6, stt:41, green_n:5,  yellow_n:8,  red_n:11},
+        {month_num:5, stt:58, green_n:9,  yellow_n:7,  red_n:8},
+        {month_num:4, stt:23, green_n:3,  yellow_n:5,  red_n:16},
+        {month_num:3, stt:31, green_n:4,  yellow_n:6,  red_n:14}
+      ]
+    }
+  };
+
+  if (!id) {
+    buildRouteScreen(DEMO.today);
+    buildSttScreen(DEMO.stt);
+    buildHistoryScreen(DEMO.history);
+    const bar = document.createElement('div');
+    bar.className = 'demo-bar';
+    bar.textContent = '⚡ ДЕМО-РЕЖИМ — реальные данные загружаются через Telegram';
+    document.body.prepend(bar);
+    document.body.style.paddingTop = '22px';
+    return;
+  }
+
+  const err = (sid, msg) => {
+    document.getElementById(sid).innerHTML = `<div class="loader"><div style="font-size:28px">⚠️</div><div>${msg}</div></div>`;
+  };
+
+  fetch(`${API}/api/agent/${id}/today`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildRouteScreen)
+    .catch(() => err('screen-route', 'Ошибка загрузки маршрута'));
+
+  fetch(`${API}/api/agent/${id}/stt`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildSttScreen)
+    .catch(() => err('screen-stt', 'Ошибка загрузки СТТ'));
+
+  fetch(`${API}/api/agent/${id}/history`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildHistoryScreen)
+    .catch(() => err('screen-history', 'Ошибка загрузки истории'));
+}
+
+main();
+</script>
+</body>
+</html>
