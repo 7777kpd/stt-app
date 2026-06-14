@@ -198,12 +198,14 @@ function normalizePoint(pt) {
   }
 
   // build hint
+  const need75 = pt.need_75 !== undefined ? pt.need_75 : null;
+  const remaining = pt.remaining !== undefined ? pt.remaining : null;
   if (pt.orders >= Math.ceil(pt.total_planned * 0.75)) {
     pt.hint = { type: 'achieved' };
-  } else if (!pt.need_75_possible) {
-    pt.hint = { type: 'unreachable', need: pt.need_75, remaining: pt.remaining };
+  } else if (pt.need_75_possible === false) {
+    pt.hint = { type: 'unreachable', need: need75, remaining: remaining };
   } else {
-    pt.hint = { type: 'need', need: pt.need_75, remaining: pt.remaining };
+    pt.hint = { type: 'need', need: need75, remaining: remaining };
   }
 
   // build cats array from cat_stts and cat_missed
@@ -235,8 +237,8 @@ function renderHint(pt) {
   if (!pt.hint) return '';
   const h = pt.hint;
   if (h.type === 'achieved')    return `<div class="hint hint-done">✅ 75% достигнуто</div>`;
-  if (h.type === 'unreachable') return `<div class="hint hint-unreachable">🚫 75% недостижимо — нужно ${h.need||'?'}, осталось ${h.remaining||'?'}</div>`;
-  return `<div class="hint hint-need">🎯 нужно ${h.need||'?'} из ${h.remaining||'?'} для 75%</div>`;
+  if (h.type === 'unreachable') return `<div class="hint hint-unreachable">🚫 75% недостижимо — нужно ${h.need !== null ? h.need : '?'}, осталось ${h.remaining !== null ? h.remaining : '?'}</div>`;
+  return `<div class="hint hint-need">🎯 нужно ${h.need !== null ? h.need : '?'} из ${h.remaining !== null ? h.remaining : '?'} для 75%</div>`;
 }
 
 function renderCats(cats) {
