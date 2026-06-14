@@ -180,8 +180,9 @@ function formatDate() {
 function normalizePoint(pt) {
   // address: use tt_short if available, else tt
   pt.address = pt.tt_short || pt.tt || '';
-  pt.visits_done = pt.passed_planned || 0;
-  pt.visits_total = pt.total_planned || 0;
+  pt.visits_done = pt.passed_planned !== undefined ? pt.passed_planned : (pt.visits_done || 0);
+  pt.visits_total = pt.total_planned !== undefined ? pt.total_planned : (pt.visits_total || 0);
+  pt.misses = pt.missed !== undefined ? pt.missed : (pt.misses || 0);
 
   // build visits array from sequence [[day, has_order], ...]
   // sequence items: [day_number, has_order] — past visits
@@ -234,8 +235,8 @@ function renderHint(pt) {
   if (!pt.hint) return '';
   const h = pt.hint;
   if (h.type === 'achieved')    return `<div class="hint hint-done">✅ 75% достигнуто</div>`;
-  if (h.type === 'unreachable') return `<div class="hint hint-unreachable">🚫 75% недостижимо — нужно ${h.need}, осталось ${h.remaining}</div>`;
-  return `<div class="hint hint-need">🎯 нужно ${h.need} из ${h.remaining} для 75%</div>`;
+  if (h.type === 'unreachable') return `<div class="hint hint-unreachable">🚫 75% недостижимо — нужно ${h.need||'?'}, осталось ${h.remaining||'?'}</div>`;
+  return `<div class="hint hint-need">🎯 нужно ${h.need||'?'} из ${h.remaining||'?'} для 75%</div>`;
 }
 
 function renderCats(cats) {
@@ -453,19 +454,21 @@ function activateScreen(name) {
 
 async function main() {
   const id = getTelegramId();
+  const urlParams = new URLSearchParams(window.location.search);
+  const startScreen = urlParams.get('screen') || 'route';
 
   document.getElementById('app').innerHTML = `
-    <div id="screen-route" class="screen active"></div>
-    <div id="screen-stt"   class="screen"></div>
-    <div id="screen-history" class="screen"></div>
+    <div id="screen-route" class="screen ${startScreen==='route'?'active':''}"></div>
+    <div id="screen-stt"   class="screen ${startScreen==='stt'?'active':''}"></div>
+    <div id="screen-history" class="screen ${startScreen==='history'?'active':''}"></div>
     <nav class="nav">
-      <button class="nav-btn active" data-screen="route" onclick="activateScreen('route')">
+      <button class="nav-btn ${startScreen==='route'?'active':''}" data-screen="route" onclick="activateScreen('route')">
         <span class="nav-icon">📍</span>Маршрут
       </button>
-      <button class="nav-btn" data-screen="stt" onclick="activateScreen('stt')">
+      <button class="nav-btn ${startScreen==='stt'?'active':''}" data-screen="stt" onclick="activateScreen('stt')">
         <span class="nav-icon">📊</span>Мой СТТ
       </button>
-      <button class="nav-btn" data-screen="history" onclick="activateScreen('history')">
+      <button class="nav-btn ${startScreen==='history'?'active':''}" data-screen="history" onclick="activateScreen('history')">
         <span class="nav-icon">🕐</span>История
       </button>
     </nav>`;
