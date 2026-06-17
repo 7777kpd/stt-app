@@ -88,32 +88,40 @@ body {
 .c-yellow { color: var(--yellow); }
 .c-green  { color: var(--green); }
 
-/* CATS (экран Мой СТТ — с явным фоном, не сливается с подложкой) */
-.cats-stt { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 0; }
-.cat-stt-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.cat-stt-name { font-size: 11px; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cat-stt-pct  { font-size: 17px; font-weight: 800; color: var(--text); }
-.cat-stt-count { font-size: 11px; margin-top: 3px; color: var(--muted); }
-
 /* STT SCREEN */
-.stt-screen { padding: 16px; }
-.stt-top-label { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
-.stt-formula-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 14px; }
-.stt-block { background: var(--card); border-radius: 12px; border: 0.5px solid var(--border); padding: 12px 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.stt-block-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
-.stt-block-pct { font-size: 26px; font-weight: 500; line-height: 1; }
-.stt-block-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.stt-screen { padding: 16px; max-width: 720px; }
+.stt-top-label { font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
+.stt-formula-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin-bottom: 1.25rem; }
+.stt-block { background: #f3f1ec; border: 0.5px solid #d8d5cc; border-radius: 14px; padding: 0.9rem 1rem; text-align: center; }
+.stt-block-label { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+.stt-block-pct { font-size: 30px; font-weight: 500; line-height: 1; }
+.stt-block-sub { font-size: 11px; color: #9c998f; margin: 4px 0 0; }
 .stt-minus { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.stt-minus-sign { font-size: 16px; color: var(--red); font-weight: 500; }
-.stt-minus-text { font-size: 10px; color: var(--red); text-align: center; line-height: 1.2; }
-.trio { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 8px; }
-.trio-third { margin-bottom: 1.5rem; }
-.trio-item { background: var(--card); border-radius: 10px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.trio-n   { font-size: 22px; font-weight: 800; }
-.trio-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.stt-minus-sign { font-size: 18px; color: var(--red); font-weight: 500; }
+.stt-minus-text { font-size: 11px; color: var(--red); text-align: center; line-height: 1.2; white-space: nowrap; }
+
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 1.25rem; }
+.trio-item { border-radius: 10px; padding: 12px; text-align: center; }
+.trio-item.lv-green  { background: #e3f0db; }
+.trio-item.lv-yellow { background: #f7ecd0; }
+.trio-item.lv-red    { background: #f3dede; }
+.trio-n   { font-size: 20px; font-weight: 500; }
+.trio-item.lv-green  .trio-n { color: var(--green); }
+.trio-item.lv-yellow .trio-n { color: var(--yellow); }
+.trio-item.lv-red    .trio-n { color: var(--red); }
+.trio-lbl { font-size: 11px; margin-top: 2px; }
+.trio-item.lv-green  .trio-lbl { color: var(--green); }
+.trio-item.lv-yellow .trio-lbl { color: var(--yellow); }
+.trio-item.lv-red    .trio-lbl { color: var(--red); }
+
 .sec-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0; }
 .cats-header { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 0 8px; }
 .cats-total { font-size: 11px; color: var(--muted); }
+.cats-stt { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.cat-stt-card { background: #dde8fb; border-radius: 10px; padding: 12px 10px; text-align: center; }
+.cat-stt-name { font-size: 12px; color: #1a4fa3; margin: 0 0 4px; }
+.cat-stt-pct  { font-size: 22px; font-weight: 500; color: #1a4fa3; }
+.cat-stt-count { font-size: 11px; color: #1a4fa3; opacity: .75; margin-top: 4px; }
 
 /* HISTORY */
 .hist-screen { padding: 16px; }
@@ -319,8 +327,6 @@ function buildSttScreen(data) {
   const mName = data.month || MONTHS[new Date().getMonth() + 1];
   const systemStt = data.system_stt ?? 0;
   const cleanStt = data.clean_stt ?? 0;
-  const lvSystem = levelOf(systemStt);
-  const lvClean = levelOf(cleanStt);
   const plannedVisits = data.planned_visits ?? 0;
   const systemOrders = data.system_orders ?? 0;
   const cleanOrders = data.clean_orders ?? 0;
@@ -351,8 +357,8 @@ function buildSttScreen(data) {
 
       <div class="stt-formula-row">
         <div class="stt-block">
-          <div class="stt-block-label">Системная</div>
-          <div class="stt-block-pct" style="color:${colorOf(lvSystem)}">${systemStt}%</div>
+          <div class="stt-block-label">Системная дистрибуция</div>
+          <div class="stt-block-pct" style="color:${colorOf(levelOf(systemStt))}">${systemStt}%</div>
           <div class="stt-block-sub">${systemOrders} заказ${systemOrders===1?'':'а'}</div>
         </div>
         <div class="stt-minus">
@@ -360,18 +366,16 @@ function buildSttScreen(data) {
           <span class="stt-minus-text">${offRouteOrders}<br>вне</span>
         </div>
         <div class="stt-block">
-          <div class="stt-block-label">Чистая</div>
-          <div class="stt-block-pct" style="color:${colorOf(lvClean)}">${cleanStt}%</div>
+          <div class="stt-block-label">Чистая дистрибуция</div>
+          <div class="stt-block-pct" style="color:${colorOf(levelOf(cleanStt))}">${cleanStt}%</div>
           <div class="stt-block-sub">${cleanOrders} заказов</div>
         </div>
       </div>
 
       <div class="trio">
-        <div class="trio-item"><div class="trio-n c-green">${data.green??0}</div><div class="trio-lbl">В системе</div></div>
-        <div class="trio-item"><div class="trio-n c-yellow">${data.yellow??0}</div><div class="trio-lbl">Потенциал</div></div>
-      </div>
-      <div class="trio-third">
-        <div class="trio-item"><div class="trio-n c-red">${data.red??0}</div><div class="trio-lbl">Провал</div></div>
+        <div class="trio-item lv-green"><div class="trio-n">${data.green??0}</div><div class="trio-lbl">В системе</div></div>
+        <div class="trio-item lv-yellow"><div class="trio-n">${data.yellow??0}</div><div class="trio-lbl">Потенциал</div></div>
+        <div class="trio-item lv-red"><div class="trio-n">${data.red??0}</div><div class="trio-lbl">Провал</div></div>
       </div>
 
       <div class="cats-header">
