@@ -314,24 +314,26 @@ function buildRouteScreen(data) {
 }
 
 function buildSttScreen(data) {
-  const overallStt = data.stt || data.overall_stt || 0;
-  const lv = levelOf(overallStt);
   const mName = data.month || MONTHS[new Date().getMonth() + 1];
+  const systemStt = data.system_stt ?? 0;
+  const cleanStt = data.clean_stt ?? 0;
+  const lvSystem = levelOf(systemStt);
+  const lvClean = levelOf(cleanStt);
+  const plannedVisits = data.planned_visits ?? 0;
+  const systemOrders = data.system_orders ?? 0;
+  const cleanOrders = data.clean_orders ?? 0;
+  const offRouteOrders = data.off_route_orders ?? 0;
+  const totalAllOrders = data.total_all_orders ?? 0;
 
-  // cats from cat_stts: {"Варенные": {"stt": 27, "missed": 75}, ...}
-  const catsData = data.cat_stts
-    ? Object.entries(data.cat_stts).map(([name, v]) => ({name, pct: v.stt||0, misses: v.missed||0}))
-    : (data.cats||[]);
+  const catsData = data.cat_shares
+    ? Object.entries(data.cat_shares).map(([name, v]) => ({name, pct: v.pct||0, count: v.count||0}))
+    : [];
 
   const catHtml = catsData.map(c => {
-    const lc = levelOf(c.pct);
-    return `<div class="cat-bar">
-      <div class="cat-bar-top">
-        <span class="cat-bar-name">${c.name}</span>
-        <span class="cat-bar-pct" style="color:${colorOf(lc)}">${c.pct}%</span>
-      </div>
-      <div class="bar-track"><div class="bar-fill" style="width:${c.pct}%;background:${barColor(lc)}"></div></div>
-      ${c.misses > 0 ? `<div class="miss-warn">⚠️ ${missLabel(c.misses)} категорийных пропусков</div>` : ''}
+    return `<div class="cat">
+      <div class="cat-name">${c.name}</div>
+      <div class="cat-pct">${c.pct}%</div>
+      <div class="cat-miss">${c.count} заказов</div>
     </div>`;
   }).join('');
 
@@ -343,17 +345,36 @@ function buildSttScreen(data) {
       </div>
     </div>
     <div class="stt-screen">
-      <div class="big-card">
-        <div class="big-pct" style="color:${colorOf(lv)}">${overallStt}%</div>
-        <div class="big-sub">общий СТТ за ${mName}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${mName} · план визитов ${plannedVisits}</div>
+
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-bottom:14px;">
+        <div class="big-card" style="padding:16px 10px;margin-bottom:0;">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Системная дистрибуция</div>
+          <div class="big-pct" style="font-size:32px;color:${colorOf(lvSystem)}">${systemStt}%</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">${systemOrders} заказ по маршруту</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+          <span style="font-size:18px;color:var(--red);font-weight:700;">−</span>
+          <span style="font-size:11px;color:var(--red);text-align:center;white-space:nowrap;">${offRouteOrders} вне<br>маршрута</span>
+        </div>
+        <div class="big-card" style="padding:16px 10px;margin-bottom:0;">
+          <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Чистая дистрибуция</div>
+          <div class="big-pct" style="font-size:32px;color:${colorOf(lvClean)}">${cleanStt}%</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;">${cleanOrders} заказов</div>
+        </div>
       </div>
+
       <div class="trio">
         <div class="trio-item"><div class="trio-n c-green">${data.green??0}</div><div class="trio-lbl">В системе</div></div>
         <div class="trio-item"><div class="trio-n c-yellow">${data.yellow??0}</div><div class="trio-lbl">Потенциал</div></div>
         <div class="trio-item"><div class="trio-n c-red">${data.red??0}</div><div class="trio-lbl">Провал</div></div>
       </div>
-      <div class="sec-title">СТТ по категориям</div>
-      ${catHtml}
+
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin:16px 0 8px;">
+        <span class="sec-title" style="margin:0;">Доля заказов по категориям</span>
+        <span style="font-size:11px;color:var(--muted);">всего заказов ${totalAllOrders}</span>
+      </div>
+      <div class="cats" style="margin-top:0;">${catHtml}</div>
     </div>`;
 }
 
