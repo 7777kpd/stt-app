@@ -77,7 +77,7 @@ body {
 .hint-done        { color: var(--green); }
 .hint-unreachable { color: var(--red); }
 
-/* CATS */
+/* CATS (точки маршрута) */
 .cats { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 8px; }
 .cat { background: var(--bg); border-radius: 8px; padding: 7px 8px; text-align: center; }
 .cat-name { font-size: 10px; color: var(--muted); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -88,23 +88,32 @@ body {
 .c-yellow { color: var(--yellow); }
 .c-green  { color: var(--green); }
 
+/* CATS (экран Мой СТТ — с явным фоном, не сливается с подложкой) */
+.cats-stt { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-top: 0; }
+.cat-stt-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 10px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.cat-stt-name { font-size: 11px; color: var(--muted); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-stt-pct  { font-size: 17px; font-weight: 800; color: var(--text); }
+.cat-stt-count { font-size: 11px; margin-top: 3px; color: var(--muted); }
+
 /* STT SCREEN */
 .stt-screen { padding: 16px; }
-.big-card { background: var(--card); border-radius: 16px; padding: 28px 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); margin-bottom: 12px; }
-.big-pct { font-size: 60px; font-weight: 900; line-height: 1; }
-.big-sub { font-size: 13px; color: var(--muted); margin-top: 5px; }
-.trio { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-bottom: 4px; }
+.stt-top-label { font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+.stt-formula-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 14px; }
+.stt-block { background: var(--card); border-radius: 12px; border: 0.5px solid var(--border); padding: 12px 10px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.stt-block-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.stt-block-pct { font-size: 26px; font-weight: 500; line-height: 1; }
+.stt-block-sub { font-size: 10px; color: var(--muted); margin-top: 4px; }
+.stt-minus { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stt-minus-sign { font-size: 16px; color: var(--red); font-weight: 500; }
+.stt-minus-text { font-size: 10px; color: var(--red); text-align: center; line-height: 1.2; }
+.trio { display: grid; grid-template-columns: repeat(2,1fr); gap: 8px; margin-bottom: 8px; }
+.trio-third { margin-bottom: 1.5rem; }
 .trio-item { background: var(--card); border-radius: 10px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
 .trio-n   { font-size: 22px; font-weight: 800; }
 .trio-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
-.sec-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 16px 0 8px; }
-.cat-bar { background: var(--card); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.cat-bar-top { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.cat-bar-name { font-size: 13px; font-weight: 600; flex: 1; }
-.cat-bar-pct  { font-size: 15px; font-weight: 800; }
-.bar-track { height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
-.bar-fill  { height: 100%; border-radius: 3px; }
-.miss-warn { font-size: 11px; color: var(--red); font-weight: 700; margin-top: 5px; }
+.sec-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0; }
+.cats-header { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 0 8px; }
+.cats-total { font-size: 11px; color: var(--muted); }
 
 /* HISTORY */
 .hist-screen { padding: 16px; }
@@ -176,17 +185,12 @@ function formatDate() {
   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} · ${days[d.getDay()]}`;
 }
 
-// Normalize point from API format to internal format
 function normalizePoint(pt) {
-  // address: use tt_short if available, else tt
   pt.address = pt.tt_short || pt.tt || '';
   pt.visits_done = pt.passed_planned !== undefined ? pt.passed_planned : (pt.visits_done || 0);
   pt.visits_total = pt.total_planned !== undefined ? pt.total_planned : (pt.visits_total || 0);
   pt.misses = pt.missed !== undefined ? pt.missed : (pt.misses || 0);
 
-  // build visits array from sequence [[day, has_order], ...]
-  // sequence items: [day_number, has_order] — past visits
-  // remaining = future visits
   if (pt.sequence) {
     pt.visits = [];
     for (const [day, has_order] of pt.sequence) {
@@ -197,7 +201,6 @@ function normalizePoint(pt) {
     }
   }
 
-  // build hint
   const need75 = pt.need_75 !== undefined ? pt.need_75 : null;
   const remaining = pt.remaining !== undefined ? pt.remaining : null;
   if (pt.orders >= Math.ceil(pt.total_planned * 0.75)) {
@@ -208,7 +211,6 @@ function normalizePoint(pt) {
     pt.hint = { type: 'need', need: need75, remaining: remaining };
   }
 
-  // build cats array from cat_stts and cat_missed
   if (pt.cat_stts) {
     pt.cats = Object.entries(pt.cat_stts).map(([name, pct]) => ({
       name,
@@ -330,10 +332,10 @@ function buildSttScreen(data) {
     : [];
 
   const catHtml = catsData.map(c => {
-    return `<div class="cat">
-      <div class="cat-name">${c.name}</div>
-      <div class="cat-pct">${c.pct}%</div>
-      <div class="cat-miss">${c.count} заказов</div>
+    return `<div class="cat-stt-card">
+      <div class="cat-stt-name">${c.name}</div>
+      <div class="cat-stt-pct">${c.pct}%</div>
+      <div class="cat-stt-count">${c.count} заказов</div>
     </div>`;
   }).join('');
 
@@ -345,36 +347,38 @@ function buildSttScreen(data) {
       </div>
     </div>
     <div class="stt-screen">
-      <div style="font-size:13px;color:var(--muted);margin-bottom:10px;">${mName} · план визитов ${plannedVisits}</div>
+      <div class="stt-top-label">${mName} · план визитов ${plannedVisits}</div>
 
-      <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;margin-bottom:14px;">
-        <div class="big-card" style="padding:16px 10px;margin-bottom:0;">
-          <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Системная дистрибуция</div>
-          <div class="big-pct" style="font-size:32px;color:${colorOf(lvSystem)}">${systemStt}%</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px;">${systemOrders} заказ по маршруту</div>
+      <div class="stt-formula-row">
+        <div class="stt-block">
+          <div class="stt-block-label">Системная</div>
+          <div class="stt-block-pct" style="color:${colorOf(lvSystem)}">${systemStt}%</div>
+          <div class="stt-block-sub">${systemOrders} заказ${systemOrders===1?'':'а'}</div>
         </div>
-        <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
-          <span style="font-size:18px;color:var(--red);font-weight:700;">−</span>
-          <span style="font-size:11px;color:var(--red);text-align:center;white-space:nowrap;">${offRouteOrders} вне<br>маршрута</span>
+        <div class="stt-minus">
+          <span class="stt-minus-sign">−</span>
+          <span class="stt-minus-text">${offRouteOrders}<br>вне</span>
         </div>
-        <div class="big-card" style="padding:16px 10px;margin-bottom:0;">
-          <div style="font-size:13px;color:var(--muted);margin-bottom:4px;">Чистая дистрибуция</div>
-          <div class="big-pct" style="font-size:32px;color:${colorOf(lvClean)}">${cleanStt}%</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:4px;">${cleanOrders} заказов</div>
+        <div class="stt-block">
+          <div class="stt-block-label">Чистая</div>
+          <div class="stt-block-pct" style="color:${colorOf(lvClean)}">${cleanStt}%</div>
+          <div class="stt-block-sub">${cleanOrders} заказов</div>
         </div>
       </div>
 
       <div class="trio">
         <div class="trio-item"><div class="trio-n c-green">${data.green??0}</div><div class="trio-lbl">В системе</div></div>
         <div class="trio-item"><div class="trio-n c-yellow">${data.yellow??0}</div><div class="trio-lbl">Потенциал</div></div>
+      </div>
+      <div class="trio-third">
         <div class="trio-item"><div class="trio-n c-red">${data.red??0}</div><div class="trio-lbl">Провал</div></div>
       </div>
 
-      <div style="display:flex;align-items:baseline;justify-content:space-between;margin:16px 0 8px;">
-        <span class="sec-title" style="margin:0;">Доля заказов по категориям</span>
-        <span style="font-size:11px;color:var(--muted);">всего заказов ${totalAllOrders}</span>
+      <div class="cats-header">
+        <span class="sec-title">Доля заказов по категориям</span>
+        <span class="cats-total">всего ${totalAllOrders}</span>
       </div>
-      <div class="cats" style="margin-top:0;">${catHtml}</div>
+      <div class="cats-stt">${catHtml}</div>
     </div>`;
 }
 
@@ -400,7 +404,6 @@ function buildHistoryScreen(data) {
       } else {
         goalText = `до цели ${mtg} мес`;
       }
-      // Build closed months chain label: Март → Апрель → Май
       const closedNames = months.filter(m => !m.is_current).map(m => {
         const parts = (m.month || '').split(' ');
         return parts[0] || '';
@@ -443,7 +446,6 @@ function buildHistoryScreen(data) {
     </div>`;
   }).join('');
 
-  // Goal progress bar
   const currentStt = (typeof tr === 'object' && tr) ? tr.current_stt : (months[0]?.stt || 0);
   const goalPct = Math.min(100, Math.round(currentStt / 75 * 100));
   const goalBarHtml = `<div class="goal-bar-wrap">
@@ -568,13 +570,20 @@ async function main() {
       ]
     },
     stt: {
-      overall_stt: 41,
-      count_green: 5, count_yellow: 8, count_red: 11,
-      cats: [
-        {name:'Варенные', pct:54, misses:18},
-        {name:'Н/К',      pct:47, misses:22},
-        {name:'С/К',      pct:28, misses:31}
-      ]
+      month: 'Июнь 2026',
+      planned_visits: 100,
+      system_orders: 21,
+      system_stt: 21,
+      off_route_orders: 9,
+      clean_orders: 12,
+      clean_stt: 12,
+      green: 0, yellow: 8, red: 11,
+      total_all_orders: 100,
+      cat_shares: {
+        'Варенные': {pct:50, count:50},
+        'Н/К': {pct:38, count:38},
+        'С/К': {pct:62, count:62}
+      }
     },
     history: {
       months: [
