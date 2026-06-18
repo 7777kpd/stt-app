@@ -62,6 +62,7 @@ body {
 .level-yellow .card-stt { color: var(--yellow); }
 .level-green  .card-stt { color: var(--green); }
 .card-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.off-route { color: #b35c5c; }
 
 /* VISITS */
 .visits { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
@@ -136,11 +137,15 @@ body {
 .month-card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
 .month-row  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .month-name { font-size: 15px; font-weight: 700; }
-.month-pct  { font-size: 19px; font-weight: 900; }
+.month-pct  { font-size: 19px; font-weight: 900; line-height: 1; }
+.month-pct-wrap { text-align: right; }
+.month-clean { font-size: 11px; margin-top: 2px; }
 .seg-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 1px; }
 .seg { border-radius: 0; }
-.month-leg { display: flex; gap: 12px; margin-top: 7px; }
+.month-leg { display: flex; gap: 10px; row-gap: 5px; margin-top: 7px; flex-wrap: wrap; }
 .leg-item  { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.leg-item-muted { color: #9c998f; }
+.leg-item-warn  { color: #b35c5c; }
 .leg-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 
 /* NAV */
@@ -209,14 +214,16 @@ function normalizePoint(pt) {
     }
   }
 
-  const need75 = pt.need_75 !== undefined ? pt.need_75 : null;
-  const remaining = pt.remaining !== undefined ? pt.remaining : null;
-  if (pt.orders >= Math.ceil(pt.total_planned * 0.75)) {
-    pt.hint = { type: 'achieved' };
-  } else if (pt.need_75_possible === false) {
-    pt.hint = { type: 'unreachable', need: need75, remaining: remaining };
-  } else {
-    pt.hint = { type: 'need', need: need75, remaining: remaining };
+  if (!pt.hint) {
+    const need75 = pt.need_75 !== undefined ? pt.need_75 : null;
+    const remaining = pt.remaining !== undefined ? pt.remaining : null;
+    if (pt.orders >= Math.ceil(pt.total_planned * 0.75)) {
+      pt.hint = { type: 'achieved' };
+    } else if (pt.need_75_possible === false) {
+      pt.hint = { type: 'unreachable', need: need75, remaining: remaining };
+    } else {
+      pt.hint = { type: 'need', need: need75, remaining: remaining };
+    }
   }
 
   if (pt.cat_stts) {
@@ -266,6 +273,7 @@ function renderCats(cats) {
 
 function renderCard(pt) {
   const lv = levelOf(pt.stt);
+  const offRoute = pt.off_schedule_orders || 0;
   return `<div class="card level-${lv}">
     <div class="card-top">
       <div>
@@ -274,7 +282,7 @@ function renderCard(pt) {
       </div>
       <div class="card-stt">${pt.stt}%</div>
     </div>
-    <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}</div>
+    <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}${offRoute > 0 ? ` · <span class="off-route">${offRoute} вне маршрута</span>` : ''}</div>
     ${renderVisits(pt.visits)}
     ${renderHint(pt)}
     ${renderCats(pt.cats)}
@@ -423,10 +431,14 @@ function buildHistoryScreen(data) {
 
   const monthCards = months.map(mo => {
     const lv = levelOf(mo.stt);
+    const cleanStt = mo.clean_stt ?? null;
+    const cleanColor = cleanStt === null ? null : (cleanStt < 0 ? '#8B1A1A' : colorOf(levelOf(cleanStt)));
     const total = (mo.total) || (mo.green||0)+(mo.yellow||0)+(mo.red||0);
     const gn = mo.green || mo.green_n || 0;
     const yn = mo.yellow || mo.yellow_n || 0;
     const rn = mo.red || mo.red_n || 0;
+    const notInRoute = mo.not_in_route || 0;
+    const notWorked = mo.not_worked || 0;
     const gf = total ? gn/total*100 : 0;
     const yf = total ? yn/total*100 : 0;
     const rf = total ? rn/total*100 : 0;
@@ -435,7 +447,10 @@ function buildHistoryScreen(data) {
     return `<div class="month-card">
       <div class="month-row">
         <div class="month-name">${mName}${isCurrent ? ' <span style="font-size:10px;color:#6b7280;font-weight:400">· в процессе</span>' : ''}</div>
-        <div class="month-pct" style="color:${colorOf(lv)}">${mo.stt}%</div>
+        <div class="month-pct-wrap">
+          <div class="month-pct" style="color:${colorOf(lv)}">${mo.stt}%</div>
+          ${cleanStt === null ? '' : `<div class="month-clean" style="color:${cleanColor}">чистая ${cleanStt}%</div>`}
+        </div>
       </div>
       <div class="seg-bar">
         <div class="seg" style="flex:${gf};background:#4caf50"></div>
@@ -446,6 +461,8 @@ function buildHistoryScreen(data) {
         <span class="leg-item"><span class="leg-dot" style="background:#4caf50"></span>${gn} в сис.</span>
         <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>${yn} пот.</span>
         <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>${rn} пров.</span>
+        ${notInRoute > 0 ? `<span class="leg-item leg-item-muted"><span class="leg-dot" style="background:#c7c2b8"></span>${notInRoute} не в маршруте</span>` : ''}
+        ${notWorked > 0 ? `<span class="leg-item leg-item-warn"><span class="leg-dot" style="background:#b35c5c"></span>${notWorked} не сработало</span>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -511,6 +528,7 @@ async function main() {
           address: 'с. Шамраївка, вул. Центральна, Буд. 10А',
           client: 'ЧАЛА ЛЮДМИЛА ВАЛЕНТИНІВНА',
           stt: 25, visits_done: 2, visits_total: 8, misses: 0,
+          off_schedule_orders: 2,
           visits: [
             {has_order:true,is_future:false},{has_order:true,is_future:false},
             {has_order:false,is_future:true},{has_order:false,is_future:true},
@@ -536,6 +554,7 @@ async function main() {
           address: 'м. Богуслав, вул. Салія, Буд. 41',
           client: 'ФОП БОНДАРЕНКО С.М.',
           stt: 62, visits_done: 4, visits_total: 8, misses: 1,
+          off_schedule_orders: 1,
           visits: [
             {has_order:true,is_future:false},{has_order:true,is_future:false},
             {has_order:false,is_future:false},{has_order:true,is_future:false},
@@ -576,12 +595,12 @@ async function main() {
     stt: {
       month: 'Июнь 2026',
       planned_visits: 100,
-      system_orders: 21,
-      system_stt: 21,
+      system_orders: 41,
+      system_stt: 41,
       off_route_orders: 9,
-      clean_orders: 12,
-      clean_stt: 12,
-      green: 0, yellow: 8, red: 11,
+      clean_orders: 32,
+      clean_stt: 32,
+      green: 5, yellow: 8, red: 11,
       total_all_orders: 100,
       cat_shares: {
         'Варенные': {pct:50, count:50},
@@ -590,11 +609,17 @@ async function main() {
       }
     },
     history: {
+      trend: {
+        avg_per_month: 4,
+        months_to_goal: 9,
+        current_stt: 41,
+        direction: 'up'
+      },
       months: [
-        {month_num:6, stt:41, green_n:5,  yellow_n:8,  red_n:11},
-        {month_num:5, stt:58, green_n:9,  yellow_n:7,  red_n:8},
-        {month_num:4, stt:23, green_n:3,  yellow_n:5,  red_n:16},
-        {month_num:3, stt:31, green_n:4,  yellow_n:6,  red_n:14}
+        {month_num:6, stt:41, clean_stt:32, green_n:5,  yellow_n:8,  red_n:11, not_in_route:7, not_worked:3, is_current:true},
+        {month_num:5, stt:58, clean_stt:48, green_n:9,  yellow_n:7,  red_n:8,  not_in_route:3, not_worked:0},
+        {month_num:4, stt:23, clean_stt:-4, green_n:3,  yellow_n:5,  red_n:16, not_in_route:9, not_worked:6},
+        {month_num:3, stt:31, clean_stt:19, green_n:4,  yellow_n:6,  red_n:14, not_in_route:5, not_worked:2}
       ]
     }
   };
