@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>СТТ — Супервайзер</title>
+<style>
+  :root {
+    --bg: #F0EADC;
+    --card: #FFFFFF;
+    --ink: #2C2A26;
+    --ink-soft: #8B8578;
+    --line: #ECE6D8;
+    --green: #3FAE6A;
+    --green-bg: #E6F4EC;
+    --yellow: #E2A335;
+    --yellow-bg: #FBF1DF;
+    --red: #DC5B4E;
+    --red-bg: #FAE7E4;
+    --red-dark: #A93B30;
+    --amber: #D98A3D;
+    --amber-bg: #F8EBDB;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: #DAD2BC;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink); display: flex; justify-content: center; padding: 32px 12px;
+  }
+  .phone {
+    width: 100%; max-width: 420px; background: var(--bg); border-radius: 28px;
+    box-shadow: 0 30px 60px -20px rgba(40, 35, 20, 0.35); overflow: hidden;
+    height: 92vh; min-height: 700px; max-height: 960px; display: flex; flex-direction: column;
+  }
+  .topbar { padding: 22px 20px 14px; display: flex; align-items: baseline; justify-content: space-between; flex-shrink: 0; }
+  .topbar h1 { font-size: 20px; font-weight: 700; margin: 0; }
+  .top-pill { font-size: 13px; color: var(--ink-soft); background: var(--card); border-radius: 100px; padding: 6px 12px; font-weight: 600; }
+  .content { padding: 4px 16px 24px; overflow-y: auto; flex: 1; }
+
+  .screen-panel { display: none; }
+  .screen-panel.active { display: block; }
+
+  .tabbar { display: flex; background: var(--card); border-top: 1px solid var(--line); padding: 9px 4px 14px; flex-shrink: 0; }
+  .tab {
+    flex: 1; text-align: center; font-size: 10px; font-weight: 700; color: var(--ink-soft);
+    background: none; border: none; font-family: inherit; cursor: pointer; padding: 6px 2px 0;
+  }
+  .tab.active { color: var(--ink); }
+  .tab .icon {
+    width: 26px; height: 26px; margin: 0 auto 4px; border-radius: 8px; background: var(--line);
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .tab.active .icon { background: #D9CFAE; }
+
+  /* LOADER */
+  .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 40px 16px; color: var(--ink-soft); font-size: 14px; }
+
+  /* ============ SCREEN: МАРШРУТ ============ */
+  #screen-route .ride-card {
+    display: flex; align-items: center; gap: 12px;
+    background: #FAE7E4; border: 1px solid #F1C9C2;
+    border-radius: 14px; padding: 13px 14px; margin-bottom: 14px;
+  }
+  #screen-route .ride-icon { font-size: 22px; flex-shrink: 0; }
+  #screen-route .ride-title { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; color: var(--red); margin-bottom: 2px; }
+  #screen-route .ride-name { font-size: 15px; font-weight: 800; color: var(--ink); }
+  #screen-route .ride-reason { font-size: 12px; color: var(--ink-soft); font-weight: 600; margin-top: 1px; }
+
+  #screen-route .summary-strip {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border-radius: 14px;
+    padding: 12px 14px; margin-bottom: 16px;
+  }
+  #screen-route .ss-num { font-size: 20px; font-weight: 800; line-height: 1; }
+  #screen-route .ss-text { font-size: 12px; color: var(--ink-soft); font-weight: 600; line-height: 1.3; }
+  #screen-route .ss-divider { width: 1px; align-self: stretch; background: var(--line); }
+  #screen-route .ss-explainer { font-size: 12px; color: var(--ink-soft); font-weight: 600; line-height: 1.4; }
+  #screen-route .ss-explainer-sub { display: block; font-size: 10.5px; font-weight: 500; color: var(--ink-soft); opacity: 0.75; margin-top: 4px; line-height: 1.35; }
+
+  #screen-route details.agent-group {
+    background: var(--card); border-radius: 16px; margin-bottom: 16px; overflow: hidden;
+    border: 1px solid #E2D9C2; box-shadow: 0 2px 6px rgba(60,50,20,0.05);
+    border-left: 4px solid var(--line);
+  }
+  #screen-route details.agent-group.severity-high { border-left-color: var(--red); }
+  #screen-route details.agent-group.severity-mid  { border-left-color: var(--amber); }
+  #screen-route details.agent-group summary {
+    list-style: none; display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; cursor: pointer; background: #EFE4C9; border-bottom: 1px solid #E2D9C2;
+  }
+  #screen-route details.agent-group summary::-webkit-details-marker { display: none; }
+  #screen-route .agent-group .name { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+  #screen-route .agent-group .meta { display: flex; align-items: center; gap: 8px; }
+  #screen-route .agent-group .count { font-size: 12px; color: var(--ink-soft); font-weight: 700; background: rgba(255,255,255,0.55); padding: 3px 9px; border-radius: 100px; }
+  #screen-route .unfilled-badge { font-size: 10.5px; font-weight: 700; color: var(--red); background: #FAE7E4; padding: 3px 8px; border-radius: 100px; }
+  #screen-route .chevron { font-size: 11px; color: var(--ink-soft); transition: transform 0.15s; }
+  #screen-route details[open] .chevron { transform: rotate(90deg); }
+
+  /* Коуч-контекст в карточке агента */
+  #screen-route .coach-context { padding: 11px 16px; background: #F8F3E5; border-bottom: 1px solid #ECE3CD; }
+  #screen-route .coach-context-label { font-size: 10px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 7px; }
+  #screen-route .coach-context-row { display: flex; flex-direction: column; gap: 2px; margin-bottom: 5px; font-size: 11.5px; line-height: 1.4; }
+  #screen-route .coach-context-key { font-weight: 800; color: var(--ink); }
+  #screen-route .coach-context-val { color: var(--ink-soft); }
+  #screen-route .coach-context-divider { height: 1px; background: #ECE3CD; margin: 7px 0; }
+  #screen-route .coach-context-score { font-size: 11.5px; font-weight: 800; padding: 4px 10px; border-radius: 100px; display: inline-block; }
+  #screen-route .coach-context-score.red { background: var(--red-bg); color: var(--red); }
+  #screen-route .coach-context-score.yellow { background: var(--yellow-bg); color: var(--yellow); }
+  #screen-route .coach-context-score.green { background: var(--green-bg); color: var(--green); }
+  #screen-route .survey-unfilled { padding: 10px 16px; background: #F8F3E5; border-bottom: 1px solid #ECE3CD; font-size: 11.5px; font-style: italic; color: var(--ink-soft); opacity: 0.7; }
+
+  #screen-route .grid-head, #screen-route .grid-row {
+    display: grid; grid-template-columns: 1fr 44px 44px 60px; align-items: stretch;
+  }
+  #screen-route .grid-head { background: #F8F3E5; border-bottom: 1.5px solid #E2D9C2; }
+  #screen-route .grid-head span {
+    font-size: 10px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em;
+    text-align: center; padding: 9px 4px; border-left: 1px solid #E2D9C2;
+  }
+  #screen-route .grid-head span:first-child { text-align: left; padding-left: 16px; border-left: none; }
+  #screen-route .grid-row { border-bottom: 1px solid #ECE3CD; }
+  #screen-route .grid-row:last-child { border-bottom: none; }
+  #screen-route .grid-row:nth-of-type(even) { background: #FBF8EF; }
+  #screen-route .point-name { font-size: 13px; font-weight: 600; line-height: 1.25; padding: 12px 10px 12px 16px; }
+  #screen-route .mark { display: flex; justify-content: center; align-items: center; border-left: 1px solid #ECE3CD; padding: 8px 0; }
+  #screen-route .mark-dot { width: 16px; height: 16px; border-radius: 50%; }
+  #screen-route .mark-dot.two { background: var(--amber); }
+  #screen-route .mark-dot.three { background: var(--red); }
+  #screen-route .offroute-num { display: flex; align-items: center; justify-content: center; border-left: 1px solid #ECE3CD; font-size: 14px; font-weight: 800; color: var(--amber); }
+  #screen-route .offroute-num.empty { color: var(--ink-soft); opacity: 0.4; }
+
+  /* ============ SCREEN: СТТ ============ */
+  #screen-stt .summary-card { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 18px; }
+  #screen-stt .summary-top-row { display: flex; justify-content: space-between; align-items: baseline; margin: 0 0 12px; }
+  #screen-stt .summary-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-soft); margin: 0; }
+  #screen-stt .period-caption { font-size: 11px; color: var(--ink-soft); font-weight: 600; }
+  #screen-stt .dist-row { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; }
+  #screen-stt .dist-tile { flex: 1; background: var(--bg); border-radius: 14px; padding: 11px 13px; }
+  #screen-stt .dist-tile-label { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.03em; }
+  #screen-stt .dist-tile-pct { font-size: 21px; font-weight: 800; line-height: 1.25; }
+  #screen-stt .dist-tile-pct.green { color: var(--green); }
+  #screen-stt .dist-tile-pct.yellow { color: var(--yellow); }
+  #screen-stt .dist-tile-pct.red { color: var(--red); }
+  #screen-stt .dist-tile-count { font-size: 11px; color: var(--ink-soft); font-weight: 600; }
+  #screen-stt .dist-minus-chip { flex-shrink: 0; width: 44px; text-align: center; }
+  #screen-stt .dist-minus-chip .val { font-size: 13px; font-weight: 800; color: var(--red); }
+  #screen-stt .dist-minus-chip .cap { font-size: 9px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; }
+  #screen-stt .category-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+  #screen-stt .category-name { width: 92px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
+  #screen-stt .category-bar-track { flex: 1; height: 7px; background: var(--bg); border-radius: 100px; overflow: hidden; }
+  #screen-stt .category-bar-fill { height: 100%; background: var(--ink); opacity: 0.55; border-radius: 100px; }
+  #screen-stt .category-pct { width: 34px; text-align: right; font-size: 12.5px; font-weight: 700; }
+  #screen-stt .segment { display: flex; background: #E5DDC8; border-radius: 12px; padding: 3px; margin-bottom: 14px; }
+  #screen-stt .segment button { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); padding: 9px 0; border-radius: 9px; cursor: pointer; }
+  #screen-stt .segment button.active { background: var(--card); color: var(--ink); }
+  #screen-stt .sub-view { display: none; }
+  #screen-stt .sub-view.active { display: block; }
+  #screen-stt .card { background: var(--card); border-radius: 18px; padding: 6px 0; }
+  #screen-stt .rating-header { display: flex; align-items: center; gap: 12px; padding: 8px 16px 4px; }
+  #screen-stt .rh-name { flex: 1; font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+  #screen-stt .rh-metrics { display: flex; gap: 14px; }
+  #screen-stt .rh-metric { width: 42px; text-align: right; font-size: 10.5px; font-weight: 700; color: var(--ink-soft); }
+  #screen-stt .rating-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  #screen-stt .rating-row:last-child { border-bottom: none; }
+  #screen-stt .rank { width: 16px; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+  #screen-stt .dot { width: 9px; height: 9px; border-radius: 50%; }
+  #screen-stt .dot.green { background: var(--green); }
+  #screen-stt .dot.yellow { background: var(--yellow); }
+  #screen-stt .dot.red { background: var(--red); }
+  #screen-stt .agent-name { flex: 1; font-size: 14.5px; font-weight: 600; }
+  #screen-stt .metrics { display: flex; gap: 14px; }
+  #screen-stt .m-sys { width: 42px; text-align: right; font-size: 13.5px; font-weight: 500; color: var(--ink-soft); }
+  #screen-stt .m-net { width: 42px; text-align: right; font-size: 15px; font-weight: 800; }
+  #screen-stt .m-net.green { color: var(--green); }
+  #screen-stt .m-net.yellow { color: var(--yellow); }
+  #screen-stt .m-net.red { color: var(--red); }
+
+  /* Тренд по неделям */
+  #screen-stt .weeks-chart { background: var(--card); border-radius: 18px; padding: 14px 16px; }
+  #screen-stt .weeks-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 12px; }
+  #screen-stt .weeks-bars { display: flex; align-items: flex-end; gap: 8px; height: 80px; }
+  #screen-stt .week-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
+  #screen-stt .week-bar { width: 100%; border-radius: 6px 6px 0 0; min-height: 4px; }
+  #screen-stt .week-bar.filled { background: var(--amber); }
+  #screen-stt .week-bar.empty { background: var(--line); }
+  #screen-stt .week-pct { font-size: 11px; font-weight: 800; color: var(--ink-soft); }
+  #screen-stt .week-num { font-size: 10px; color: var(--ink-soft); font-weight: 600; }
+  #screen-stt .weeks-delta { font-size: 12px; font-weight: 700; margin-top: 10px; text-align: center; }
+
+  /* ============ SCREEN: ИСТОРИЯ ============ */
+  #screen-history .trend-card { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 16px; }
+  #screen-history .trend-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  #screen-history .trend-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+  #screen-history .trend-value { font-size: 14px; font-weight: 800; }
+  #screen-history .trend-value.up { color: var(--green); }
+  #screen-history .trend-value.down { color: var(--red); }
+  #screen-history .forecast-line { font-size: 13px; font-weight: 600; color: var(--ink); margin: 10px 0 12px; }
+  #screen-history .goal-track { height: 10px; background: var(--bg); border-radius: 100px; position: relative; overflow: visible; margin-bottom: 6px; }
+  #screen-history .goal-fill { height: 100%; background: var(--green); border-radius: 100px; }
+  #screen-history .goal-marker { position: absolute; top: -4px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); border: 3px solid var(--ink); transform: translateX(-50%); }
+  #screen-history .goal-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-soft); font-weight: 600; }
+  #screen-history .month-card { background: var(--card); border-radius: 18px; padding: 15px 16px; margin-bottom: 12px; }
+  #screen-history .month-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  #screen-history .month-name { font-size: 14.5px; font-weight: 700; }
+  #screen-history .month-badge { display: inline-block; font-size: 10px; font-weight: 800; color: var(--amber); background: #F8EBDB; padding: 2px 8px; border-radius: 100px; margin-top: 4px; text-transform: uppercase; }
+  #screen-history .net-pct { font-size: 24px; font-weight: 800; line-height: 1; }
+  #screen-history .net-pct.green { color: var(--green); }
+  #screen-history .net-pct.yellow { color: var(--yellow); }
+  #screen-history .net-pct.red { color: var(--red); }
+  #screen-history .sys-pct { font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-top: 2px; }
+  #screen-history .level-bar { display: flex; height: 9px; border-radius: 100px; overflow: hidden; margin-bottom: 9px; }
+  #screen-history .level-bar .seg.green { background: var(--green); }
+  #screen-history .level-bar .seg.yellow { background: var(--yellow); }
+  #screen-history .level-bar .seg.red { background: var(--red); }
+  #screen-history .month-legend { font-size: 11.5px; color: var(--ink-soft); font-weight: 600; line-height: 1.5; }
+  #screen-history .month-legend b { color: var(--ink); font-weight: 800; }
+  #screen-history .extra-line { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
+
+  /* ============ SCREEN: ИИ-КОУЧ ============ */
+  #screen-training .coach-summary-row { display: flex; gap: 8px; margin-bottom: 18px; }
+  #screen-training .coach-stat { flex: 1; border-radius: 14px; padding: 12px 10px; text-align: center; }
+  #screen-training .coach-stat.green { background: var(--green-bg); }
+  #screen-training .coach-stat.yellow { background: var(--yellow-bg); }
+  #screen-training .coach-stat.red { background: var(--red-bg); }
+  #screen-training .coach-stat-num { font-size: 24px; font-weight: 800; line-height: 1; }
+  #screen-training .coach-stat.green .coach-stat-num { color: var(--green); }
+  #screen-training .coach-stat.yellow .coach-stat-num { color: var(--yellow); }
+  #screen-training .coach-stat.red .coach-stat-num { color: var(--red); }
+  #screen-training .coach-stat-cap { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
+  #screen-training .coach-section-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin: 0 0 10px; }
+  #screen-training details.coach-agent-card {
+    background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden;
+    border-left: 4px solid var(--line);
+  }
+  #screen-training details.coach-agent-card.level-red { border-left-color: var(--red); }
+  #screen-training details.coach-agent-card.level-yellow { border-left-color: var(--yellow); }
+  #screen-training details.coach-agent-card.level-green { border-left-color: var(--green); }
+  #screen-training details.coach-agent-card summary {
+    list-style: none; display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 16px; cursor: pointer;
+  }
+  #screen-training details.coach-agent-card summary::-webkit-details-marker { display: none; }
+  #screen-training .ca-name { font-size: 14px; font-weight: 700; }
+  #screen-training .ca-status { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 100px; }
+  #screen-training .ca-status.red { background: var(--red-bg); color: var(--red); }
+  #screen-training .ca-status.yellow { background: var(--yellow-bg); color: var(--yellow); }
+  #screen-training .ca-status.green { background: var(--green-bg); color: var(--green); }
+  #screen-training .ca-body { padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+  #screen-training .ca-dots { display: flex; gap: 6px; margin-bottom: 8px; }
+  #screen-training .ca-dot { width: 12px; height: 12px; border-radius: 50%; }
+  #screen-training .ca-dot.d1 { background: var(--red); }
+  #screen-training .ca-dot.d2 { background: var(--yellow); }
+  #screen-training .ca-dot.d3 { background: var(--green); }
+  #screen-training .ca-dot.dn { background: var(--line); }
+  #screen-training .ca-pattern { font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
+  #screen-training .coach-sv-card {
+    background: #FAE7E4; border: 1px solid #F1C9C2; border-radius: 16px;
+    padding: 14px 16px; margin-bottom: 16px; margin-top: 16px;
+  }
+  #screen-training .coach-sv-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--red); margin-bottom: 5px; }
+  #screen-training .coach-sv-text { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; margin-bottom: 4px; }
+  #screen-training .coach-feedback-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+  #screen-training .coach-fb-btn { background: rgba(255,255,255,0.6); border: 1px solid #F1C9C2; border-radius: 8px; padding: 5px 10px; font-size: 14px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="phone">
+    <div class="topbar">
+      <h1 id="topTitle">Загрузка...</h1>
+      <div class="top-pill" id="topPill" style="display:none"></div>
+    </div>
+    <div class="content" id="mainContent">
+      <div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>
+    </div>
+    <div class="tabbar" id="tabbar" style="display:none">
+      <button class="tab active" data-screen="route" onclick="switchTab('route')"><span class="icon">🗺️</span>Маршрут</button>
+      <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>СТТ</button>
+      <button class="tab" data-screen="history" onclick="switchTab('history')"><span class="icon">📈</span>История</button>
+      <button class="tab" data-screen="training" onclick="switchTab('training')"><span class="icon">🧠</span>ИИ-коуч</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
+
+const screenMeta = {
+  route:    { title: 'Точки контроля на сегодня', pill: () => formatDate() },
+  stt:      { title: 'СТТ команды',               pill: () => _sttMonth || '' },
+  history:  { title: 'История команды',           pill: () => '' },
+  training: { title: 'ИИ-коуч',                   pill: () => _coachPeriod || '7 дней' },
+};
+
+let _telegramId = null;
+let _sttMonth = '';
+let _coachPeriod = '';
+let _coachPatterns = [];
+
+function getTelegramId() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('id')) return p.get('id');
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
+    return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  return null;
+}
+
+function formatDate() {
+  const d = new Date();
+  const days = ['вс','пн','вт','ср','чт','пт','сб'];
+  const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return `${d.getDate()} ${months[d.getMonth()]} · ${days[d.getDay()]}`;
+}
+
+function levelClass(pct) {
+  return pct >= 75 ? 'green' : pct >= 50 ? 'yellow' : 'red';
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.screen-panel').forEach(el => {
+    el.classList.toggle('active', el.id === 'screen-' + name);
+  });
+  document.querySelectorAll('.tab').forEach(el => {
+    el.classList.toggle('active', el.dataset.screen === name);
+  });
+  const meta = screenMeta[name];
+  document.getElementById('topTitle').textContent = meta.title;
+  const pill = document.getElementById('topPill');
+  const pillText = meta.pill();
+  if (pillText) {
+    pill.textContent = pillText;
+    pill.style.display = 'block';
+  } else {
+    pill.style.display = 'none';
+  }
+  document.getElementById('mainContent').scrollTop = 0;
+}
+
+// ============================================================
+// РЕНДЕР: МАРШРУТ
+// ============================================================
+function renderRoute(data) {
+  const agents = data.agents || [];
+  const summary = data.summary || {};
+  const rideWith = data.ride_with;
+
+  let html = '';
+
+  // С кем выехать
+  if (rideWith) {
+    html += `
+      <div class="ride-card">
+        <span class="ride-icon">🚗</span>
+        <div>
+          <div class="ride-title">С кем выехать сегодня</div>
+          <div class="ride-name">${rideWith.agent}</div>
+          <div class="ride-reason">${rideWith.reason}</div>
+        </div>
+      </div>`;
+  }
+
+  // Сводка
+  html += `
+    <div class="summary-strip">
+      <div>
+        <div class="ss-num">${summary.total_points || 0}</div>
+        <div class="ss-text">точек у ${summary.agents_count || 0} агентов</div>
+      </div>
+      <div class="ss-divider"></div>
+      <div class="ss-explainer">
+        Точки с 2+ пропусками заказов подряд и/или заказы вне маршрута
+        <span class="ss-explainer-sub">Месяц ни при чём — считаем последние визиты подряд</span>
+      </div>
+    </div>`;
+
+  if (agents.length === 0) {
+    html += '<div class="empty">Проблемных точек нет 🎉</div>';
+  }
+
+  agents.forEach(agent => {
+    const survey = agent.survey || {};
+    const points = agent.points || [];
+    const hasSurvey = survey.filled;
+    const badgeHtml = !hasSurvey
+      ? `<span class="unfilled-badge">опросник не заполнен</span>` : '';
+
+    html += `
+      <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}" ${agent.severity === 'high' ? 'open' : ''}>
+        <summary>
+          <span class="name">${agent.name}</span>
+          <span class="meta">${badgeHtml}<span class="count">${points.length} точки</span><span class="chevron">▶</span></span>
+        </summary>`;
+
+    // Блок коуч-контекста
+    if (hasSurvey) {
+      const scoreClass = survey.ai_score === 3 ? 'green' : survey.ai_score === 2 ? 'yellow' : 'red';
+      const scoreLabel = survey.ai_status || '—';
+      html += `
+        <div class="coach-context">
+          <div class="coach-context-label">🧠 Вчера про ${survey.hard_point || '—'}</div>
+          <div class="coach-context-row">
+            <span class="coach-context-key">Что помешало:</span>
+            <span class="coach-context-val">«${survey.obstacle || '—'}»</span>
+          </div>
+          <div class="coach-context-row">
+            <span class="coach-context-key">Действие:</span>
+            <span class="coach-context-val">«${survey.action || '—'}»</span>
+          </div>
+          <div class="coach-context-divider"></div>
+          <div class="coach-context-score ${scoreClass}">${scoreLabel}</div>
+        </div>`;
+    } else if (survey.date === null) {
+      // Нет ответа вообще — ничего не показываем
+    } else {
+      html += `<div class="survey-unfilled">Опросник за вчера не заполнен</div>`;
+    }
+
+    // Таблица точек
+    html += `<div class="grid-head"><span>Точка</span><span>2</span><span>3+</span><span>Вне м.</span></div>`;
+    points.forEach(pt => {
+      html += `
+        <div class="grid-row">
+          <span class="point-name">${pt.name}</span>
+          <span class="mark">${pt.missed_2 ? '<span class="mark-dot two"></span>' : ''}</span>
+          <span class="mark">${pt.missed_3plus ? '<span class="mark-dot three"></span>' : ''}</span>
+          <span class="offroute-num ${pt.off_route === 0 ? 'empty' : ''}">${pt.off_route > 0 ? pt.off_route : '—'}</span>
+        </div>`;
+    });
+
+    html += `</details>`;
+  });
+
+  return html;
+}
+
+// ============================================================
+// РЕНДЕР: СТТ
+// ============================================================
+function renderStt(data) {
+  _sttMonth = data.month || '';
+  const lv = levelClass(data.clean_stt || 0);
+  const lvSys = levelClass(data.system_stt || 0);
+
+  // Категории
+  const catsHtml = (data.categories || []).map(c => `
+    <div class="category-row">
+      <span class="category-name">${c.name}</span>
+      <div class="category-bar-track"><div class="category-bar-fill" style="width:${c.pct}%"></div></div>
+      <span class="category-pct">${c.pct}%</span>
+    </div>`).join('');
+
+  // Рейтинг
+  const ratingHtml = (data.rating || []).map(r => `
+    <div class="rating-row">
+      <span class="rank">${r.rank}</span>
+      <span class="dot ${r.dot}"></span>
+      <span class="agent-name">${r.agent}</span>
+      <span class="metrics">
+        <span class="m-sys">${r.sys}%</span>
+        <span class="m-net ${r.dot}">${r.net}%</span>
+      </span>
+    </div>`).join('');
+
+  // Тренд по неделям
+  const weeks = data.trend_weeks || [];
+  const maxVal = Math.max(...weeks.filter(w => w.clean_stt !== null).map(w => w.clean_stt), 1);
+  const barsHtml = weeks.map(w => {
+    if (w.clean_stt === null) {
+      return `<div class="week-col">
+        <div class="week-pct">—</div>
+        <div class="week-bar empty" style="height:20px"></div>
+        <div class="week-num">Нед ${w.week}</div>
+      </div>`;
+    }
+    const h = Math.max(8, Math.round(w.clean_stt / maxVal * 70));
+    return `<div class="week-col">
+      <div class="week-pct">${w.clean_stt}%</div>
+      <div class="week-bar filled" style="height:${h}px"></div>
+      <div class="week-num">Нед ${w.week}</div>
+    </div>`;
+  }).join('');
+
+  const deltaHtml = data.trend_delta !== null && data.trend_delta !== undefined
+    ? `<div class="weeks-delta" style="color:${data.trend_delta >= 0 ? 'var(--green)' : 'var(--red)'}">
+        ${data.trend_delta >= 0 ? '+' : ''}${data.trend_delta}% за месяц
+       </div>` : '';
+
+  return `
+    <div class="summary-card">
+      <div class="summary-top-row">
+        <p class="summary-label">Итог по команде</p>
+        <span class="period-caption">${data.planned_visits} плановых визитов</span>
+      </div>
+      <div class="dist-row">
+        <div class="dist-tile">
+          <div class="dist-tile-label">Системная</div>
+          <div class="dist-tile-pct ${lvSys}">${data.system_stt}%</div>
+          <div class="dist-tile-count">${data.system_orders} заказов</div>
+        </div>
+        <div class="dist-minus-chip">
+          <div class="val">−${data.off_route}</div>
+          <div class="cap">вне</div>
+        </div>
+        <div class="dist-tile">
+          <div class="dist-tile-label">Чистая</div>
+          <div class="dist-tile-pct ${lv}">${data.clean_stt}%</div>
+          <div class="dist-tile-count">${data.clean_orders} заказов</div>
+        </div>
+      </div>
+      ${catsHtml ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:4px 0 8px;">Продажи по категориям</div>${catsHtml}` : ''}
+    </div>
+
+    <div class="segment">
+      <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг</button>
+      <button id="btn-trend" onclick="sttView('trend')">Тренд</button>
+    </div>
+
+    <div id="view-rating" class="sub-view active">
+      <div class="card">
+        <div class="rating-header">
+          <span class="rh-name">Агент</span>
+          <span class="rh-metrics"><span class="rh-metric">Сист</span><span class="rh-metric">Чист</span></span>
+        </div>
+        ${ratingHtml}
+      </div>
+    </div>
+
+    <div id="view-trend" class="sub-view">
+      <div class="weeks-chart">
+        <div class="weeks-label">Чистая по неделям</div>
+        <div class="weeks-bars">${barsHtml}</div>
+        ${deltaHtml}
+      </div>
+    </div>`;
+}
+
+function sttView(name) {
+  ['rating','trend'].forEach(n => {
+    document.getElementById('view-'+n).classList.toggle('active', n === name);
+    document.getElementById('btn-'+n).classList.toggle('active', n === name);
+  });
+}
+
+// ============================================================
+// РЕНДЕР: ИСТОРИЯ
+// ============================================================
+function renderHistory(data) {
+  const tr = data.trend || {};
+  let trendHtml = '';
+
+  if (tr.avg_per_month === null || tr.avg_per_month === undefined) {
+    trendHtml = `<div class="trend-card">
+      <div class="forecast-line">Накапливаем историю — тренд появится после второго закрытого месяца</div>
+    </div>`;
+  } else if (tr.current_stt >= 75) {
+    trendHtml = `<div class="trend-card"><div class="forecast-line">✅ Цель 75% достигнута</div></div>`;
+  } else {
+    const dir = tr.avg_per_month >= 0 ? 'up' : 'down';
+    const arrow = tr.avg_per_month >= 0 ? '↗' : '↘';
+    const avgText = tr.avg_per_month >= 0 ? `+${tr.avg_per_month}%` : `${tr.avg_per_month}%`;
+    const goalText = tr.months_to_goal === null ? 'до цели — снижение'
+      : tr.months_to_goal === 0 ? 'цель достигнута' : `до цели ~${tr.months_to_goal} мес`;
+    const goalPct = Math.max(0, Math.min(100, Math.round((tr.current_stt || 0) / 75 * 100)));
+    trendHtml = `
+      <div class="trend-card">
+        <div class="trend-row">
+          <span class="trend-label">Тренд по чистой</span>
+          <span class="trend-value ${dir}">${arrow} ${avgText} в мес</span>
+        </div>
+        <div class="forecast-line">При таком темпе — ${goalText}</div>
+        <div class="goal-track">
+          <div class="goal-fill" style="width:${goalPct}%"></div>
+          <div class="goal-marker" style="left:${goalPct}%"></div>
+        </div>
+        <div class="goal-labels"><span>0%</span><span>Цель 75%</span></div>
+      </div>`;
+  }
+
+  const monthsHtml = (data.history || []).map(mo => {
+    const lv = mo.clean_stt < 0 ? 'red' : levelClass(mo.clean_stt);
+    const total = (mo.green || 0) + (mo.yellow || 0) + (mo.red || 0);
+    const gf = total ? mo.green/total*100 : 0;
+    const yf = total ? mo.yellow/total*100 : 0;
+    const rf = total ? mo.red/total*100 : 0;
+    return `
+      <div class="month-card">
+        <div class="month-top">
+          <div>
+            <div class="month-name">${mo.month}</div>
+            ${mo.is_current ? '<div class="month-badge">в процессе</div>' : ''}
+          </div>
+          <div>
+            <div class="net-pct ${lv}">${mo.clean_stt}%</div>
+            <div class="sys-pct">сист ${mo.stt}%</div>
+          </div>
+        </div>
+        <div class="level-bar">
+          <div class="seg green" style="flex:${gf}"></div>
+          <div class="seg yellow" style="flex:${yf}"></div>
+          <div class="seg red" style="flex:${rf}"></div>
+        </div>
+        <div class="month-legend">
+          <b>${mo.green}</b> в системе · <b>${mo.yellow}</b> потенциал · <b>${mo.red}</b> провал
+        </div>
+        ${(mo.not_in_route > 0 || mo.not_worked > 0) ? `
+        <div class="extra-line">
+          ${mo.not_in_route > 0 ? `Не в маршруте: ${mo.not_in_route}` : ''}
+          ${mo.not_in_route > 0 && mo.not_worked > 0 ? ' · ' : ''}
+          ${mo.not_worked > 0 ? `Не сработало: ${mo.not_worked}` : ''}
+        </div>` : ''}
+      </div>`;
+  }).join('');
+
+  return trendHtml + monthsHtml;
+}
+
+// ============================================================
+// РЕНДЕР: ИИ-КОУЧ
+// ============================================================
+function renderCoach(data) {
+  _coachPeriod = data.period || '7 дней';
+  _coachPatterns = data.patterns_for_topic || [];
+  const ts = data.team_summary || {};
+
+  const agentsHtml = (data.agents || []).map(a => {
+    const dotsHtml = (a.trend_dots || []).map(d => {
+      const cls = d === null ? 'dn' : d === 1 ? 'd1' : d === 2 ? 'd2' : 'd3';
+      return `<span class="ca-dot ${cls}"></span>`;
+    }).join('');
+
+    return `
+      <details class="coach-agent-card level-${a.status_color}">
+        <summary>
+          <span class="ca-name">${a.name}</span>
+          <span class="ca-status ${a.status_color}">${a.status}</span>
+        </summary>
+        <div class="ca-body">
+          <div class="ca-dots">${dotsHtml}</div>
+          <div class="ca-pattern">${a.pattern}</div>
+        </div>
+      </details>`;
+  }).join('');
+
+  return `
+    <div class="coach-summary-row">
+      <div class="coach-stat green">
+        <div class="coach-stat-num">${ts.acts || 0}</div>
+        <div class="coach-stat-cap">Действует</div>
+      </div>
+      <div class="coach-stat yellow">
+        <div class="coach-stat-num">${ts.grows || 0}</div>
+        <div class="coach-stat-cap">Растёт</div>
+      </div>
+      <div class="coach-stat red">
+        <div class="coach-stat-num">${ts.waits || 0}</div>
+        <div class="coach-stat-cap">Ждёт</div>
+      </div>
+    </div>
+
+    <div class="coach-section-label">По агентам — тренд 5 дней</div>
+    ${agentsHtml}
+
+    <div class="coach-sv-card">
+      <div class="coach-sv-label">Тема обучения по результатам недели</div>
+      <div class="coach-sv-text" id="coach-topic">Генерируется по итогам недели...</div>
+      <div style="border-top:1px solid #F1C9C2;margin:10px 0;"></div>
+      <div id="program-area">
+        <button onclick="generateProgram()" style="width:100%;background:#A93B30;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">
+          ✦ Сгенерировать программу обучения
+        </button>
+      </div>
+      <div class="coach-feedback-row">
+        <button class="coach-fb-btn" onclick="sendFeedback('up')">👍</button>
+        <button class="coach-fb-btn" onclick="sendFeedback('down')">👎</button>
+        <span style="font-size:11px;color:#993C1D;font-weight:600;margin-left:4px;">Материал обучения практичный?</span>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// ГЕНЕРАЦИЯ ПРОГРАММЫ ОБУЧЕНИЯ
+// ============================================================
+async function generateProgram() {
+  const area = document.getElementById('program-area');
+  area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Генерирую программу...</div>';
+
+  const topic = document.getElementById('coach-topic')?.textContent || 'работа с возражениями';
+
+  try {
+    const res = await fetch(`${API}/api/sv/generate-program`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        patterns: _coachPatterns.slice(0, 10),
+        topic: topic,
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const parsed = await res.json();
+
+    let html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:2px;">';
+    parsed.steps.forEach(s => {
+      html += `
+        <div style="background:#fff;border-radius:10px;padding:10px 12px;border:1px solid #F1C9C2;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+            <div style="width:22px;height:22px;border-radius:50%;background:#A93B30;color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;">${s.num}</div>
+            <div style="font-size:12.5px;font-weight:800;color:#2C2A26;">${s.title}</div>
+          </div>
+          <div style="font-size:12px;color:#6B5B4E;line-height:1.45;padding-left:30px;">${s.action}</div>
+        </div>`;
+    });
+    html += '</div>';
+    area.innerHTML = html;
+
+  } catch(e) {
+    area.innerHTML = `<div style="font-size:12px;color:#A93B30;padding:8px 0;">
+      Ошибка генерации.
+      <button onclick="generateProgram()" style="background:none;border:none;color:#A93B30;font-weight:700;cursor:pointer;text-decoration:underline;font-size:12px;">Попробовать ещё раз</button>
+    </div>`;
+  }
+}
+
+// ============================================================
+// FEEDBACK СВ
+// ============================================================
+async function sendFeedback(rating) {
+  if (!_telegramId) return;
+  try {
+    await fetch(`${API}/api/sv/${_telegramId}/coach/feedback?conducted=true&rating=${rating}`, {
+      method: 'POST'
+    });
+    const row = document.querySelector('.coach-feedback-row');
+    if (row) row.innerHTML = `<span style="font-size:12px;color:var(--green);font-weight:700;">✅ Оценка записана</span>`;
+  } catch(e) {
+    console.error('feedback error', e);
+  }
+}
+
+// ============================================================
+// MAIN — загрузка данных
+// ============================================================
+async function main() {
+  _telegramId = getTelegramId();
+  if (!_telegramId) {
+    document.getElementById('topTitle').textContent = 'Нет доступа';
+    document.getElementById('mainContent').innerHTML =
+      '<div class="empty">Откройте через Telegram</div>';
+    return;
+  }
+
+  // Инициализируем контейнеры экранов
+  document.getElementById('mainContent').innerHTML = `
+    <div id="screen-route" class="screen-panel active"></div>
+    <div id="screen-stt"   class="screen-panel"></div>
+    <div id="screen-history" class="screen-panel"></div>
+    <div id="screen-training" class="screen-panel"></div>`;
+  document.getElementById('tabbar').style.display = 'flex';
+
+  const err = (screenId, msg) => {
+    const el = document.getElementById(screenId);
+    if (el) el.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
+  };
+
+  // Загружаем все 4 вкладки параллельно
+  const [routeRes, sttRes, historyRes, coachRes] = await Promise.allSettled([
+    fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
+    fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
+    fetch(`${API}/api/sv/${_telegramId}/history`).then(r => r.ok ? r.json() : Promise.reject()),
+    fetch(`${API}/api/sv/${_telegramId}/coach/week`).then(r => r.ok ? r.json() : Promise.reject()),
+  ]);
+
+  if (routeRes.status === 'fulfilled') {
+    document.getElementById('screen-route').innerHTML = renderRoute(routeRes.value);
+  } else {
+    err('screen-route', 'Ошибка загрузки маршрута');
+  }
+
+  if (sttRes.status === 'fulfilled') {
+    document.getElementById('screen-stt').innerHTML = renderStt(sttRes.value);
+  } else {
+    err('screen-stt', 'Ошибка загрузки СТТ');
+  }
+
+  if (historyRes.status === 'fulfilled') {
+    document.getElementById('screen-history').innerHTML = renderHistory(historyRes.value);
+  } else {
+    err('screen-history', 'Ошибка загрузки истории');
+  }
+
+  if (coachRes.status === 'fulfilled') {
+    document.getElementById('screen-training').innerHTML = renderCoach(coachRes.value);
+  } else {
+    err('screen-training', 'Ошибка загрузки ИИ-коуча');
+  }
+
+  // Обновляем заголовок первой вкладки
+  document.getElementById('topTitle').textContent = 'Точки контроля на сегодня';
+  const pill = document.getElementById('topPill');
+  pill.textContent = formatDate();
+  pill.style.display = 'block';
+}
+
+main();
+</script>
+</body>
+</html>
