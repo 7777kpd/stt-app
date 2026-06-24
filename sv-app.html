@@ -286,7 +286,9 @@
 </div>
 
 <script>
-const API = 'https://worker-production-1dfb.up.railway.app';
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
 
 const screenMeta = {
   route:    { title: 'Точки контроля на сегодня', pill: () => formatDate() },
