@@ -540,7 +540,10 @@ function renderStt(data) {
       <div class="weeks-chart">
         <div class="weeks-label">Чистая по неделям</div>
         <div class="weeks-bars">${barsHtml}</div>
-        ${deltaHtml}
+        <div class="weeks-legend">
+          <div class="weeks-leg-item"><div class="weeks-leg-dot" style="background:var(--amber)"></div>закрытая</div>
+          <div class="weeks-leg-item"><div class="weeks-leg-dot" style="background:var(--line);border:1px dashed #C4B89A"></div>текущая</div>
+        </div>
       </div>
     </div>`;
 }
