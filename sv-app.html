@@ -483,15 +483,15 @@ function renderStt(data) {
     const h = Math.max(12, Math.round(w.clean_stt / maxVal * 75));
     const isCurrent = w.is_current;
     const barClass = isCurrent ? 'current' : 'filled';
-    const offText = w.week_off > 0 ? \`−\${w.week_off} вне\` : '';
+    const offText = w.week_off > 0 ? `−${w.week_off} вне` : '';
     const offColor = isCurrent ? 'current' : '';
-    return \`<div class="week-col">
-      <div class="week-pct">\${w.clean_stt}%</div>
-      <div class="week-bar \${barClass}" style="height:\${h}px">
-        \${offText ? \`<span class="week-bar-off \${offColor}">\${offText}</span>\` : ''}
+    return `<div class="week-col">
+      <div class="week-pct">${w.clean_stt}%</div>
+      <div class="week-bar ${barClass}" style="height:${h}px">
+        ${offText ? '<span class="week-bar-off ' + offColor + '">' + offText + '</span>' : ''}
       </div>
-      <div class="week-num">\${w.label ? w.label.split(' ')[0] : 'Нед ' + w.week}</div>
-    </div>\`;
+      <div class="week-num">${w.label ? w.label.split(' ')[0] : 'Нед ' + w.week}</div>
+    </div>`;
   }).join('');
 
   const deltaHtml = '';
