@@ -368,7 +368,7 @@ function renderRoute(data) {
     <div class="summary-strip">
       <div>
         <div class="ss-num">${summary.total_points || 0}</div>
-        <div class="ss-text">точек у ${summary.agents_count || 0} агентов</div>
+        <div class="ss-text">точек на контроле</div>
       </div>
       <div class="ss-divider"></div>
       <div class="ss-explainer">
@@ -389,7 +389,7 @@ function renderRoute(data) {
       ? `<span class="unfilled-badge">опросник не заполнен</span>` : '';
 
     html += `
-      <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}" ${agent.severity === 'high' ? 'open' : ''}>
+      <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}" >
         <summary>
           <span class="name">${agent.name}</span>
           <span class="meta">${badgeHtml}<span class="count">${points.length} точки</span><span class="chevron">▶</span></span>
