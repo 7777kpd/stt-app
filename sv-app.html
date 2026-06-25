@@ -289,6 +289,7 @@
       <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>СТТ</button>
       <button class="tab" data-screen="history" onclick="switchTab('history')"><span class="icon">📈</span>История</button>
       <button class="tab" data-screen="training" onclick="switchTab('training')"><span class="icon">🧠</span>ИИ-коуч</button>
+      <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итог дня</button>
     </div>
   </div>
 </div>
@@ -759,6 +760,83 @@ async function sendFeedback(rating) {
   }
 }
 
+
+// ============================================================
+// RENDER — Итог дня
+// ============================================================
+function renderDay(data) {
+  const team = data.team || {};
+  const agents = data.agents || [];
+
+  const statsHtml = `
+    <div class="stat-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div class="stat-card">
+        <div class="stat-val">${team.planned || 0}</div>
+        <div class="stat-label">плановых</div>
+      </div>
+      <div class="stat-card" style="position:relative">
+        <div class="stat-val">${team.orders || 0} <span style="font-size:13px;color:var(--red);font-weight:700">−${team.off || 0} вне</span></div>
+        <div class="stat-label">заказов</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--amber)">${team.system_stt || 0}%</div>
+        <div class="stat-label">системная</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-val" style="color:var(--amber)">${team.clean_stt || 0}%</div>
+        <div class="stat-label">чистая</div>
+      </div>
+    </div>`;
+
+  const agentsHtml = agents.map(a => {
+    const dotColor = a.level === 'green' ? 'var(--green)' : a.level === 'red' ? 'var(--red)' : 'var(--yellow)';
+    const sttColor = a.level === 'green' ? 'var(--green)' : a.level === 'red' ? 'var(--red)' : 'var(--yellow)';
+    const shortName = a.name.split(' ').slice(0, 2).join(' ');
+    const offStr = a.off > 0 ? ` · −${a.off} вне` : '';
+
+    const pointsHtml = (a.control_points || []).map(p => {
+      const result = p.had_order
+        ? '<span style="color:var(--green);font-weight:700;font-size:14px">✓</span>'
+        : '<span style="color:var(--red);font-weight:700;font-size:14px">✕</span>';
+      const clientLine = p.client ? `<div style="font-size:10px;color:var(--ink-soft)">${p.client}</div>` : '';
+      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--line);gap:8px">
+        <div><div style="font-size:12px;color:var(--ink);line-height:1.3">${p.name}</div>${clientLine}</div>
+        ${result}
+      </div>`;
+    }).join('');
+
+    const hasPoints = (a.control_points || []).length > 0;
+    const pointsSummary = hasPoints ? `${a.control_points.length} точек контроля` : 'нет точек контроля';
+
+    return `<details style="border-bottom:1.5px solid var(--line)">
+      <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:11px 0;">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--ink)">${shortName}</div>
+            <div style="font-size:11px;color:var(--ink-soft)">${a.orders}/${a.planned} зак${offStr} · ${pointsSummary}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:14px;font-weight:700;color:${sttColor}">${a.stt}%</span>
+          <span style="font-size:10px;color:var(--ink-soft)">▶</span>
+        </div>
+      </summary>
+      ${hasPoints ? `<div style="padding:0 0 10px 16px">${pointsHtml}<div style="height:4px"></div></div>` : ''}
+    </details>`;
+  }).join('');
+
+  return `
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-label">Команда за день</div>
+      ${statsHtml}
+    </div>
+    <div class="card">
+      <div class="section-label">По торговым · точки контроля</div>
+      ${agentsHtml}
+    </div>`;
+}
+
 // ============================================================
 // MAIN — загрузка данных
 // ============================================================
@@ -776,7 +854,8 @@ async function main() {
     <div id="screen-route" class="screen-panel active"></div>
     <div id="screen-stt"   class="screen-panel"></div>
     <div id="screen-history" class="screen-panel"></div>
-    <div id="screen-training" class="screen-panel"></div>`;
+    <div id="screen-training" class="screen-panel"></div>
+    <div id="screen-day" class="screen-panel"></div>`;
   document.getElementById('tabbar').style.display = 'flex';
 
   const err = (screenId, msg) => {
@@ -784,12 +863,13 @@ async function main() {
     if (el) el.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
   };
 
-  // Загружаем все 4 вкладки параллельно
-  const [routeRes, sttRes, historyRes, coachRes] = await Promise.allSettled([
+  // Загружаем все 5 вкладок параллельно
+  const [routeRes, sttRes, historyRes, coachRes, dayRes] = await Promise.allSettled([
     fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/history`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/coach/week`).then(r => r.ok ? r.json() : Promise.reject()),
+    fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
   ]);
 
   if (routeRes.status === 'fulfilled') {
@@ -815,6 +895,16 @@ async function main() {
   } else {
     err('screen-training', 'Ошибка загрузки ИИ-коуча');
   }
+
+  if (dayRes.status === 'fulfilled') {
+    document.getElementById('screen-day').innerHTML = renderDay(dayRes.value);
+  } else {
+    err('screen-day', 'Ошибка загрузки итога дня');
+  }
+
+  // Переключаем на нужную вкладку если указан ?tab=
+  const tabParam = new URLSearchParams(window.location.search).get('tab');
+  if (tabParam) switchTab(tabParam);
 
   // Обновляем заголовок первой вкладки
   document.getElementById('topTitle').textContent = 'Улучшить систему';
