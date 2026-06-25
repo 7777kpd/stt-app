@@ -768,23 +768,24 @@ function renderDay(data) {
   const team = data.team || {};
   const agents = data.agents || [];
 
+  const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
   const statsHtml = `
-    <div class="stat-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div class="stat-card">
-        <div class="stat-val">${team.planned || 0}</div>
-        <div class="stat-label">плановых</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+      <div style="${tileStyle}">
+        <div style="font-size:20px;font-weight:700;color:var(--ink)">${team.planned || 0}</div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">плановых</div>
       </div>
-      <div class="stat-card" style="position:relative">
-        <div class="stat-val">${team.orders || 0} <span style="font-size:13px;color:var(--red);font-weight:700">−${team.off || 0} вне</span></div>
-        <div class="stat-label">заказов</div>
+      <div style="${tileStyle}">
+        <div style="font-size:20px;font-weight:700;color:var(--ink)">${team.orders || 0} <span style="font-size:13px;color:var(--red);font-weight:700">−${team.off || 0} вне</span></div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">заказов</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-val" style="color:var(--amber)">${team.system_stt || 0}%</div>
-        <div class="stat-label">системная</div>
+      <div style="${tileStyle}">
+        <div style="font-size:20px;font-weight:700;color:var(--amber)">${team.system_stt || 0}%</div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">системная</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-val" style="color:var(--amber)">${team.clean_stt || 0}%</div>
-        <div class="stat-label">чистая</div>
+      <div style="${tileStyle}">
+        <div style="font-size:20px;font-weight:700;color:var(--amber)">${team.clean_stt || 0}%</div>
+        <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">чистая</div>
       </div>
     </div>`;
 
@@ -826,13 +827,15 @@ function renderDay(data) {
     </details>`;
   }).join('');
 
+  const cardStyle = 'background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;border:0.5px solid var(--line);';
+  const labelStyle = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin-bottom:10px;';
   return `
-    <div class="card" style="margin-bottom:12px">
-      <div class="section-label">Команда за день</div>
+    <div style="${cardStyle}">
+      <div style="${labelStyle}">Команда за день</div>
       ${statsHtml}
     </div>
-    <div class="card">
-      <div class="section-label">По торговым · точки контроля</div>
+    <div style="${cardStyle}">
+      <div style="${labelStyle}">По торговым · точки контроля</div>
       ${agentsHtml}
     </div>`;
 }
