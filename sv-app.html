@@ -466,14 +466,14 @@ function renderStt(data) {
   const ratingRows = (data.rating || []).map(r => {
     const shortName = r.agent.split(' ').slice(0, 2).join(' ');
     const netColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
-    const offVal = r.sys !== r.net ? (r.sys - r.net) : 0;
-    const planned = data.planned_visits ? Math.round(data.planned_visits / (data.rating || []).length) : '—';
-    const sysOrders = r.sys && planned !== '—' ? Math.round(r.sys / 100 * planned) : '—';
+    const planned = r.planned || '—';
+    const orders = r.orders || '—';
+    const off = r.off > 0 ? '−' + r.off : '—';
     return '<tr>' +
       '<td><span class="dot ' + r.dot + '"></span>' + shortName + '</td>' +
-      '<td>' + (planned !== '—' ? planned : '—') + '</td>' +
-      '<td>' + (sysOrders !== '—' ? sysOrders : '—') + '</td>' +
-      '<td style="color:var(--red)">−' + offVal + '</td>' +
+      '<td>' + planned + '</td>' +
+      '<td>' + orders + '</td>' +
+      '<td style="color:var(--red)">' + off + '</td>' +
       '<td style="font-weight:800;color:' + netColor + '">' + r.net + '%</td>' +
       '</tr>';
   }).join('');
@@ -540,10 +540,6 @@ function renderStt(data) {
 
     <div id="view-rating" class="sub-view active">
       <div class="card">
-        <div class="rating-header">
-          <span class="rh-name">Агент</span>
-          <span class="rh-metrics"><span class="rh-metric">Сист</span><span class="rh-metric">Чист</span></span>
-        </div>
         ${ratingHtml}
       </div>
     </div>
