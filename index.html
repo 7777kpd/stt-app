@@ -583,64 +583,53 @@ function buildHistoryScreen(data) {
 
 
 function buildDayScreen(data) {
-  if (!data) {
+  if (!data || !data.my) {
     document.getElementById('screen-day').innerHTML = '<div class="empty">Данные итога дня недоступны</div>';
     return;
   }
-  const d = data.team || {};
-  const agents = data.agents || [];
-  const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;flex:1;';
 
-  const tilesHtml = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${d.planned||0}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">плановых</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${d.orders||0} <span style="font-size:13px;color:var(--red);font-weight:700">−${d.off||0} вне</span></div><div style="font-size:10px;color:var(--muted);margin-top:2px">заказов</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(d.system_stt||0))}">${d.system_stt||0}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">системная</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(d.clean_stt||0))}">${d.clean_stt||0}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">чистая</div></div>
+  const my = data.my;
+  const focusPts = data.focus_points || [];
+  const team = data.team || [];
+
+  const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
+
+  // Мой итог
+  const myHtml = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${my.planned}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">плановых</div></div>
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${my.orders} <span style="font-size:13px;color:var(--red);font-weight:700">−${my.off} вне</span></div><div style="font-size:10px;color:var(--muted);margin-top:2px">заказов</div></div>
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.sys_stt))}">${my.sys_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">системная</div></div>
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.clean_stt))}">${my.clean_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">чистая</div></div>
     </div>`;
 
+  // Точки фокуса
+  const focusHtml = focusPts.length > 0
+    ? focusPts.map(p => {
+        const res = p.had_order
+          ? '<span style="color:#2D5A1B;font-weight:700;font-size:15px;flex-shrink:0">✓</span>'
+          : '<span style="color:#8B1A1A;font-weight:700;font-size:15px;flex-shrink:0">✕</span>';
+        const cl = p.client ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${p.client}</div>` : '';
+        return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">
+          <div><div style="font-size:12px;font-weight:600;line-height:1.3">${p.name}</div>${cl}</div>${res}</div>`;
+      }).join('').replace(/border-bottom[^"]+(?="><\/div>\s*$)/, '')
+    : '<div class="empty" style="padding:12px 0">Нет точек контроля от СВ</div>';
+
+  // Команда
+  const teamHtml = team.map(a => {
+    const short = a.name.split(' ').slice(0,2).join(' ');
+    const col = colorOf(levelOf(a.clean_stt));
+    const dotCol = a.level === 'green' ? '#2D5A1B' : a.level === 'yellow' ? '#8B6914' : '#8B1A1A';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:6px;font-size:12px">
+      <span style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;display:inline-block"></span>
+      <span style="flex:1;font-weight:500">${short}</span>
+      <span style="color:var(--muted);font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
+      <span style="font-weight:700;font-size:13px;color:${col};min-width:36px;text-align:right">${a.clean_stt}%</span>
+    </div>`;
+  }).join('') || '<div class="empty" style="padding:12px 0">Нет данных по команде</div>';
+
   const cardStyle = 'background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);';
-  const labelStyle = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;';
-
-  const pointsHtml = (agents).map(a => {
-    const clean = a.planned > 0 ? Math.round(Math.max(0, a.orders - a.off) / a.planned * 100) : 0;
-    const lv = levelOf(clean);
-    const col = colorOf(lv);
-    const shortName = a.name.split(' ').slice(0,2).join(' ');
-    const ptCount = (a.control_points||[]).length;
-    const ptLabel = ptCount > 0 ? ptCount + ' контрольных точек дня' : 'нет контрольных точек';
-    const aTile = 'background:var(--bg);border-radius:8px;padding:7px 10px;text-align:center;flex:1;';
-
-    const ptsHtml = (a.control_points||[]).map(p => {
-      const res = p.had_order
-        ? '<span style="color:#2D5A1B;font-weight:700;font-size:14px;flex-shrink:0">✓</span>'
-        : '<span style="color:#8B1A1A;font-weight:700;font-size:14px;flex-shrink:0">✕</span>';
-      const cl = p.client ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${p.client}</div>` : '';
-      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);gap:8px">
-        <div><div style="font-size:12px;line-height:1.3">${p.name}</div>${cl}</div>${res}</div>`;
-    }).join('');
-
-    return `<details style="border-bottom:1.5px solid #e0d8cc">
-      <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 0;gap:8px">
-        <div style="display:flex;align-items:center;gap:8px;flex:1">
-          <span style="width:8px;height:8px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
-          <div><div style="font-size:13px;font-weight:700">${shortName}</div><div style="font-size:11px;color:var(--muted);margin-top:1px">${ptLabel}</div></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <span style="font-size:15px;font-weight:700;color:${col}">${clean}%</span>
-          <span style="font-size:10px;color:var(--muted)">▶</span>
-        </div>
-      </summary>
-      <div style="padding:4px 0 10px 16px">
-        <div style="display:flex;gap:6px;margin-bottom:10px">
-          <div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.planned}</div><div style="font-size:9px;color:var(--muted);margin-top:1px">визитов</div></div>
-          <div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.orders}</div><div style="font-size:9px;color:var(--muted);margin-top:1px">заказов</div></div>
-          <div style="${aTile}"><div style="font-size:15px;font-weight:700;color:${a.off>0?'#8B1A1A':'inherit'}">−${a.off}</div><div style="font-size:9px;color:var(--muted);margin-top:1px">вне</div></div>
-        </div>
-        ${ptsHtml}
-      </div>
-    </details>`;
-  }).join('');
+  const labelStyle = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;';
 
   document.getElementById('screen-day').innerHTML = `
     <div class="header">
@@ -651,15 +640,25 @@ function buildDayScreen(data) {
     </div>
     <div style="padding:12px 16px 80px">
       <div style="${cardStyle}">
-        <div style="${labelStyle}">Команда за день</div>
-        ${tilesHtml}
+        <span style="${labelStyle}">Мой итог</span>
+        ${myHtml}
       </div>
       <div style="${cardStyle}">
-        <div style="${labelStyle}">По торговым</div>
-        ${pointsHtml || '<div class="empty">Нет данных</div>'}
+        <span style="${labelStyle}">⚠️ Точки фокуса СВ — выполнено?</span>
+        ${focusHtml}
+      </div>
+      <div style="${cardStyle}">
+        <details>
+          <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
+            <span style="${labelStyle}margin:0">Команда сегодня</span>
+            <span style="font-size:10px;color:var(--muted)">▶</span>
+          </summary>
+          <div style="padding-top:6px">${teamHtml}</div>
+        </details>
       </div>
     </div>`;
 }
+
 
 function activateScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
