@@ -1,1246 +1,838 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from datetime import date, timedelta
-from collections import defaultdict, Counter
-import math
-import companies
-import stt as stt_module
-import coach as coach_module
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>СТТ — Маршрут</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #F5F0EB; --card: #FFFFFF;
+  --red: #8B1A1A; --yellow: #8B6914; --green: #2D5A1B;
+  --blue-light: #E8F0FE; --blue: #1a56db;
+  --text: #1a1a1a; --muted: #6b7280; --border: #e5e7eb;
+  --nav-h: 64px;
+}
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px; line-height: 1.5; min-height: 100vh;
+  padding-bottom: var(--nav-h);
+}
 
-app = FastAPI()
+/* HEADER */
+.header { background: var(--card); padding: 14px 16px 0; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+.header-top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; }
+.header-name { font-weight: 700; font-size: 16px; }
+.header-date { font-size: 13px; color: var(--muted); }
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+/* TABS */
+.tabs { display: flex; border-top: 1px solid var(--border); margin: 0 -16px; }
+.tab {
+  flex: 1; border: none; background: none; padding: 10px 4px 9px;
+  font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  white-space: nowrap;
+}
+.tab.active-red    { border-bottom-color: var(--red);    color: var(--red);    font-weight: 700; }
+.tab.active-yellow { border-bottom-color: var(--yellow); color: var(--yellow); font-weight: 700; }
+.tab.active-green  { border-bottom-color: var(--green);  color: var(--green);  font-weight: 700; }
+.badge { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; border-radius: 9px; font-size: 10px; font-weight: 700; padding: 0 4px; background: #f3f4f6; color: var(--text); }
+.tab.active-red    .badge { background: #fee2e2; color: var(--red); }
+.tab.active-yellow .badge { background: #fef3c7; color: var(--yellow); }
+.tab.active-green  .badge { background: #d1fae5; color: var(--green); }
+
+/* INTENTION */
+.intention { margin: 12px 16px 4px; background: var(--blue-light); border-radius: 10px; padding: 10px 12px; }
+.intention-label { font-size: 11px; font-weight: 700; color: #1e3a8a; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+.intention-text  { font-size: 13px; color: #1e3a8a; font-weight: 500; }
+
+/* CARDS */
+.cards { padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--card); border-radius: 12px; padding: 12px 14px; border-left: 3px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.card.level-red    { border-left-color: var(--red); }
+.card.level-yellow { border-left-color: var(--yellow); }
+.card.level-green  { border-left-color: var(--green); }
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.card-addr { font-weight: 700; font-size: 13px; flex: 1; line-height: 1.3; }
+.card-client { font-size: 12px; color: var(--muted); font-style: italic; margin-top: 2px; }
+.card-stt { font-weight: 900; font-size: 19px; flex-shrink: 0; line-height: 1.1; }
+.level-red    .card-stt { color: var(--red); }
+.level-yellow .card-stt { color: var(--yellow); }
+.level-green  .card-stt { color: var(--green); }
+.card-meta { font-size: 12px; color: var(--muted); margin-top: 5px; }
+.off-route { color: #b35c5c; }
+
+/* VISITS */
+.visits { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.v { width: 26px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.v-ok     { background: #d1fae5; color: #065f46; }
+.v-miss   { background: #fee2e2; color: #991b1b; }
+.v-future { background: #f3f4f6; color: #9ca3af; }
+.v-sep    { color: #d1d5db; font-size: 16px; margin: 0 2px; }
+
+/* HINT */
+.hint { font-size: 12px; margin-top: 7px; font-weight: 600; }
+.hint-need        { color: var(--blue); }
+.hint-done        { color: var(--green); }
+.hint-unreachable { color: var(--red); }
+
+/* CATS (точки маршрута) */
+.cats { display: grid; grid-template-columns: repeat(3,1fr); gap: 6px; margin-top: 8px; }
+.cat { background: var(--bg); border-radius: 8px; padding: 7px 8px; text-align: center; }
+.cat-name { font-size: 10px; color: var(--muted); margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cat-pct  { font-size: 15px; font-weight: 800; }
+.cat-miss { font-size: 10px; margin-top: 2px; color: var(--muted); }
+.cat-miss.bad { color: var(--red); font-weight: 700; }
+.c-red    { color: var(--red); }
+.c-yellow { color: var(--yellow); }
+.c-green  { color: var(--green); }
+
+/* STT SCREEN */
+.stt-screen { padding: 16px; max-width: 720px; }
+.stt-top-label { font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
+.stt-formula-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin-bottom: 1.25rem; }
+.stt-block { background: var(--card); border: 2px solid #c7c3b8; border-radius: 14px; padding: 0.9rem 1rem; text-align: center; }
+.stt-block-label { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+.stt-block-pct { font-size: 30px; font-weight: 500; line-height: 1; }
+.stt-block-sub { font-size: 11px; color: #9c998f; margin: 4px 0 0; }
+.stt-minus { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stt-minus-sign { font-size: 18px; color: var(--red); font-weight: 500; }
+.stt-minus-text { font-size: 11px; color: var(--red); text-align: center; line-height: 1.2; white-space: nowrap; }
+
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 1.25rem; }
+.trio-item { border-radius: 10px; padding: 12px; text-align: center; }
+.trio-item.lv-green  { background: #e3f0db; }
+.trio-item.lv-yellow { background: #f7ecd0; }
+.trio-item.lv-red    { background: #f3dede; }
+.trio-n   { font-size: 20px; font-weight: 500; }
+.trio-item.lv-green  .trio-n { color: var(--green); }
+.trio-item.lv-yellow .trio-n { color: var(--yellow); }
+.trio-item.lv-red    .trio-n { color: var(--red); }
+.trio-lbl { font-size: 11px; margin-top: 2px; }
+.trio-item.lv-green  .trio-lbl { color: var(--green); }
+.trio-item.lv-yellow .trio-lbl { color: var(--yellow); }
+.trio-item.lv-red    .trio-lbl { color: var(--red); }
+
+.sec-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0; }
+.cats-header { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 0 8px; }
+.cats-total { font-size: 11px; color: var(--muted); }
+.cats-stt { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.cat-stt-card { background: #dde8fb; border-radius: 10px; padding: 12px 10px; text-align: center; }
+.cat-stt-name { font-size: 12px; color: #1a4fa3; margin: 0 0 4px; }
+.cat-stt-pct  { font-size: 22px; font-weight: 500; color: #1a4fa3; }
+.cat-stt-count { font-size: 11px; color: #1a4fa3; opacity: .75; margin-top: 4px; }
+
+/* HISTORY */
+.hist-screen { padding: 16px; }
+.goal-bar-wrap { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
+.goal-bar-track { flex:1; height:6px; background:#e5e7eb; border-radius:3px; overflow:visible; position:relative; }
+.goal-bar-fill { height:100%; border-radius:3px; background:#2D5A1B; }
+.goal-marker { position:absolute; right:0; top:-4px; width:2px; height:14px; background:#2D5A1B; border-radius:1px; }
+.goal-label { font-size:11px; font-weight:700; color:#2D5A1B; white-space:nowrap; }
+.trend-banner { background: var(--blue-light); border-radius: 12px; padding: 12px 16px; display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+.trend-arrow { font-size: 16px; color: var(--blue); }
+.trend-text  { font-size: 14px; font-weight: 700; color: #1e3a8a; }
+.month-card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.month-row  { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.month-name { font-size: 15px; font-weight: 700; }
+.month-pct  { font-size: 19px; font-weight: 900; line-height: 1; }
+.month-pct-wrap { text-align: right; }
+.month-clean { font-size: 11px; margin-top: 2px; }
+.seg-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 1px; }
+.seg { border-radius: 0; }
+.month-leg { display: flex; gap: 10px; row-gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+.leg-item  { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 4px; }
+.leg-item-muted { color: #9c998f; }
+.leg-item-warn  { color: #b35c5c; }
+.leg-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* NAV */
+.nav { position: fixed; bottom: 0; left: 0; right: 0; height: var(--nav-h); background: var(--card); border-top: 1px solid var(--border); display: flex; z-index: 20; }
+.nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border: none; background: none; cursor: pointer; font-size: 10px; color: var(--muted); font-weight: 500; }
+.nav-btn.active { color: var(--blue); }
+.nav-icon { font-size: 20px; }
+
+/* FOCUS BLOCK */
+.focus-block { margin: 10px 16px 4px; }
+details.focus-details { background: #fff3cd; border: 1px solid #f59e0b; border-radius: 12px; overflow: hidden; }
+details.focus-details summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; }
+details.focus-details summary::-webkit-details-marker { display: none; }
+.focus-sum-left { display: flex; align-items: center; gap: 8px; }
+.focus-title { font-size: 13px; font-weight: 700; color: #7c4f00; }
+.focus-count { font-size: 11px; color: #7c4f00; background: rgba(245,158,11,0.2); border-radius: 100px; padding: 2px 8px; font-weight: 700; }
+.focus-chevron { font-size: 11px; color: #7c4f00; display: inline-block; transition: transform 0.2s; }
+details.focus-details[open] .focus-chevron { transform: rotate(90deg); }
+.focus-points { border-top: 1px solid #f0d090; }
+.focus-point { display: flex; align-items: flex-start; justify-content: space-between; padding: 9px 14px; border-bottom: 1px solid #f0d090; gap: 8px; }
+.focus-point:last-child { border-bottom: none; }
+.focus-point-name { font-size: 12px; font-weight: 600; color: #2C2A26; line-height: 1.3; }
+.focus-point-client { font-size: 10px; color: #8B6914; margin-top: 1px; }
+.focus-point-reason { font-size: 10px; color: #7c4f00; margin-top: 3px; }
+.focus-point-stt { font-size: 13px; font-weight: 700; flex-shrink: 0; }
+
+/* FOCUS CARDS */
+.card.focus { border: 2px solid #f59e0b; border-left: 4px solid #f59e0b; }
+.focus-badge { display: inline-block; background: #fff3cd; border: 1px solid #f59e0b; border-radius: 6px; font-size: 10px; font-weight: 700; color: #7c4f00; padding: 2px 6px; margin-top: 4px; }
+.focus-reason { font-size: 11px; margin-top: 6px; color: #7c4f00; background: #fff3cd; border-radius: 6px; padding: 4px 8px; display: inline-block; }
+.focus-banner { margin: 10px 16px 0; background: #fff3cd; border: 1px solid #f59e0b; border-radius: 10px; padding: 9px 12px; display: flex; align-items: center; gap: 8px; }
+.focus-banner-text { font-size: 12px; font-weight: 600; color: #7c4f00; }
+
+/* UTILS */
+.loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--muted); }
+.spinner { width: 32px; height: 32px; border: 3px solid var(--border); border-top-color: var(--blue); border-radius: 50%; animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { text-align: center; padding: 40px 16px; color: var(--muted); }
+.screen { display: none; }
+.screen.active { display: block; }
+.demo-bar { position: fixed; top: 0; left: 0; right: 0; background: #f59e0b; color: #fff; text-align: center; font-size: 11px; font-weight: 700; padding: 4px; z-index: 100; letter-spacing: .03em; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>
+</div>
+
+<script>
+const API = 'https://develop-production-0a2d.up.railway.app';
+const MONTHS = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+function getTelegramId() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('id')) return p.get('id');
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
+    return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  return null;
+}
+
+function levelOf(pct) { return pct >= 75 ? 'green' : pct >= 50 ? 'yellow' : 'red'; }
+function colorOf(l)   { return l==='green' ? '#2D5A1B' : l==='yellow' ? '#8B6914' : '#8B1A1A'; }
+function barColor(l)  { return l==='green' ? '#4caf50' : l==='yellow' ? '#f59e0b' : '#ef4444'; }
+
+function missLabel(n) {
+  if (n === 0) return '0 пропусков';
+  if (n === 1) return '1 пропуск';
+  if (n >= 2 && n <= 4) return `${n} пропуска`;
+  return `${n} пропусков`;
+}
+
+function formatDate() {
+  const d = new Date();
+  const days = ['вс','пн','вт','ср','чт','пт','сб'];
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} · ${days[d.getDay()]}`;
+}
+
+function normalizePoint(pt) {
+  pt.address = pt.tt_short || pt.tt || '';
+  pt.visits_done = pt.passed_planned !== undefined ? pt.passed_planned : (pt.visits_done || 0);
+  pt.visits_total = pt.total_planned !== undefined ? pt.total_planned : (pt.visits_total || 0);
+  pt.misses = pt.missed !== undefined ? pt.missed : (pt.misses || 0);
+
+  if (pt.sequence) {
+    pt.visits = [];
+    for (const [day, has_order] of pt.sequence) {
+      pt.visits.push({ has_order, is_future: false });
+    }
+    for (let i = 0; i < (pt.remaining || 0); i++) {
+      pt.visits.push({ has_order: false, is_future: true });
+    }
+  }
+
+  if (!pt.hint) {
+    const need75 = pt.need_75 !== undefined ? pt.need_75 : null;
+    const remaining = pt.remaining !== undefined ? pt.remaining : null;
+    if (pt.orders >= Math.ceil(pt.total_planned * 0.75)) {
+      pt.hint = { type: 'achieved' };
+    } else if (pt.need_75_possible === false) {
+      pt.hint = { type: 'unreachable', need: need75, remaining: remaining };
+    } else {
+      pt.hint = { type: 'need', need: need75, remaining: remaining };
+    }
+  }
+
+  if (pt.cat_stts) {
+    pt.cats = Object.entries(pt.cat_stts).map(([name, pct]) => ({
+      name,
+      pct,
+      misses: (pt.cat_missed || {})[name] || 0
+    }));
+  }
+
+  return pt;
+}
+
+function renderVisits(visits) {
+  if (!visits?.length) return '';
+  let html = '<div class="visits">';
+  let sepDone = false;
+  for (const v of visits) {
+    if (!sepDone && v.is_future) { html += '<span class="v-sep">|</span>'; sepDone = true; }
+    if (v.is_future)      html += '<span class="v v-future">·</span>';
+    else if (v.has_order) html += '<span class="v v-ok">✓</span>';
+    else                  html += '<span class="v v-miss">✕</span>';
+  }
+  return html + '</div>';
+}
+
+function renderHint(pt) {
+  if (!pt.hint) return '';
+  const h = pt.hint;
+  if (h.type === 'achieved')    return `<div class="hint hint-done">✅ 75% достигнуто</div>`;
+  if (h.type === 'unreachable') return `<div class="hint hint-unreachable">🚫 75% недостижимо — нужно ${h.need !== null ? h.need : '?'}, осталось ${h.remaining !== null ? h.remaining : '?'}</div>`;
+  return `<div class="hint hint-need">🎯 нужно ${h.need !== null ? h.need : '?'} из ${h.remaining !== null ? h.remaining : '?'} для 75%</div>`;
+}
+
+function renderCats(cats) {
+  if (!cats?.length) return '';
+  return '<div class="cats">' + cats.map(c => {
+    const lv = levelOf(c.pct);
+    const bad = c.misses > 0;
+    return `<div class="cat">
+      <div class="cat-name">${c.name}</div>
+      <div class="cat-pct c-${lv}">${c.pct}%</div>
+      <div class="cat-miss${bad?' bad':''}">${missLabel(c.misses)}</div>
+    </div>`;
+  }).join('') + '</div>';
+}
+
+function calcMissedStreak(visits) {
+  // Считаем пропуски подряд с конца прошедших визитов
+  const past = (visits || []).filter(v => !v.is_future);
+  let streak = 0;
+  for (let i = past.length - 1; i >= 0; i--) {
+    if (!past[i].has_order) streak++;
+    else break;
+  }
+  return streak;
+}
+
+function renderCard(pt) {
+  const lv = levelOf(pt.stt);
+  const offRoute = pt.off_schedule_orders || 0;
+  return `<div class="card level-${lv}">
+    <div class="card-top">
+      <div>
+        <div class="card-addr">${pt.address}</div>
+        ${pt.client ? `<div class="card-client">${pt.client}</div>` : ''}
+      </div>
+      <div class="card-stt">${pt.stt}%</div>
+    </div>
+    <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}${offRoute > 0 ? ` · <span class="off-route">${offRoute} вне маршрута</span>` : ''}</div>
+    ${renderVisits(pt.visits)}
+    ${renderHint(pt)}
+    ${renderCats(pt.cats)}
+  </div>`;
+}
+
+function buildRouteScreen(data) {
+  const grouped = { red:[], yellow:[], green:[] };
+  for (const pt of (data.points||[])) {
+    normalizePoint(pt);
+    grouped[levelOf(pt.stt)].push(pt);
+  }
+
+  // Сортируем: фокусные точки (2+ пропуска или вне) наверх
+  function sortWithFocus(pts) {
+    return [...pts].sort((a, b) => {
+      const aFocus = calcMissedStreak(a.visits) >= 2 || (a.off_schedule_orders||0) > 0;
+      const bFocus = calcMissedStreak(b.visits) >= 2 || (b.off_schedule_orders||0) > 0;
+      return (bFocus ? 1 : 0) - (aFocus ? 1 : 0);
+    });
+  }
+
+  // Считаем общее кол-во фокусных точек
+  const allPoints = [...grouped.red, ...grouped.yellow, ...grouped.green];
+  const focusCount = allPoints.filter(p =>
+    calcMissedStreak(p.visits) >= 2 || (p.off_schedule_orders||0) > 0
+  ).length;
+
+  let tab = grouped.red.length ? 'red' : grouped.yellow.length ? 'yellow' : 'green';
+  const agentName = data.agent || data.agent_name || '';
+
+  // Строим блок фокуса СВ
+  const focusPoints = allPoints.filter(p =>
+    calcMissedStreak(p.visits) >= 2 || (p.off_schedule_orders||0) > 0
+  );
+
+  function getFocusReason(p) {
+    const streak = calcMissedStreak(p.visits);
+    if (streak >= 3) return '3+ пропуска подряд';
+    if (streak >= 2) return '2 пропуска подряд';
+    return 'вне маршрута';
+  }
+
+  const focusBlockHtml = focusPoints.length > 0 ? `
+    <div class="focus-block">
+      <details class="focus-details">
+        <summary>
+          <div class="focus-sum-left">
+            <span style="font-size:16px">⚠️</span>
+            <span class="focus-title">Фокус СВ</span>
+            <span class="focus-count">${focusPoints.length} точек</span>
+          </div>
+          <span class="focus-chevron">▶</span>
+        </summary>
+        <div class="focus-points">
+          ${focusPoints.map(p => `
+            <div class="focus-point">
+              <div>
+                <div class="focus-point-name">${p.address}</div>
+                ${p.client ? `<div class="focus-point-client">${p.client}</div>` : ''}
+                <div class="focus-point-reason">${getFocusReason(p)}</div>
+              </div>
+              <div class="focus-point-stt" style="color:${colorOf(levelOf(p.stt))}">${p.stt}%</div>
+            </div>`).join('')}
+        </div>
+      </details>
+    </div>` : '';
+
+  function render() {
+    document.getElementById('screen-route').innerHTML = `
+      <div class="header">
+        <div class="header-top">
+          <div class="header-name">${agentName}</div>
+          <div class="header-date">${formatDate()}</div>
+        </div>
+        <div class="tabs" id="tabs">
+          <button class="tab ${tab==='red'?'active-red':''}" data-t="red">Провал<span class="badge">${grouped.red.length}</span></button>
+          <button class="tab ${tab==='yellow'?'active-yellow':''}" data-t="yellow">Потенциал<span class="badge">${grouped.yellow.length}</span></button>
+          <button class="tab ${tab==='green'?'active-green':''}" data-t="green">В системе<span class="badge">${grouped.green.length}</span></button>
+        </div>
+      </div>
+      ${data.intention ? `<div class="intention">
+        <div class="intention-label">🎯 Намерение на сегодня</div>
+        <div class="intention-text">${data.intention}</div>
+      </div>` : ''}
+      ${focusBlockHtml}
+      <div id="tab-content">
+        ${grouped[tab].length
+          ? `<div class="cards">${grouped[tab].map(renderCard).join('')}</div>`
+          : `<div class="empty">Точки отсутствуют</div>`}
+      </div>`;
+
+    document.getElementById('tabs').addEventListener('click', e => {
+      const btn = e.target.closest('[data-t]');
+      if (!btn) return;
+      tab = btn.dataset.t;
+      render();
+    });
+  }
+  render();
+}
+
+function buildSttScreen(data) {
+  const mName = data.month || MONTHS[new Date().getMonth() + 1];
+  const systemStt = data.system_stt ?? 0;
+  const cleanStt = data.clean_stt ?? 0;
+  const plannedVisits = data.planned_visits ?? 0;
+  const systemOrders = data.system_orders ?? 0;
+  const cleanOrders = data.clean_orders ?? 0;
+  const offRouteOrders = data.off_route_orders ?? 0;
+  const totalAllOrders = data.total_all_orders ?? 0;
+
+  const catsData = data.cat_shares
+    ? Object.entries(data.cat_shares).map(([name, v]) => ({name, pct: v.pct||0, count: v.count||0}))
+    : [];
+
+  const catHtml = catsData.map(c => {
+    return `<div class="cat-stt-card">
+      <div class="cat-stt-name">${c.name}</div>
+      <div class="cat-stt-pct">${c.pct}%</div>
+      <div class="cat-stt-count">${c.count} заказов</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('screen-stt').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div class="header-name">Мой СТТ</div>
+        <div class="header-date">${mName}</div>
+      </div>
+    </div>
+    <div class="stt-screen">
+      <div class="stt-top-label">${mName} · план визитов ${plannedVisits}</div>
+
+      <div class="stt-formula-row">
+        <div class="stt-block">
+          <div class="stt-block-label">Системная дистрибуция</div>
+          <div class="stt-block-pct" style="color:${colorOf(levelOf(systemStt))}">${systemStt}%</div>
+          <div class="stt-block-sub">${systemOrders} заказ${systemOrders===1?'':'а'}</div>
+        </div>
+        <div class="stt-minus">
+          <span class="stt-minus-sign">−</span>
+          <span class="stt-minus-text">${offRouteOrders}<br>вне</span>
+        </div>
+        <div class="stt-block">
+          <div class="stt-block-label">Чистая дистрибуция</div>
+          <div class="stt-block-pct" style="color:${colorOf(levelOf(cleanStt))}">${cleanStt}%</div>
+          <div class="stt-block-sub">${cleanOrders} заказов</div>
+        </div>
+      </div>
+
+      <div class="trio">
+        <div class="trio-item lv-green"><div class="trio-n">${data.green??0}</div><div class="trio-lbl">В системе</div></div>
+        <div class="trio-item lv-yellow"><div class="trio-n">${data.yellow??0}</div><div class="trio-lbl">Потенциал</div></div>
+        <div class="trio-item lv-red"><div class="trio-n">${data.red??0}</div><div class="trio-lbl">Провал</div></div>
+      </div>
+
+      <div class="cats-header">
+        <span class="sec-title">Доля заказов по категориям</span>
+        <span class="cats-total">всего ${totalAllOrders}</span>
+      </div>
+      <div class="cats-stt">${catHtml}</div>
+    </div>`;
+}
+
+function buildHistoryScreen(data) {
+  const months = data.history || data.months || [];
+  let trendHtml = '';
+  const tr = data.trend;
+  if (tr && typeof tr === 'object') {
+    const avg = tr.avg_per_month;
+    const mtg = tr.months_to_goal;
+    const cur = tr.current_stt;
+    let arrow, avgText, goalText;
+
+    if (cur >= 75) {
+      trendHtml = `<div class="trend-banner"><span class="trend-arrow">✅</span><span class="trend-text">Цель 75% достигнута</span></div>`;
+    } else {
+      arrow = avg >= 0 ? '↗' : '↘';
+      avgText = avg >= 0 ? `+${avg}% в мес` : `${avg}% в мес`;
+      if (mtg === null || mtg === undefined) {
+        goalText = 'до цели — снижение';
+      } else if (mtg === 0) {
+        goalText = 'цель достигнута';
+      } else {
+        goalText = `до цели ${mtg} мес`;
+      }
+      const closedNames = months.filter(m => !m.is_current).map(m => {
+        const parts = (m.month || '').split(' ');
+        return parts[0] || '';
+      }).reverse().join(' → ');
+      const trendSub = closedNames ? `<div style="font-size:11px;color:#3b5bdb;margin-top:2px;">тренд по закрытым: ${closedNames}</div>` : '';
+      trendHtml = `<div class="trend-banner"><span class="trend-arrow">${arrow}</span><div><div class="trend-text">${avgText} · ${goalText}</div>${trendSub}</div></div>`;
+    }
+  } else if (months.length >= 2) {
+    const diff = typeof tr === 'number' ? tr : (months[0].stt - months[months.length-1].stt);
+    const arrow = diff >= 0 ? '↗' : '↘';
+    trendHtml = `<div class="trend-banner"><span class="trend-arrow">${arrow}</span><span class="trend-text">${diff >= 0 ? '+' : ''}${diff}% за период</span></div>`;
+  }
+
+  const monthCards = months.map(mo => {
+    const lv = levelOf(mo.stt);
+    const cleanStt = mo.clean_stt ?? null;
+    const cleanColor = cleanStt === null ? null : (cleanStt < 0 ? '#8B1A1A' : colorOf(levelOf(cleanStt)));
+    const total = (mo.total) || (mo.green||0)+(mo.yellow||0)+(mo.red||0);
+    const gn = mo.green || mo.green_n || 0;
+    const yn = mo.yellow || mo.yellow_n || 0;
+    const rn = mo.red || mo.red_n || 0;
+    const notInRoute = mo.not_in_route || 0;
+    const notWorked = mo.not_worked || 0;
+    const gf = total ? gn/total*100 : 0;
+    const yf = total ? yn/total*100 : 0;
+    const rf = total ? rn/total*100 : 0;
+    const mName = mo.month || MONTHS[mo.month_num] || mo.month_label || '';
+    const isCurrent = mo.is_current;
+    return `<div class="month-card">
+      <div class="month-row">
+        <div class="month-name">${mName}${isCurrent ? ' <span style="font-size:10px;color:#6b7280;font-weight:400">· в процессе</span>' : ''}</div>
+        <div class="month-pct-wrap">
+          <div class="month-pct" style="color:${colorOf(lv)}">${mo.stt}%</div>
+          ${cleanStt === null ? '' : `<div class="month-clean" style="color:${cleanColor}">чистая ${cleanStt}%</div>`}
+        </div>
+      </div>
+      <div class="seg-bar">
+        <div class="seg" style="flex:${gf};background:#4caf50"></div>
+        <div class="seg" style="flex:${yf};background:#f59e0b"></div>
+        <div class="seg" style="flex:${rf};background:#ef4444"></div>
+      </div>
+      <div class="month-leg">
+        <span class="leg-item"><span class="leg-dot" style="background:#4caf50"></span>${gn} в сис.</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>${yn} пот.</span>
+        <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>${rn} пров.</span>
+        ${notInRoute > 0 ? `<span class="leg-item leg-item-muted"><span class="leg-dot" style="background:#c7c2b8"></span>${notInRoute} не в маршруте</span>` : ''}
+        ${notWorked > 0 ? `<span class="leg-item leg-item-warn"><span class="leg-dot" style="background:#b35c5c"></span>${notWorked} не сработало</span>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  const currentStt = (typeof tr === 'object' && tr) ? tr.current_stt : (months[0]?.stt || 0);
+  const goalPct = Math.min(100, Math.round(currentStt / 75 * 100));
+  const goalBarHtml = `<div class="goal-bar-wrap">
+    <div class="goal-bar-track">
+      <div class="goal-bar-fill" style="width:${goalPct}%"></div>
+      <div class="goal-marker"></div>
+    </div>
+    <div class="goal-label">цель 75%</div>
+  </div>`;
+
+  document.getElementById('screen-history').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div class="header-name">История</div>
+        <div class="header-date">4 месяца</div>
+      </div>
+    </div>
+    <div class="hist-screen">
+      ${trendHtml}
+      ${goalBarHtml}
+      ${monthCards||'<div class="empty">Данные отсутствуют</div>'}
+    </div>`;
+}
 
 
-def json_response(data):
-    return JSONResponse(
-        content=data,
-        media_type="application/json; charset=utf-8"
-    )
+function buildDayScreen(data) {
+  if (!data || !data.my) {
+    document.getElementById('screen-day').innerHTML = '<div class="empty">Данные итога дня недоступны</div>';
+    return;
+  }
+
+  const my = data.my;
+  const focusPts = data.focus_points || [];
+  const team = data.team || [];
+
+  const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
+  const myHtml = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${my.planned}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">плановых</div></div>
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${my.orders} <span style="font-size:13px;color:var(--red);font-weight:700">−${my.off} вне</span></div><div style="font-size:10px;color:var(--muted);margin-top:2px">заказов</div></div>
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.sys_stt))}">${my.sys_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">системная</div></div>
+      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.clean_stt))}">${my.clean_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">чистая</div></div>
+    </div>`;
+
+  const focusHtml = focusPts.length > 0
+    ? focusPts.map((p, i) => {
+        const res = p.had_order
+          ? '<span style="color:#2D5A1B;font-weight:700;font-size:15px;flex-shrink:0">✓</span>'
+          : '<span style="color:#8B1A1A;font-weight:700;font-size:15px;flex-shrink:0">✕</span>';
+        const cl = p.client ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${p.client}</div>` : '';
+        const border = i < focusPts.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+        return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;${border}gap:8px">
+          <div><div style="font-size:12px;font-weight:600;line-height:1.3">${p.name}</div>${cl}</div>${res}</div>`;
+      }).join('')
+    : '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет точек контроля от СВ</div>';
+
+  const teamHtml = team.map((a, i) => {
+    const short = a.name.split(' ').slice(0,2).join(' ');
+    const col = colorOf(levelOf(a.clean_stt));
+    const dotCol = a.level === 'green' ? '#2D5A1B' : a.level === 'yellow' ? '#8B6914' : '#8B1A1A';
+    const border = i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${border}gap:6px;font-size:12px">
+      <span style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;display:inline-block"></span>
+      <span style="flex:1;font-weight:500;color:#1e1b4b">${short}</span>
+      <span style="color:#6366F1;font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
+      <span style="font-weight:700;font-size:13px;color:${col};min-width:36px;text-align:right">${a.clean_stt}%</span>
+    </div>`;
+  }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет данных по команде</div>';
+
+  const cardStyle = 'background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);';
+  const labelStyle = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;';
+
+  document.getElementById('screen-day').innerHTML = `
+    <div class="header">
+      <div class="header-top">
+        <div class="header-name">Итог дня</div>
+        <div class="header-date">${formatDate()}</div>
+      </div>
+    </div>
+    <div style="padding:12px 16px 80px">
+      <div style="${cardStyle}">
+        <span style="${labelStyle}">Мой итог</span>
+        ${myHtml}
+      </div>
+      <div style="${cardStyle}">
+        <span style="${labelStyle}">⚠️ Точки фокуса СВ — выполнено?</span>
+        ${focusHtml}
+      </div>
+      <div style="background:#EEF2FF;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #C7D2FE;">
+        <details open>
+          <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+            <span style="font-size:13px;font-weight:700;color:#3730A3">👥 Команда сегодня</span>
+            <span style="font-size:10px;color:#6366F1">▶</span>
+          </summary>
+          <div style="padding-top:8px">${teamHtml}</div>
+        </details>
+      </div>
+    </div>`;
+}
 
 
-def get_user_and_company(telegram_id: str):
-    company = companies.find_company_by_telegram_id(telegram_id)
-    if company is None:
-        return None, None
-    structure = company.load_structure()
-    users = structure.get('users', {})
-    user = users.get(telegram_id)
-    return user, company
+function activateScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-screen="${name}"]`).classList.add('active');
+}
 
+async function main() {
+  const id = getTelegramId();
+  const urlParams = new URLSearchParams(window.location.search);
+  const startScreen = urlParams.get('screen') || 'route';
 
-# ============================================================
-# СУЩЕСТВУЮЩИЕ ЭНДПОИНТЫ ТП (без изменений)
-# ============================================================
+  document.getElementById('app').innerHTML = `
+    <div id="screen-route" class="screen ${startScreen==='route'?'active':''}"></div>
+    <div id="screen-stt"   class="screen ${startScreen==='stt'?'active':''}"></div>
+    <div id="screen-history" class="screen ${startScreen==='history'?'active':''}"></div>
+    <div id="screen-day" class="screen ${startScreen==='day'?'active':''}"></div>
+    <nav class="nav">
+      <button class="nav-btn ${startScreen==='route'?'active':''}" data-screen="route" onclick="activateScreen('route')">
+        <span class="nav-icon">📍</span>Маршрут
+      </button>
+      <button class="nav-btn ${startScreen==='stt'?'active':''}" data-screen="stt" onclick="activateScreen('stt')">
+        <span class="nav-icon">📊</span>Мой СТТ
+      </button>
+      <button class="nav-btn ${startScreen==='history'?'active':''}" data-screen="history" onclick="activateScreen('history')">
+        <span class="nav-icon">🕐</span>История
+      </button>
+      <button class="nav-btn ${startScreen==='day'?'active':''}" data-screen="day" onclick="activateScreen('day')">
+        <span class="nav-icon">📋</span>Итог дня
+      </button>
+    </nav>`;
 
-@app.get("/api/agent/{telegram_id}/today")
-async def agent_today(telegram_id: str):
-    user, company = get_user_and_company(telegram_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    today = date.today()
-    points = stt_module.get_agent_today_points(company, user['name'], today)
-
-    responses = company.load_form_responses()
-    response = responses.get(telegram_id, {})
-
-    yesterday = today - timedelta(days=1)
-    response_date = response.get('response_date')
-
-    if response_date == yesterday:
-        potential = response.get('potential', '')
-        intention_lines = [line.strip() for line in potential.split(',') if line.strip()]
-        intention = '\n'.join(f"🎯 {line}" for line in intention_lines) if intention_lines else "Не указал"
-    else:
-        intention = "Не указал"
-
-    cnt = Counter(p['level'] for p in points)
-    total_orders = sum(p['orders'] for p in points)
-    total_planned = sum(p['total_planned'] for p in points)
-    total_stt = int(round(total_orders / total_planned * 100, 0)) if total_planned else 0
-
-    weekdays = ['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье']
-
-    return json_response({
-        'agent': user['name'],
-        'date': today.strftime('%d.%m.%Y'),
-        'weekday': weekdays[today.weekday()],
-        'total': len(points),
-        'green': cnt.get('🟢', 0),
-        'yellow': cnt.get('🟡', 0),
-        'red': cnt.get('🔴', 0),
-        'stt': total_stt,
-        'intention': intention,
-        'points': points
-    })
-
-
-@app.get("/api/agent/{telegram_id}/stt")
-async def agent_stt(telegram_id: str):
-    user, company = get_user_and_company(telegram_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    today = date.today()
-    month = today.month
-    year = today.year
-    yesterday = today.day - 1
-
-    plan_data = company.load_plan(month, year)
-    fact_data = company.load_fact(month, year, yesterday)
-    plan = plan_data.get('plan', {})
-
-    all_points = []
-    for (agent, tt), info in plan.items():
-        if agent != user['name']:
-            continue
-        r = stt_module.calc_point_stt(company, agent, tt, today, plan_data, fact_data)
-        if r:
-            all_points.append(r)
-
-    cnt = Counter(p['level'] for p in all_points)
-    total_orders = sum(p['orders'] for p in all_points)
-    total_planned_sum = sum(p['total_planned'] for p in all_points)
-    total_stt = int(round(total_orders / total_planned_sum * 100, 0)) if total_planned_sum else 0
-
-    off_schedule_total = sum(p.get('off_schedule_orders', 0) for p in all_points)
-    distribution = stt_module.calc_agent_distribution(company, user['name'], today, plan_data, fact_data)
-    outside_plan_orders = max(0, distribution['total_all_orders'] - total_orders - off_schedule_total)
-    off_route_total = off_schedule_total + outside_plan_orders
-    clean_orders = max(0, total_orders - off_route_total)
-    clean_stt = int(round(clean_orders / total_planned_sum * 100, 0)) if total_planned_sum else 0
-
-    weeks = _calc_weekly(all_points, today)
-
-    return json_response({
-        'agent': user['name'],
-        'month': _month_name(today.month, today.year),
-        'planned_visits': total_planned_sum,
-        'system_orders': total_orders,
-        'system_stt': total_stt,
-        'off_route_orders': off_route_total,
-        'clean_orders': clean_orders,
-        'clean_stt': clean_stt,
-        'green': cnt.get('🟢', 0),
-        'yellow': cnt.get('🟡', 0),
-        'red': cnt.get('🔴', 0),
-        'total': len(all_points),
-        'total_all_orders': distribution['total_all_orders'],
-        'cat_shares': distribution['cat_shares'],
-        'weeks': weeks
-    })
-
-
-@app.get("/api/agent/{telegram_id}/history")
-async def agent_history(telegram_id: str):
-    user, company = get_user_and_company(telegram_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    today = date.today()
-    history = []
-
-    for i in range(4):
-        month = today.month - i
-        year = today.year
-        if month <= 0:
-            month += 12
-            year -= 1
-
-        if month == 12:
-            last_day = 31
-        else:
-            last_day = (date(year, month + 1, 1) - timedelta(days=1)).day
-
-        is_current = (i == 0)
-        up_to = today.day - 1 if is_current else last_day
-        if up_to <= 0:
-            up_to = 1
-
-        plan_data = company.load_plan(month, year)
-        fact_data = company.load_fact(month, year, up_to)
-        plan = plan_data.get('plan', {})
-
-        class _CalcDate:
-            def __init__(self, year, month, day):
-                self.year = year
-                self.month = month
-                self.day = day
-
-        calc_date = today if is_current else _CalcDate(year, month, up_to + 1)
-        all_points = []
-        for (agent, tt), info in plan.items():
-            if agent != user['name']:
-                continue
-            r = stt_module.calc_point_stt(company, agent, tt, calc_date, plan_data, fact_data)
-            if r:
-                all_points.append(r)
-
-        cnt = Counter(p['level'] for p in all_points)
-        total_orders = sum(p['orders'] for p in all_points)
-        total_planned = sum(p['total_planned'] for p in all_points)
-        month_stt = int(round(total_orders / total_planned * 100, 0)) if total_planned else 0
-
-        off_schedule_total = sum(p.get('off_schedule_orders', 0) for p in all_points)
-        distribution = stt_module.calc_agent_distribution(company, user['name'], calc_date, plan_data, fact_data)
-        outside_plan_orders = max(0, distribution['total_all_orders'] - total_orders - off_schedule_total)
-        off_route_total = off_schedule_total + outside_plan_orders
-        clean_orders = max(0, total_orders - off_route_total)
-        clean_stt = int(round(clean_orders / total_planned * 100, 0)) if total_planned else 0
-
-        plan_tt_codes = {info.get('tt_code', '') for (agent, tt), info in plan.items() if agent == user['name']}
-        orders_by_code = fact_data.get('orders', {})
-        outside_plan_tt_codes = set()
-        for (a, tt_code), day_cats in orders_by_code.items():
-            if a != user['name'] or tt_code in plan_tt_codes:
-                continue
-            if any(day <= up_to for day in day_cats.keys()):
-                outside_plan_tt_codes.add(tt_code)
-        off_schedule_tt_count = sum(1 for p in all_points if p.get('off_schedule_orders', 0) > 0)
-        not_in_route_points = len(outside_plan_tt_codes) + off_schedule_tt_count
-        not_worked_points = sum(
-            1 for p in all_points
-            if p.get('orders', 0) == 0 and p.get('off_schedule_orders', 0) == 0
-        )
-
-        history.append({
-            'month': _month_name(month, year),
-            'stt': month_stt,
-            'clean_stt': clean_stt,
-            'green': cnt.get('🟢', 0),
-            'yellow': cnt.get('🟡', 0),
-            'red': cnt.get('🔴', 0),
-            'not_in_route': not_in_route_points,
-            'not_worked': not_worked_points,
-            'total': len(all_points),
-            'is_current': is_current
-        })
-
-    closed = [h for h in history if not h['is_current']]
-    trend_info = _calc_trend(closed, history[0]['clean_stt'])
-
-    return json_response({
-        'agent': user['name'],
-        'trend': trend_info,
-        'history': history
-    })
-
-
-# ============================================================
-# НОВЫЕ ЭНДПОИНТЫ — ДАШБОРД СВ
-# ============================================================
-
-@app.get("/api/sv/{telegram_id}/route")
-async def sv_route(telegram_id: str):
-    """
-    Вкладка «Маршрут» — точки контроля на сегодня.
-    Возвращает список агентов с проблемными точками и блок ИИ-коуча.
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user or user.get('role') != 'sv':
-        raise HTTPException(status_code=404, detail="SV not found")
-
-    today = date.today()
-    summary = stt_module.get_sv_today_summary(company, user['name'], today)
-
-    # Загружаем ответы опросника за вчера
-    bot_responses = company.load_bot_responses(days_back=2)
-
-    agents_out = []
-    for agent_name, agent_data in summary['agents'].items():
-        points = agent_data['points']
-
-        # Считаем пропуски подряд для каждой точки
-        problem_points = []
-        for p in points:
-            missed_streak = _calc_missed_streak(p.get('sequence', []))
-            off_route = p.get('off_schedule_orders', 0)
-
-            # Попадает в список если: 2+ пропуска подряд ИЛИ есть вне маршрута
-            if missed_streak >= 2 or off_route > 0:
-                problem_points.append({
-                    'name': p['tt_short'],
-                    'client': p.get('client', ''),
-                    'missed_2': missed_streak == 2,
-                    'missed_3plus': missed_streak >= 3,
-                    'off_route': off_route,
-                })
-
-        if not problem_points:
-            continue
-
-        # Severity для цветовой полосы слева
-        has_3plus = any(p['missed_3plus'] for p in problem_points)
-        severity = 'high' if has_3plus else 'mid'
-
-        # Блок ИИ-коуча — последний ответ агента за вчера
-        agent_tg_id = _find_agent_tg_id(company, agent_name)
-        survey = _build_survey_block(bot_responses, agent_tg_id, today)
-
-        agents_out.append({
-            'name': agent_name,
-            'severity': severity,
-            'survey': survey,
-            'points': problem_points,
-        })
-
-    # Сортировка: high первые, затем по количеству точек
-    agents_out.sort(key=lambda a: (0 if a['severity'] == 'high' else 1, -len(a['points'])))
-
-    # Рекомендация «с кем выехать»
-    ride_with = None
-    if agents_out:
-        top = agents_out[0]
-        reason_parts = []
-        if len(top['points']) > 1:
-            reason_parts.append(f"{len(top['points'])} не системные точки")
-        else:
-            reason_parts.append("1 не системная точка")
-        if top['severity'] == 'high':
-            reason_parts.append("есть 3+ пропуска подряд")
-        ride_with = {
-            'agent': top['name'],
-            'reason': ' · '.join(reason_parts),
+  const DEMO = {
+    today: {
+      agent_name: 'Гребінник Ігор',
+      intention: 'Строго выполню маршрут без пропусков',
+      points: [
+        {
+          address: 'с. Шамраївка, вул. Центральна, Буд. 10А',
+          client: 'ЧАЛА ЛЮДМИЛА ВАЛЕНТИНІВНА',
+          stt: 25, visits_done: 2, visits_total: 8, misses: 0,
+          off_schedule_orders: 2,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'need', need:4, remaining:6},
+          cats: [{name:'Варенные',pct:25,misses:0},{name:'Н/К',pct:25,misses:0},{name:'С/К',pct:0,misses:2}]
+        },
+        {
+          address: 'м. Богуслав, вул. Фрунзе, Буд. 99Б',
+          client: 'ФОП КОВАЛЕНКО В.С.',
+          stt: 0, visits_done: 3, visits_total: 8, misses: 3,
+          visits: [
+            {has_order:false,is_future:false},{has_order:false,is_future:false},{has_order:false,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'unreachable', need:6, remaining:5},
+          cats: [{name:'Варенные',pct:0,misses:3},{name:'Н/К',pct:0,misses:3},{name:'С/К',pct:0,misses:3}]
+        },
+        {
+          address: 'м. Богуслав, вул. Салія, Буд. 41',
+          client: 'ФОП БОНДАРЕНКО С.М.',
+          stt: 62, visits_done: 4, visits_total: 8, misses: 1,
+          off_schedule_orders: 1,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'need', need:2, remaining:4},
+          cats: [{name:'Варенные',pct:75,misses:0},{name:'Н/К',pct:62,misses:1},{name:'С/К',pct:37,misses:2}]
+        },
+        {
+          address: 'с. Воронків, вул. Центральна, Буд. 2',
+          client: 'ФОП БОРЯК В.С.',
+          stt: 75, visits_done: 4, visits_total: 8, misses: 0,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'achieved'},
+          cats: [{name:'Варенные',pct:75,misses:0},{name:'Н/К',pct:75,misses:0},{name:'С/К',pct:75,misses:0}]
+        },
+        {
+          address: 'м. Миронівка, вул. Шевченка, Буд. 5',
+          client: 'ФОП МЕЛЬНИК О.В.',
+          stt: 87, visits_done: 4, visits_total: 8, misses: 0,
+          visits: [
+            {has_order:true,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:false},{has_order:true,is_future:false},
+            {has_order:false,is_future:true},{has_order:false,is_future:true},
+            {has_order:false,is_future:true},{has_order:false,is_future:true}
+          ],
+          hint: {type:'achieved'},
+          cats: [{name:'Варенные',pct:87,misses:0},{name:'Н/К',pct:75,misses:0},{name:'С/К',pct:87,misses:0}]
         }
-
-    return json_response({
-        'sv_name': user['name'],
-        'date': today.strftime('%d.%m.%Y'),
-        'summary': {
-            'total_points': sum(len(a['points']) for a in agents_out),
-            'agents_count': len(agents_out),
-        },
-        'ride_with': ride_with,
-        'agents': agents_out,
-    })
-
-
-@app.get("/api/sv/{telegram_id}/stt")
-async def sv_stt(telegram_id: str):
-    """
-    Вкладка «СТТ» — итог по команде, рейтинг агентов, тренд по неделям.
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user or user.get('role') != 'sv':
-        raise HTTPException(status_code=404, detail="SV not found")
-
-    today = date.today()
-    month = today.month
-    year = today.year
-    yesterday = today.day - 1
-
-    structure = company.load_structure()
-
-    # Список агентов команды СВ (из Структуры)
-    team_agents = {
-        u['name'] for u in structure.get('users', {}).values()
-        if u.get('role') == 'agent' and u.get('sv') == user['name']
+      ]
+    },
+    stt: {
+      month: 'Июнь 2026',
+      planned_visits: 100,
+      system_orders: 41,
+      system_stt: 41,
+      off_route_orders: 9,
+      clean_orders: 32,
+      clean_stt: 32,
+      green: 5, yellow: 8, red: 11,
+      total_all_orders: 100,
+      cat_shares: {
+        'Варенные': {pct:50, count:50},
+        'Н/К': {pct:38, count:38},
+        'С/К': {pct:62, count:62}
+      }
+    },
+    history: {
+      trend: {
+        avg_per_month: 4,
+        months_to_goal: 9,
+        current_stt: 41,
+        direction: 'up'
+      },
+      months: [
+        {month_num:6, stt:41, clean_stt:32, green_n:5,  yellow_n:8,  red_n:11, not_in_route:7, not_worked:3, is_current:true},
+        {month_num:5, stt:58, clean_stt:48, green_n:9,  yellow_n:7,  red_n:8,  not_in_route:3, not_worked:0},
+        {month_num:4, stt:23, clean_stt:-4, green_n:3,  yellow_n:5,  red_n:16, not_in_route:9, not_worked:6},
+        {month_num:3, stt:31, clean_stt:19, green_n:4,  yellow_n:6,  red_n:14, not_in_route:5, not_worked:2}
+      ]
     }
-
-    plan_data = company.load_plan(month, year)
-    fact_data = company.load_fact(month, year, yesterday)
-    plan = plan_data.get('plan', {})
-
-    # Собираем все точки команды
-    all_points = []
-    agent_points = defaultdict(list)
-
-    for (agent, tt), info in plan.items():
-        if agent not in team_agents:
-            continue
-        r = stt_module.calc_point_stt(company, agent, tt, today, plan_data, fact_data)
-        if r:
-            all_points.append(r)
-            agent_points[agent].append(r)
-
-    # Итог по команде
-    total_orders = sum(p['orders'] for p in all_points)
-    total_planned = sum(p['total_planned'] for p in all_points)
-    system_stt = int(round(total_orders / total_planned * 100, 0)) if total_planned else 0
-
-    # Вне маршрута — оба критерия (уникальные заказы)
-    off_route_total = _calc_team_off_route(plan, fact_data, team_agents)
-    clean_orders = max(0, total_orders - off_route_total)
-    clean_stt = int(round(clean_orders / total_planned * 100, 0)) if total_planned else 0
-
-    # Категории по команде
-    cat_totals = defaultdict(int)
-    cat_orders_total = defaultdict(int)
-    for p in all_points:
-        for cat, pct in p.get('cat_stts', {}).items():
-            cat_totals[cat] += p['total_planned']
-            cat_orders_total[cat] += int(round(pct * p['total_planned'] / 100))
-    categories = [
-        {'name': cat, 'pct': int(round(cat_orders_total[cat] / cat_totals[cat] * 100)) if cat_totals[cat] else 0}
-        for cat in cat_totals
-    ]
-
-    # Рейтинг агентов (по чистой дистрибуции)
-    rating = []
-    for agent, points in agent_points.items():
-        a_orders = sum(p['orders'] for p in points)
-        a_planned = sum(p['total_planned'] for p in points)
-        a_off = _calc_agent_off_route(plan, fact_data, agent)
-        a_sys = int(round(a_orders / a_planned * 100, 0)) if a_planned else 0
-        a_clean = int(round(max(0, a_orders - a_off) / a_planned * 100, 0)) if a_planned else 0
-        level = 'green' if a_clean >= 75 else 'yellow' if a_clean >= 50 else 'red'
-        rating.append({'agent': agent, 'sys': a_sys, 'net': a_clean, 'dot': level, 'planned': a_planned, 'orders': a_orders, 'off': a_off})
-
-    rating.sort(key=lambda x: -x['net'])
-    for i, r in enumerate(rating):
-        r['rank'] = i + 1
-
-    # Тренд по неделям
-    trend_weeks = _calc_team_weekly(all_points, today, plan_data, fact_data, team_agents)
-
-    # Дельта тренда
-    filled_weeks = [w for w in trend_weeks if w['clean_stt'] is not None]
-    trend_delta = None
-    if len(filled_weeks) >= 2:
-        trend_delta = round(filled_weeks[-1]['clean_stt'] - filled_weeks[0]['clean_stt'], 1)
-
-    return json_response({
-        'month': _month_name(month, year),
-        'planned_visits': total_planned,
-        'system_stt': system_stt,
-        'system_orders': total_orders,
-        'off_route': off_route_total,
-        'clean_stt': clean_stt,
-        'clean_orders': clean_orders,
-        'categories': categories,
-        'rating': rating,
-        'trend_weeks': trend_weeks,
-        'trend_delta': trend_delta,
-    })
-
-
-@app.get("/api/sv/{telegram_id}/history")
-async def sv_history(telegram_id: str):
-    """
-    Вкладка «История» — 4 месяца команды, тренд по чистой.
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user or user.get('role') != 'sv':
-        raise HTTPException(status_code=404, detail="SV not found")
-
-    today = date.today()
-    structure = company.load_structure()
-
-    # Список агентов команды СВ (из Структуры)
-    team_agents = {
-        u['name'] for u in structure.get('users', {}).values()
-        if u.get('role') == 'agent' and u.get('sv') == user['name']
-    }
-
-    history = []
-
-    for i in range(4):
-        month = today.month - i
-        year = today.year
-        if month <= 0:
-            month += 12
-            year -= 1
-
-        if month == 12:
-            last_day = 31
-        else:
-            last_day = (date(year, month + 1, 1) - timedelta(days=1)).day
-
-        is_current = (i == 0)
-        up_to = today.day - 1 if is_current else last_day
-        if up_to <= 0:
-            up_to = 1
-
-        plan_data = company.load_plan(month, year)
-        fact_data = company.load_fact(month, year, up_to)
-        plan = plan_data.get('plan', {})
-
-        class _CalcDate:
-            def __init__(self, y, m, d):
-                self.year = y; self.month = m; self.day = d
-
-        calc_date = today if is_current else _CalcDate(year, month, up_to + 1)
-
-        all_points = []
-        for (agent, tt), info in plan.items():
-            if agent not in team_agents:
-                continue
-            r = stt_module.calc_point_stt(company, agent, tt, calc_date, plan_data, fact_data)
-            if r:
-                all_points.append(r)
-
-        cnt = Counter(p['level'] for p in all_points)
-        total_orders = sum(p['orders'] for p in all_points)
-        total_planned = sum(p['total_planned'] for p in all_points)
-        month_stt = int(round(total_orders / total_planned * 100, 0)) if total_planned else 0
-
-        off_route = sum(p.get('off_schedule_orders', 0) for p in all_points)
-        clean_orders = max(0, total_orders - off_route)
-        clean_stt = int(round(clean_orders / total_planned * 100, 0)) if total_planned else 0
-
-        not_in_route = sum(1 for p in all_points if p.get('off_schedule_orders', 0) > 0)
-        not_worked = sum(1 for p in all_points if p.get('orders', 0) == 0 and p.get('off_schedule_orders', 0) == 0)
-
-        history.append({
-            'month': _month_name(month, year),
-            'stt': month_stt,
-            'clean_stt': clean_stt,
-            'green': cnt.get('🟢', 0),
-            'yellow': cnt.get('🟡', 0),
-            'red': cnt.get('🔴', 0),
-            'not_in_route': not_in_route,
-            'not_worked': not_worked,
-            'is_current': is_current,
-        })
-
-    closed = [h for h in history if not h['is_current']]
-    trend = _calc_trend(closed, history[0]['clean_stt'])
-
-    return json_response({
-        'sv_name': user['name'],
-        'trend': trend,
-        'history': history,
-    })
-
-
-@app.get("/api/sv/{telegram_id}/coach/week")
-async def sv_coach_week(telegram_id: str):
-    """
-    Вкладка «ИИ-коуч» — недельная сводка команды.
-    Статусы агентов, паттерны, тема обучения.
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user or user.get('role') != 'sv':
-        raise HTTPException(status_code=404, detail="SV not found")
-
-    today = date.today()
-    structure = company.load_structure()
-
-    # Все агенты команды СВ (из Структуры)
-    team_agents = {}
-    for tg_id, u in structure.get('users', {}).items():
-        if u.get('role') == 'agent' and u.get('sv') == user['name']:
-                team_agents[tg_id] = u['name']
-
-    # Ответы за 7 дней
-    bot_responses = company.load_bot_responses(days_back=7)
-
-    agents_out = []
-    status_counts = {'Действует': 0, 'Растёт': 0, 'Ждёт': 0, 'Нет данных': 0}
-
-    for tg_id, agent_name in team_agents.items():
-        responses = bot_responses.get(tg_id, [])
-
-        # Берём последние 5 оценок (от старых к новым)
-        scores_raw = [r['ai_score'] for r in reversed(responses) if r['ai_score'] is not None]
-        scores_5 = scores_raw[-5:] if len(scores_raw) >= 5 else scores_raw
-
-        # Дополняем None если меньше 5 дней
-        while len(scores_5) < 5:
-            scores_5.insert(0, None)
-
-        status = coach_module.calc_agent_status(scores_5)
-        color = coach_module.agent_status_color(status)
-        status_counts[status] = status_counts.get(status, 0) + 1
-
-        # Паттерн — последний reasoning от ИИ
-        pattern = None
-        for r in responses:
-            if r.get('ai_reasoning'):
-                pattern = r['ai_reasoning']
-                break
-
-        agents_out.append({
-            'name': agent_name,
-            'status': status,
-            'status_color': color,
-            'trend_dots': scores_5,
-            'pattern': pattern or 'Нет данных за неделю',
-        })
-
-    # Сортировка: сначала «Ждёт», потом «Растёт», потом «Действует»
-    status_order = {'Ждёт': 0, 'Растёт': 1, 'Действует': 2, 'Нет данных': 3}
-    agents_out.sort(key=lambda a: status_order.get(a['status'], 9))
-
-    # Тема обучения — генерируется отдельно кнопкой на фронтенде
-    # Здесь передаём сырые паттерны для генерации
-    all_patterns = []
-    for tg_id, responses in bot_responses.items():
-        if tg_id in team_agents:
-            for r in responses:
-                if r.get('obstacle'):
-                    all_patterns.append({
-                        'agent': team_agents[tg_id],
-                        'obstacle': r['obstacle'],
-                        'ai_score': r['ai_score'],
-                        'ai_status': r['ai_status'],
-                    })
-
-    today_str = today.strftime('%d.%m.%Y')
-    week_start = (today - timedelta(days=6)).strftime('%d.%m')
-    week_end = today.strftime('%d.%m')
-
-    return json_response({
-        'period': f"{week_start}–{week_end}",
-        'team_summary': {
-            'acts': status_counts.get('Действует', 0),
-            'grows': status_counts.get('Растёт', 0),
-            'waits': status_counts.get('Ждёт', 0),
-        },
-        'agents': agents_out,
-        'patterns_for_topic': all_patterns,
-    })
-
-
-@app.post("/api/sv/{telegram_id}/coach/feedback")
-async def sv_coach_feedback(telegram_id: str, conducted: bool, rating: str, topic: str = ''):
-    """
-    Обратная связь СВ после встречи:
-    - conducted: True/False — провёл ли встречу по программе
-    - rating: 'up' или 'down' — практичность программы
-    - topic: тема встречи
-    Пишет в лист «Ответы СВ» (создаётся автоматически если нет).
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user or user.get('role') != 'sv':
-        raise HTTPException(status_code=404, detail="SV not found")
-
-    today = date.today()
-
-    try:
-        sh = company._open()
-        try:
-            ws = sh.worksheet("Ответы СВ")
-        except Exception:
-            # Создаём лист если не существует
-            ws = sh.add_worksheet(title="Ответы СВ", rows=1000, cols=6)
-            ws.append_row(['timestamp', 'sv_name', 'date', 'conducted', 'rating', 'topic'])
-
-        from datetime import datetime
-        ws.append_row([
-            datetime.now().strftime('%d.%m.%Y %H:%M:%S'),
-            user['name'],
-            today.strftime('%d.%m.%Y'),
-            'да' if conducted else 'нет',
-            rating,
-            topic,
-        ], value_input_option='USER_ENTERED')
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Ошибка записи: {e}")
-
-    return json_response({'ok': True})
-
-
-@app.get("/api/role/{telegram_id}")
-async def get_role(telegram_id: str):
-    """
-    Определяет роль пользователя — для Mini App чтобы показать
-    нужный набор экранов (agent → 3 экрана, sv → 4 вкладки).
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    return json_response({
-        'role': user.get('role', 'agent'),
-        'name': user.get('name', ''),
-    })
-
-
-# ============================================================
-# ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-# ============================================================
-
-def _calc_agent_off_route(plan, fact_data, agent_name: str) -> int:
-    """
-    Считает уникальные заказы вне маршрута для одного агента.
-    Критерий 1: заказ на плановую точку в неплановый день.
-    Критерий 2: заказ на точку которой нет в плане агента.
-    """
-    from stt import get_calendar
-    orders = fact_data.get('orders', {})
-
-    # Строим карту: tt_code → плановые дни агента
-    agent_plan_map = {}
-    for (a, tt), info in plan.items():
-        if a == agent_name:
-            tc = info.get('tt_code', '')
-            if tc:
-                agent_plan_map[tc] = info.get('days', set())
-
-    # Получаем календарь текущего месяца
-    from datetime import date as _date
-    today = _date.today()
-    cal = stt_module.get_calendar(today.month, today.year)
-
-    off_set = set()
-    for (agent, tt_code), day_cats in orders.items():
-        if agent != agent_name:
-            continue
-        planned_days = agent_plan_map.get(tt_code)
-        for d in day_cats:
-            if planned_days is None:
-                off_set.add((tt_code, d))
-            else:
-                day_name = cal.get(d, '')
-                if day_name not in planned_days:
-                    off_set.add((tt_code, d))
-
-    return len(off_set)
-
-
-def _calc_team_off_route(plan, fact_data, team_agents) -> int:
-    """
-    Считает уникальные заказы вне маршрута для всей команды.
-    """
-    from datetime import date as _date
-    today = _date.today()
-    cal = stt_module.get_calendar(today.month, today.year)
-    orders = fact_data.get('orders', {})
-
-    agent_plan_map = {}
-    for (agent, tt), info in plan.items():
-        if agent in team_agents:
-            tc = info.get('tt_code', '')
-            if tc:
-                if agent not in agent_plan_map:
-                    agent_plan_map[agent] = {}
-                agent_plan_map[agent][tc] = info.get('days', set())
-
-    off_set = set()
-    for (agent, tt_code), day_cats in orders.items():
-        if agent not in team_agents:
-            continue
-        planned_days = agent_plan_map.get(agent, {}).get(tt_code)
-        for d in day_cats:
-            if planned_days is None:
-                off_set.add((agent, tt_code, d))
-            else:
-                day_name = cal.get(d, '')
-                if day_name not in planned_days:
-                    off_set.add((agent, tt_code, d))
-
-    return len(off_set)
-
-
-def _calc_missed_streak(sequence: list) -> int:
-    """
-    Считает количество пропусков ПОДРЯД в конце последовательности визитов.
-    Сквозной счётчик — не сбрасывается по месяцам.
-    sequence: список (day, had_order) от старых к новым.
-    """
-    streak = 0
-    for _, had in reversed(sequence):
-        if not had:
-            streak += 1
-        else:
-            break
-    return streak
-
-
-def _find_agent_tg_id(company, agent_name: str) -> str | None:
-    """Находит Telegram ID агента по имени из структуры."""
-    structure = company.load_structure()
-    for tg_id, user in structure.get('users', {}).items():
-        if user.get('name') == agent_name and user.get('role') == 'agent':
-            return tg_id
-    return None
-
-
-def _build_survey_block(bot_responses: dict, agent_tg_id: str, today) -> dict:
-    """
-    Строит блок опросника для карточки агента на вкладке «Маршрут».
-    Берёт последний ответ агента.
-    """
-    if not agent_tg_id:
-        return {'filled': False, 'date': None}
-
-    responses = bot_responses.get(agent_tg_id, [])
-    if not responses:
-        return {'filled': False, 'date': None}
-
-    last = responses[0]  # новые первыми
-    yesterday = (today - timedelta(days=1)).strftime('%d.%m.%Y')
-
-    return {
-        'filled': True,
-        'date': last['date'],
-        'hard_point': last['hard_point'],
-        'obstacle': last['obstacle'],
-        'action': last['action'],
-        'ai_score': last['ai_score'],
-        'ai_status': last['ai_status'],
-        'ai_reasoning': last['ai_reasoning'],
-        'is_yesterday': last['date'] == yesterday,
-    }
-
-
-def _calc_trend(closed_months, current_stt):
-    if len(closed_months) < 2:
-        return {
-            'avg_per_month': None,
-            'months_to_goal': None,
-            'current_stt': current_stt,
-            'direction': 'neutral'
-        }
-
-    oldest = closed_months[-1]['clean_stt']
-    newest = closed_months[0]['clean_stt']
-    periods = len(closed_months) - 1
-    avg_per_month = round((newest - oldest) / periods, 1)
-
-    if current_stt >= 75:
-        months_to_goal = 0
-    elif avg_per_month <= 0:
-        months_to_goal = None
-    else:
-        months_to_goal = math.ceil((75 - current_stt) / avg_per_month)
-
-    direction = 'up' if avg_per_month > 0 else 'down' if avg_per_month < 0 else 'neutral'
-
-    return {
-        'avg_per_month': avg_per_month,
-        'months_to_goal': months_to_goal,
-        'current_stt': current_stt,
-        'direction': direction
-    }
-
-
-def _month_name(month, year):
-    names = ['Январь','Февраль','Март','Апрель','Май','Июнь',
-             'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
-    return f"{names[month-1]} {year}"
-
-
-def _calc_weekly(points, today):
-    weeks = []
-    for week_num in range(1, 5):
-        week_start = (week_num - 1) * 7 + 1
-        week_end = week_num * 7
-        week_orders = 0
-        week_planned = 0
-        for p in points:
-            for d, had in p['sequence']:
-                if week_start <= d <= week_end:
-                    week_planned += 1
-                    if had:
-                        week_orders += 1
-        week_stt = int(round(week_orders / week_planned * 100, 0)) if week_planned else 0
-        weeks.append({'week': week_num, 'stt': week_stt, 'planned': week_planned})
-    return weeks
-
-
-def _calc_team_weekly(all_points, today, plan_data, fact_data, team_agents):
-    """
-    Тренд по неделям для команды СВ.
-    Плановые — все визиты по календарю (как в итоге месяца).
-    Заказы — системные минус вне маршрута за каждую неделю.
-    """
-    from collections import defaultdict
-    import math as _math
-
-    cal = stt_module.get_calendar(today.month, today.year)
-    plan = plan_data.get('plan', {})
-    orders = fact_data.get('orders', {})
-
-    # Все плановые tt_codes команды
-    team_tt_codes = set()
-    for (agent, tt), info in plan.items():
-        if agent in team_agents:
-            team_tt_codes.add(info.get('tt_code', ''))
-
-    weeks = []
-    for week_num in range(1, 5):
-        week_start = (week_num - 1) * 7 + 1
-        week_end = week_num * 7
-
-        # Дни этой недели по календарю
-        week_days = {d for d, dn in cal.items() if week_start <= d <= week_end}
-
-        # Плановые визиты — все запланированные дни недели из плана
-        week_planned = 0
-        for (agent, tt), info in plan.items():
-            if agent not in team_agents:
-                continue
-            days = info.get('days', set())
-            # Сколько дней недели совпадают с плановыми днями точки
-            week_planned += len(week_days & {d for d, dn in cal.items() if dn in days})
-
-        # Системные заказы — только прошедшие дни
-        week_orders = 0
-        for (agent, tt_code), day_cats in orders.items():
-            if agent not in team_agents:
-                continue
-            for d in day_cats:
-                if week_start <= d <= week_end:
-                    # Проверяем что это плановый визит
-                    agent_plan = {k: v for k, v in plan.items() if k[0] == agent}
-                    for (a, tt), info in agent_plan.items():
-                        if info.get('tt_code') == tt_code:
-                            day_name = cal.get(d, '')
-                            if day_name in info.get('days', set()):
-                                week_orders += 1
-                                break
-
-        # Вне маршрута — оба критерия, только за эту неделю
-        agent_plan_map = {}
-        for (agent, tt), info in plan.items():
-            if agent in team_agents:
-                tc = info.get('tt_code', '')
-                if tc:
-                    if agent not in agent_plan_map:
-                        agent_plan_map[agent] = {}
-                    agent_plan_map[agent][tc] = info.get('days', set())
-
-        week_off_set = set()
-        for (agent, tt_code), day_cats in orders.items():
-            if agent not in team_agents:
-                continue
-            planned_days = agent_plan_map.get(agent, {}).get(tt_code)
-            for d in day_cats:
-                if week_start <= d <= week_end:
-                    if planned_days is None:
-                        week_off_set.add((agent, tt_code, d))
-                    else:
-                        day_name = cal.get(d, '')
-                        if day_name not in planned_days:
-                            week_off_set.add((agent, tt_code, d))
-        week_off = len(week_off_set)
-
-        if week_planned == 0:
-            weeks.append({
-                'week': week_num,
-                'label': _week_label(week_num, today),
-                'clean_stt': None,
-                'week_off': 0,
-                'is_current': week_start <= today.day <= week_end,
-            })
-        else:
-            clean_orders = max(0, week_orders - week_off)
-            clean_stt = int(round(clean_orders / week_planned * 100, 0))
-            weeks.append({
-                'week': week_num,
-                'label': _week_label(week_num, today),
-                'clean_stt': clean_stt,
-                'week_off': week_off,
-                'is_current': week_start <= today.day <= week_end,
-            })
-
-    return weeks
-
-
-def _week_label(week_num, today):
-    month = today.month
-    year = today.year
-    start_day = (week_num - 1) * 7 + 1
-    end_day = min(week_num * 7, 30)
-    return f"{start_day}–{end_day} {_month_name(month, year).split()[0].lower()}"
-
-
-@app.post("/api/sv/generate-program")
-async def sv_generate_program(request: dict):
-    """
-    Проксирует запрос к Claude Sonnet для генерации программы обучения.
-    API-ключ остаётся на сервере — не светится в браузере.
-
-    Body: { "patterns": [...], "topic": "..." }
-    """
-    import httpx
-    import config as cfg
-
-    patterns = request.get("patterns", [])
-    topic = request.get("topic", "работа с возражениями")
-
-    patterns_text = "\n".join(
-        f"— «{p.get('obstacle', '')}» ({p.get('agent', '')}, оценка {p.get('ai_score') or '?'}/3)"
-        for p in patterns[:10]
-    ) or "— данных нет, используй общую тематику"
-
-    prompt = f"""Ты тренер торговых представителей в FMCG дистрибуции.
-
-Тема обучения: «{topic}»
-
-Реальные ответы торговых этой команды за неделю:
-{patterns_text}
-
-Напиши программу обучения РОВНО 4 шага. Требования:
-- Бей точно в реальные паттерны команды
-- Язык простой и конкретный — как говорят в поле, без теории
-- Каждый шаг: короткое название (до 5 слов) + одно конкретное действие которое торговый может сделать завтра
-- Каждый шаг начинается с глагола
-- Максимум 2 предложения на шаг
-- Без вводных слов и заключений
-
-Верни ТОЛЬКО JSON без markdown:
-{{"steps":[{{"num":1,"title":"...","action":"..."}},{{"num":2,"title":"...","action":"..."}},{{"num":3,"title":"...","action":"..."}},{{"num":4,"title":"...","action":"..."}}]}}"""
-
-    headers = {
-        "x-api-key": cfg.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-    }
-    body = {
-        "model": "claude-sonnet-4-6",
-        "max_tokens": 1000,
-        "messages": [{"role": "user", "content": prompt}],
-    }
-
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=headers,
-                json=body,
-            )
-            resp.raise_for_status()
-            data = resp.json()
-
-        text = data["content"][0]["text"].strip()
-        start = text.find('{')
-        end = text.rfind('}') + 1
-        if start == -1 or end == 0:
-            raise ValueError("JSON не найден в ответе")
-
-        import json
-        parsed = json.loads(text[start:end])
-        return json_response(parsed)
-
-    except httpx.HTTPStatusError as e:
-        raise HTTPException(status_code=502, detail=f"Anthropic API error: {e.response.status_code}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-@app.get("/api/sv/{telegram_id}/today")
-async def sv_today(telegram_id: str):
-    """
-    Вкладка «Итог дня» — данные команды за сегодня.
-    Плановых визитов, заказов, вне маршрута, чистая дистрибуция.
-    По каждому агенту: план/факт/вне + точки контроля с результатом.
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user or user.get('role') != 'sv':
-        raise HTTPException(status_code=404, detail="SV not found")
-
-    today = date.today()
-    today_name = stt_module.RU_DAYS[today.weekday()]
-    structure = company.load_structure()
-
-    team_agents = {
-        tg_id: u['name'] for tg_id, u in structure.get('users', {}).items()
-        if u.get('role') == 'agent' and u.get('sv') == user['name']
-    }
-
-    plan_data = company.load_plan(today.month, today.year)
-    fact_data = company.load_fact(today.month, today.year, today.day)
-    plan = plan_data.get('plan', {})
-    orders = fact_data.get('orders', {})
-    cal = stt_module.get_calendar(today.month, today.year)
-
-    # Утренние точки контроля (проблемные точки команды сегодня)
-    morning_summary = stt_module.get_sv_today_summary(company, user['name'], today)
-
-    # По каждому агенту считаем данные за сегодня
-    agents_out = []
-    team_planned_today = 0
-    team_orders_today = 0
-    team_off_today = 0
-
-    for tg_id, agent_name in team_agents.items():
-        # Плановые точки агента сегодня
-        agent_planned_today = []
-        for (agent, tt), info in plan.items():
-            if agent != agent_name:
-                continue
-            if today_name in info.get('days', set()):
-                agent_planned_today.append(info.get('tt_code', ''))
-
-        planned_count = len(agent_planned_today)
-        planned_set = set(agent_planned_today)
-
-        # Заказы агента сегодня
-        orders_today = 0
-        for tt_code in planned_set:
-            day_cats = orders.get((agent_name, tt_code), {})
-            if today.day in day_cats:
-                orders_today += 1
-
-        # Вне маршрута сегодня
-        off_today = 0
-        for (agent, tt_code), day_cats in orders.items():
-            if agent != agent_name:
-                continue
-            if today.day not in day_cats:
-                continue
-            # Критерий 1: точки нет в плане
-            if tt_code not in planned_set:
-                off_today += 1
-            else:
-                # Критерий 2: плановая точка но сегодня не плановый день
-                for (a, tt), info in plan.items():
-                    if a == agent_name and info.get('tt_code') == tt_code:
-                        if today_name not in info.get('days', set()):
-                            off_today += 1
-                        break
-
-        stt_today = int(round(orders_today / planned_count * 100, 0)) if planned_count else 0
-        level = 'green' if stt_today >= 75 else 'yellow' if stt_today >= 50 else 'red'
-
-        # Точки контроля этого агента — из утреннего маршрута
-        agent_morning_data = morning_summary['agents'].get(agent_name, {})
-        morning_points = agent_morning_data.get('points', [])
-        control_points = []
-        for p in morning_points:
-            missed_streak = _calc_missed_streak(p.get('sequence', []))
-            off_route = p.get('off_schedule_orders', 0)
-            if missed_streak >= 2 or off_route > 0:
-                # Проверяем был ли заказ сегодня
-                tt_code = p.get('tt_code', '')
-                day_cats = orders.get((agent_name, tt_code), {})
-                had_order = today.day in day_cats
-                control_points.append({
-                    'name': p['tt_short'],
-                    'client': p.get('client', ''),
-                    'had_order': had_order,
-                })
-
-        team_planned_today += planned_count
-        team_orders_today += orders_today
-        team_off_today += off_today
-
-        agents_out.append({
-            'name': agent_name,
-            'planned': planned_count,
-            'orders': orders_today,
-            'off': off_today,
-            'stt': stt_today,
-            'level': level,
-            'control_points': control_points,
-        })
-
-    agents_out.sort(key=lambda a: a['stt'])
-
-    clean_today = max(0, team_orders_today - team_off_today)
-    clean_stt_today = int(round(clean_today / team_planned_today * 100, 0)) if team_planned_today else 0
-    system_stt_today = int(round(team_orders_today / team_planned_today * 100, 0)) if team_planned_today else 0
-
-    weekdays = ['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье']
-
-    return json_response({
-        'sv_name': user['name'],
-        'date': today.strftime('%d.%m.%Y'),
-        'weekday': weekdays[today.weekday()],
-        'team': {
-            'planned': team_planned_today,
-            'orders': team_orders_today,
-            'off': team_off_today,
-            'system_stt': system_stt_today,
-            'clean_stt': clean_stt_today,
-        },
-        'agents': agents_out,
-    })
-
-
-@app.get("/api/agent/{telegram_id}/day")
-async def agent_day(telegram_id: str):
-    """
-    Итог дня для агента:
-    - Мой итог (план/заказы/вне/чистая за сегодня)
-    - Точки фокуса СВ с результатом за сегодня (✓/✕)
-    - Команда сегодня (остальные агенты)
-    """
-    user, company = get_user_and_company(telegram_id)
-    if not user or user.get('role') != 'agent':
-        raise HTTPException(status_code=404, detail="Agent not found")
-
-    today = date.today()
-    today_name = stt_module.RU_DAYS[today.weekday()]
-    structure = company.load_structure()
-    agent_name = user['name']
-    sv_name = user.get('sv', '')
-
-    plan_data = company.load_plan(today.month, today.year)
-    fact_data = company.load_fact(today.month, today.year, today.day)
-    plan = plan_data.get('plan', {})
-    orders = fact_data.get('orders', {})
-    cal = stt_module.get_calendar(today.month, today.year)
-
-    def calc_agent_day(name):
-        planned_today = [info.get('tt_code','') for (a,tt),info in plan.items()
-                         if a == name and today_name in info.get('days', set())]
-        planned_set = set(planned_today)
-        planned_count = len(planned_set)
-        orders_today = sum(1 for tc in planned_set
-                          if today.day in orders.get((name, tc), {}))
-        off_today = 0
-        for (a, tc), day_cats in orders.items():
-            if a != name or today.day not in day_cats:
-                continue
-            if tc not in planned_set:
-                off_today += 1
-            else:
-                for (ag, tt), info in plan.items():
-                    if ag == name and info.get('tt_code') == tc:
-                        if today_name not in info.get('days', set()):
-                            off_today += 1
-                        break
-        sys_stt = int(round(orders_today / planned_count * 100, 0)) if planned_count else 0
-        clean = max(0, orders_today - off_today)
-        clean_stt = int(round(clean / planned_count * 100, 0)) if planned_count else 0
-        level = 'green' if clean_stt >= 75 else 'yellow' if clean_stt >= 50 else 'red'
-        return {'planned': planned_count, 'orders': orders_today, 'off': off_today,
-                'sys_stt': sys_stt, 'clean_stt': clean_stt, 'level': level}
-
-    # Мой итог
-    my = calc_agent_day(agent_name)
-
-    # Точки фокуса СВ — из утреннего маршрута
-    morning_summary = stt_module.get_sv_today_summary(company, sv_name, today) if sv_name else {'agents': {}}
-    agent_morning = morning_summary.get('agents', {}).get(agent_name, {})
-    morning_points = agent_morning.get('points', [])
-
-    focus_points = []
-    for p in morning_points:
-        streak = _calc_missed_streak(p.get('sequence', []))
-        off_route = p.get('off_schedule_orders', 0)
-        if streak >= 2 or off_route > 0:
-            tc = p.get('tt_code', '')
-            had_order = today.day in orders.get((agent_name, tc), {})
-            focus_points.append({
-                'name': p['tt_short'],
-                'client': p.get('client', ''),
-                'had_order': had_order,
-            })
-
-    # Команда сегодня (остальные агенты)
-    team_agents = {
-        u['name'] for u in structure.get('users', {}).values()
-        if u.get('role') == 'agent' and u.get('sv') == sv_name and u['name'] != agent_name
-    }
-    team = []
-    for name in sorted(team_agents):
-        d = calc_agent_day(name)
-        team.append({'name': name, **d})
-    team.sort(key=lambda x: -x['clean_stt'])
-
-    weekdays = ['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье']
-    return json_response({
-        'agent': agent_name,
-        'date': today.strftime('%d.%m.%Y'),
-        'weekday': weekdays[today.weekday()],
-        'my': my,
-        'focus_points': focus_points,
-        'team': team,
-    })
-
-@app.get("/health")
-async def health():
-    return json_response({"status": "ok"})
+  };
+
+  if (!id) {
+    buildRouteScreen(DEMO.today);
+    buildSttScreen(DEMO.stt);
+    buildHistoryScreen(DEMO.history);
+    const bar = document.createElement('div');
+    bar.className = 'demo-bar';
+    bar.textContent = '⚡ ДЕМО-РЕЖИМ — реальные данные загружаются через Telegram';
+    document.body.prepend(bar);
+    document.body.style.paddingTop = '22px';
+    return;
+  }
+
+  const err = (sid, msg) => {
+    document.getElementById(sid).innerHTML = `<div class="loader"><div style="font-size:28px">⚠️</div><div>${msg}</div></div>`;
+  };
+
+  fetch(`${API}/api/agent/${id}/today`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildRouteScreen)
+    .catch(() => err('screen-route', 'Ошибка загрузки маршрута'));
+
+  fetch(`${API}/api/agent/${id}/stt`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildSttScreen)
+    .catch(() => err('screen-stt', 'Ошибка загрузки СТТ'));
+
+  fetch(`${API}/api/agent/${id}/history`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildHistoryScreen)
+    .catch(() => err('screen-history', 'Ошибка загрузки истории'));
+
+  fetch(`${API}/api/agent/${id}/day`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildDayScreen)
+    .catch(() => err('screen-day', 'Ошибка загрузки итога дня'));
+}
+
+main();
+</script>
+</body>
+</html>
