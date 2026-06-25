@@ -162,9 +162,14 @@
   #screen-stt .rh-name { flex: 1; font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
   #screen-stt .rh-metrics { display: flex; gap: 14px; }
   #screen-stt .rh-metric { width: 42px; text-align: right; font-size: 10.5px; font-weight: 700; color: var(--ink-soft); }
-  #screen-stt .rating-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
-  #screen-stt .rating-row:last-child { border-bottom: none; }
-  #screen-stt .rank { width: 16px; font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+  #screen-stt .rating-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  #screen-stt .rating-table thead tr { background: var(--bg-card); border-bottom: 1px solid var(--line); }
+  #screen-stt .rating-table th { padding: 7px 10px; text-align: right; font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+  #screen-stt .rating-table th:first-child { text-align: left; }
+  #screen-stt .rating-table tbody tr { border-bottom: 1px solid var(--line); }
+  #screen-stt .rating-table tbody tr:last-child { border-bottom: none; }
+  #screen-stt .rating-table td { padding: 10px 10px; text-align: right; }
+  #screen-stt .rating-table td:first-child { text-align: left; }
   #screen-stt .dot { width: 9px; height: 9px; border-radius: 50%; }
   #screen-stt .dot.green { background: var(--green); }
   #screen-stt .dot.yellow { background: var(--yellow); }
@@ -294,7 +299,7 @@ const API = new URLSearchParams(window.location.search).get('dev') === '1'
   : 'https://worker-production-1dfb.up.railway.app';
 
 const screenMeta = {
-  route:    { title: 'Точки контроля на сегодня', pill: () => formatDate() },
+  route:    { title: 'Улучшить систему', pill: () => formatDate() },
   stt:      { title: 'СТТ команды',               pill: () => _sttMonth || '' },
   history:  { title: 'История команды',           pill: () => '' },
   training: { title: 'ИИ-коуч',                   pill: () => _coachPeriod || '7 дней' },
@@ -428,7 +433,7 @@ function renderRoute(data) {
     points.forEach(pt => {
       html += `
         <div class="grid-row">
-          <span class="point-name">${pt.name}</span>
+          <span class="point-name">${pt.name}${pt.client ? '<span style="display:block;font-size:11px;font-weight:400;color:var(--ink-soft);margin-top:2px;">' + pt.client + '</span>' : ''}</span>
           <span class="mark">${pt.missed_2 ? '<span class="mark-dot two"></span>' : ''}</span>
           <span class="mark">${pt.missed_3plus ? '<span class="mark-dot three"></span>' : ''}</span>
           <span class="offroute-num ${pt.off_route === 0 ? 'empty' : ''}">${pt.off_route > 0 ? pt.off_route : '—'}</span>
@@ -458,16 +463,23 @@ function renderStt(data) {
     </div>`).join('');
 
   // Рейтинг
-  const ratingHtml = (data.rating || []).map(r => `
-    <div class="rating-row">
-      <span class="rank">${r.rank}</span>
-      <span class="dot ${r.dot}"></span>
-      <span class="agent-name">${r.agent}</span>
-      <span class="metrics">
-        <span class="m-sys">${r.sys}%</span>
-        <span class="m-net ${r.dot}">${r.net}%</span>
-      </span>
-    </div>`).join('');
+  const ratingRows = (data.rating || []).map(r => {
+    const shortName = r.agent.split(' ').slice(0, 2).join(' ');
+    const netColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
+    const offVal = r.sys !== r.net ? (r.sys - r.net) : 0;
+    const planned = data.planned_visits ? Math.round(data.planned_visits / (data.rating || []).length) : '—';
+    const sysOrders = r.sys && planned !== '—' ? Math.round(r.sys / 100 * planned) : '—';
+    return '<tr>' +
+      '<td><span class="dot ' + r.dot + '"></span>' + shortName + '</td>' +
+      '<td>' + (planned !== '—' ? planned : '—') + '</td>' +
+      '<td>' + (sysOrders !== '—' ? sysOrders : '—') + '</td>' +
+      '<td style="color:var(--red)">−' + offVal + '</td>' +
+      '<td style="font-weight:800;color:' + netColor + '">' + r.net + '%</td>' +
+      '</tr>';
+  }).join('');
+  const ratingHtml = '<table class="rating-table"><thead><tr>' +
+    '<th>Торговый</th><th>Визиты</th><th>Заказы</th><th>Вне</th><th>Чистая</th>' +
+    '</tr></thead><tbody>' + ratingRows + '</tbody></table>';
 
   // Тренд по неделям
   const weeks = data.trend_weeks || [];
@@ -809,7 +821,7 @@ async function main() {
   }
 
   // Обновляем заголовок первой вкладки
-  document.getElementById('topTitle').textContent = 'Точки контроля на сегодня';
+  document.getElementById('topTitle').textContent = 'Улучшить систему';
   const pill = document.getElementById('topPill');
   pill.textContent = formatDate();
   pill.style.display = 'block';
