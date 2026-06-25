@@ -593,8 +593,6 @@ function buildDayScreen(data) {
   const team = data.team || [];
 
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
-
-  // Мой итог
   const myHtml = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
       <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${my.planned}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">плановых</div></div>
@@ -603,30 +601,30 @@ function buildDayScreen(data) {
       <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.clean_stt))}">${my.clean_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">чистая</div></div>
     </div>`;
 
-  // Точки фокуса
   const focusHtml = focusPts.length > 0
-    ? focusPts.map(p => {
+    ? focusPts.map((p, i) => {
         const res = p.had_order
           ? '<span style="color:#2D5A1B;font-weight:700;font-size:15px;flex-shrink:0">✓</span>'
           : '<span style="color:#8B1A1A;font-weight:700;font-size:15px;flex-shrink:0">✕</span>';
         const cl = p.client ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${p.client}</div>` : '';
-        return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:8px">
+        const border = i < focusPts.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+        return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;${border}gap:8px">
           <div><div style="font-size:12px;font-weight:600;line-height:1.3">${p.name}</div>${cl}</div>${res}</div>`;
-      }).join('').replace(/border-bottom[^"]+(?="><\/div>\s*$)/, '')
-    : '<div class="empty" style="padding:12px 0">Нет точек контроля от СВ</div>';
+      }).join('')
+    : '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет точек контроля от СВ</div>';
 
-  // Команда
-  const teamHtml = team.map(a => {
+  const teamHtml = team.map((a, i) => {
     const short = a.name.split(' ').slice(0,2).join(' ');
     const col = colorOf(levelOf(a.clean_stt));
     const dotCol = a.level === 'green' ? '#2D5A1B' : a.level === 'yellow' ? '#8B6914' : '#8B1A1A';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);gap:6px;font-size:12px">
+    const border = i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${border}gap:6px;font-size:12px">
       <span style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;display:inline-block"></span>
-      <span style="flex:1;font-weight:500">${short}</span>
-      <span style="color:var(--muted);font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
+      <span style="flex:1;font-weight:500;color:#1e1b4b">${short}</span>
+      <span style="color:#6366F1;font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
       <span style="font-weight:700;font-size:13px;color:${col};min-width:36px;text-align:right">${a.clean_stt}%</span>
     </div>`;
-  }).join('') || '<div class="empty" style="padding:12px 0">Нет данных по команде</div>';
+  }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет данных по команде</div>';
 
   const cardStyle = 'background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);';
   const labelStyle = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;';
@@ -647,13 +645,13 @@ function buildDayScreen(data) {
         <span style="${labelStyle}">⚠️ Точки фокуса СВ — выполнено?</span>
         ${focusHtml}
       </div>
-      <div style="${cardStyle}">
-        <details>
-          <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between">
-            <span style="${labelStyle}margin:0">Команда сегодня</span>
-            <span style="font-size:10px;color:var(--muted)">▶</span>
+      <div style="background:#EEF2FF;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #C7D2FE;">
+        <details open>
+          <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+            <span style="font-size:13px;font-weight:700;color:#3730A3">👥 Команда сегодня</span>
+            <span style="font-size:10px;color:#6366F1">▶</span>
           </summary>
-          <div style="padding-top:6px">${teamHtml}</div>
+          <div style="padding-top:8px">${teamHtml}</div>
         </details>
       </div>
     </div>`;
