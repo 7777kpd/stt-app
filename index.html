@@ -44,9 +44,7 @@ body {
 .tab.active-green  .badge { background: #d1fae5; color: var(--green); }
 
 /* INTENTION */
-.intention { margin: 12px 16px 4px; background: var(--blue-light); border-radius: 10px; padding: 10px 12px; }
-.intention-label { font-size: 11px; font-weight: 700; color: #1e3a8a; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
-.intention-text  { font-size: 13px; color: #1e3a8a; font-weight: 500; }
+
 
 /* CARDS */
 .cards { padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 10px; }
@@ -400,10 +398,7 @@ function buildRouteScreen(data) {
           <button class="tab ${tab==='green'?'active-green':''}" data-t="green">В системе<span class="badge">${grouped.green.length}</span></button>
         </div>
       </div>
-      ${data.intention ? `<div class="intention">
-        <div class="intention-label">🎯 Намерение на сегодня</div>
-        <div class="intention-text">${data.intention}</div>
-      </div>` : ''}
+
       ${focusBlockHtml}
       <div id="tab-content">
         ${grouped[tab].length
@@ -693,7 +688,6 @@ async function main() {
   const DEMO = {
     today: {
       agent_name: 'Гребінник Ігор',
-      intention: 'Строго выполню маршрут без пропусков',
       points: [
         {
           address: 'с. Шамраївка, вул. Центральна, Буд. 10А',
