@@ -466,21 +466,22 @@ function renderStt(data) {
   const ratingRows = (data.rating || []).map(r => {
     const shortName = r.agent.split(' ').slice(0, 2).join(' ');
     const netColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
+    const dotColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
     const off = r.off > 0 ? '−' + r.off : '—';
-    return '<tr>' +
-      '<td><span class="dot ' + r.dot + '"></span>' + shortName + '</td>' +
-      '<td>' + (r.planned || '—') + '</td>' +
-      '<td>' + (r.orders || '—') + '</td>' +
-      '<td style="color:var(--red)">' + off + '</td>' +
-      '<td style="font-weight:800;color:' + netColor + '">' + r.net + '%</td>' +
+    return '<tr style="border-bottom:0.5px solid var(--line)">' +
+      '<td style="padding:9px 8px;text-align:left"><span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>' + shortName + '</td>' +
+      '<td style="padding:9px 8px;text-align:right">' + (r.planned || '—') + '</td>' +
+      '<td style="padding:9px 8px;text-align:right">' + (r.orders || '—') + '</td>' +
+      '<td style="padding:9px 8px;text-align:right;color:var(--red)">' + off + '</td>' +
+      '<td style="padding:9px 8px;text-align:right;font-weight:800;color:' + netColor + '">' + r.net + '%</td>' +
       '</tr>';
   }).join('');
-  const ratingHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="border-bottom:1px solid var(--line)">' +
-    '<th style="padding:7px 10px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th>' +
-    '<th style="padding:7px 10px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Визиты</th>' +
-    '<th style="padding:7px 10px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th>' +
-    '<th style="padding:7px 10px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th>' +
-    '<th style="padding:7px 10px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чистая</th>' +
+  const ratingHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed"><colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><thead><tr style="border-bottom:1px solid var(--line)">' +
+    '<th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th>' +
+    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Визиты</th>' +
+    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th>' +
+    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th>' +
+    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чистая</th>' +
     '</tr></thead><tbody>' + ratingRows + '</tbody></table>';
 
   // Тренд по неделям
