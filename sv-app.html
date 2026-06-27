@@ -23,14 +23,13 @@
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: var(--bg);
+    margin: 0; background: #DAD2BC;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--ink);
+    color: var(--ink); display: flex; justify-content: center; padding: 32px 12px;
   }
   .phone {
-    width: 100%; max-width: 420px; background: var(--bg); border-radius: 28px;
-    box-shadow: 0 30px 60px -20px rgba(40, 35, 20, 0.35); overflow: hidden;
-    height: 92vh; min-height: 700px; max-height: 960px; display: flex; flex-direction: column;
+    width: 100%; max-width: 480px; background: var(--bg);
+    height: 100dvh; display: flex; flex-direction: column;
   }
   .topbar { padding: 22px 20px 14px; display: flex; align-items: baseline; justify-content: space-between; flex-shrink: 0; }
   .topbar h1 { font-size: 20px; font-weight: 700; margin: 0; }
@@ -151,7 +150,7 @@
   #screen-stt .category-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
   #screen-stt .category-name { width: 92px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--ink-soft); }
   #screen-stt .category-bar-track { flex: 1; height: 7px; background: var(--bg); border-radius: 100px; overflow: hidden; }
-  #screen-stt .category-bar-fill { height: 100%; border-radius: 100px; }
+  #screen-stt .category-bar-fill { height: 100%; background: var(--ink); opacity: 0.55; border-radius: 100px; }
   #screen-stt .category-pct { width: 34px; text-align: right; font-size: 12.5px; font-weight: 700; }
   #screen-stt .segment { display: flex; background: #E5DDC8; border-radius: 12px; padding: 3px; margin-bottom: 14px; }
   #screen-stt .segment button { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); padding: 9px 0; border-radius: 9px; cursor: pointer; }
@@ -281,22 +280,18 @@
       <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>СТТ</button>
       <button class="tab" data-screen="history" onclick="switchTab('history')"><span class="icon">📈</span>История</button>
       <button class="tab" data-screen="training" onclick="switchTab('training')"><span class="icon">🧠</span>ИИ-коуч</button>
-      <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итог дня</button>
     </div>
   </div>
 </div>
 
 <script>
-const API = new URLSearchParams(window.location.search).get('dev') === '1'
-  ? 'https://develop-production-0a2d.up.railway.app'
-  : 'https://worker-production-1dfb.up.railway.app';
+const API = 'https://worker-production-1dfb.up.railway.app';
 
 const screenMeta = {
-  route:    { title: 'Улучшить систему', pill: () => formatDate() },
+  route:    { title: 'Точки контроля на сегодня', pill: () => formatDate() },
   stt:      { title: 'СТТ команды',               pill: () => _sttMonth || '' },
   history:  { title: 'История команды',           pill: () => '' },
   training: { title: 'ИИ-коуч',                   pill: () => _coachPeriod || '7 дней' },
-  day:      { title: 'Итог дня',                     pill: () => formatDate() },
 };
 
 let _telegramId = null;
@@ -392,7 +387,7 @@ function renderRoute(data) {
       ? `<span class="unfilled-badge">опросник не заполнен</span>` : '';
 
     html += `
-      <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}" >
+      <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}" ${agent.severity === 'high' ? 'open' : ''}>
         <summary>
           <span class="name">${agent.name}</span>
           <span class="meta">${badgeHtml}<span class="count">${points.length} точки</span><span class="chevron">▶</span></span>
@@ -449,64 +444,105 @@ function renderStt(data) {
   const lvSys = levelClass(data.system_stt || 0);
 
   // Категории
-  const totalOrders = data.system_orders || 0;
-  const catsHtml = (data.categories || []).map(c => {
-    const count = Math.round(c.pct * totalOrders / 100);
-    const color = c.pct >= 75 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)';
-    return `
+  const catsHtml = (data.categories || []).map(c => `
     <div class="category-row">
       <span class="category-name">${c.name}</span>
-      <div class="category-bar-track"><div class="category-bar-fill" style="width:${c.pct}%;background:${color}"></div></div>
-      <span style="font-size:11px;color:var(--ink-soft);white-space:nowrap">${count} из ${totalOrders}</span>
-      <span class="category-pct" style="color:${color}">${c.pct}%</span>
-    </div>`;
-  }).join('');
+      <div class="category-bar-track"><div class="category-bar-fill" style="width:${c.pct}%"></div></div>
+      <span class="category-pct">${c.pct}%</span>
+    </div>`).join('');
 
   // Рейтинг
-  const ratingRows = (data.rating || []).map(r => {
-    const shortName = r.agent.split(' ').slice(0, 2).join(' ');
-    const netColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
-    const dotColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
-    const off = r.off > 0 ? '−' + r.off : '—';
-    return '<tr style="border-bottom:0.5px solid var(--line)">' +
-      '<td style="padding:9px 8px;text-align:left"><span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>' + shortName + '</td>' +
-      '<td style="padding:9px 8px;text-align:right">' + (r.planned || '—') + '</td>' +
-      '<td style="padding:9px 8px;text-align:right">' + (r.orders || '—') + '</td>' +
-      '<td style="padding:9px 8px;text-align:right;color:var(--red)">' + off + '</td>' +
-      '<td style="padding:9px 8px;text-align:right;font-weight:800;color:' + netColor + '">' + r.net + '%</td>' +
-      '</tr>';
-  }).join('');
-  const ratingHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed"><colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><thead><tr style="border-bottom:1px solid var(--line)">' +
-    '<th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th>' +
-    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Визиты</th>' +
-    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th>' +
-    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th>' +
-    '<th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чистая</th>' +
-    '</tr></thead><tbody>' + ratingRows + '</tbody></table>';
+  const ratingHtml = (data.rating || []).map(r => `
+    <div class="rating-row">
+      <span class="rank">${r.rank}</span>
+      <span class="dot ${r.dot}"></span>
+      <span class="agent-name">${r.agent}</span>
+      <span class="metrics">
+        <span class="m-sys">${r.sys}%</span>
+        <span class="m-net ${r.dot}">${r.net}%</span>
+      </span>
+    </div>`).join('');
 
   // Тренд по неделям
   const weeks = data.trend_weeks || [];
-  const maxVal = Math.max(...weeks.filter(w => w.clean_stt !== null).map(w => w.clean_stt), 1);
+  const posWeeks = weeks.filter(w => !w.is_current && w.clean_stt !== null && w.clean_stt > 0);
+  const maxVal = Math.max(...weeks.filter(w => w.clean_stt !== null && w.clean_stt > 0).map(w => w.clean_stt), 1);
+  const bestWeek = posWeeks.length > 0 ? posWeeks.reduce((a, b) => a.clean_stt > b.clean_stt ? a : b) : null;
+
   const barsHtml = weeks.map(w => {
+    const isCurrent = w.is_current;
+    const isBest = bestWeek && w.week === bestWeek.week;
+    const isZero = w.clean_stt === 0 || w.clean_stt === null;
+    const lbl = w.label ? w.label.split(' ')[0] : 'Нед ' + w.week;
+    const offTxt = w.week_off > 0 ? `<span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.85)">−${w.week_off}</span>` : '';
+    const offTxtRed = w.week_off > 0 ? `<span style="font-size:9px;font-weight:800;color:var(--red)">−${w.week_off}</span>` : '';
+    const offTxtDash = w.week_off > 0 ? `<span style="font-size:9px;font-weight:800;color:#C4B89A">−${w.week_off}</span>` : '';
+
     if (w.clean_stt === null) {
       return `<div class="week-col">
-        <div class="week-pct">—</div>
-        <div class="week-bar empty" style="height:20px"></div>
-        <div class="week-num">Нед ${w.week}</div>
+        <div class="week-pct" style="color:var(--ink-soft)">—</div>
+        <div class="week-bar" style="height:14px;background:var(--line);opacity:.4;border-radius:6px 6px 0 0"></div>
+        <div class="week-num">${lbl}</div>
       </div>`;
     }
-    const h = Math.max(8, Math.round(w.clean_stt / maxVal * 70));
-    return `<div class="week-col">
-      <div class="week-pct">${w.clean_stt}%</div>
-      <div class="week-bar filled" style="height:${h}px"></div>
-      <div class="week-num">Нед ${w.week}</div>
+    if (isCurrent) {
+      const h = isZero ? 14 : Math.max(16, Math.round(w.clean_stt / maxVal * 70));
+      const pctColor = isZero ? 'var(--ink-soft)' : 'var(--ink-soft)';
+      return `<div class="week-col">
+        <div class="week-pct" style="color:${pctColor}">${w.clean_stt}%</div>
+        <div class="week-bar" style="height:${h}px;border-radius:6px 6px 0 0;border:1.5px dashed #C4B89A;border-bottom:none;display:flex;align-items:center;justify-content:center">${offTxtDash}</div>
+        <div class="week-num">${lbl}</div>
+      </div>`;
+    }
+    if (isZero) {
+      return `<div class="week-col">
+        <div class="week-pct" style="color:var(--red)">0%</div>
+        <div class="week-bar" style="height:14px;background:#FAE7E4;border:1px solid #F1C9C2;border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center">${offTxtRed}</div>
+        <div class="week-num">${lbl}</div>
+      </div>`;
+    }
+    const h = Math.max(16, Math.round(w.clean_stt / maxVal * 70));
+    const barBg = isBest ? 'var(--green)' : 'var(--amber)';
+    const pctColor = isBest ? 'var(--green)' : 'var(--amber)';
+    const bestMark = isBest ? ' ✦' : '';
+    const wkStyle = isBest ? `color:var(--green);font-weight:800` : '';
+    const colWrap = isBest ? `style="background:var(--green-bg);border-radius:6px;padding:2px 0"` : '';
+    return `<div class="week-col" ${colWrap}>
+      <div class="week-pct" style="color:${pctColor}">${w.clean_stt}%${bestMark}</div>
+      <div class="week-bar" style="height:${h}px;background:${barBg};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center">${offTxt}</div>
+      <div class="week-num" style="${wkStyle}">${lbl}</div>
     </div>`;
   }).join('');
 
-  const deltaHtml = data.trend_delta !== null && data.trend_delta !== undefined
-    ? `<div class="weeks-delta" style="color:${data.trend_delta >= 0 ? 'var(--green)' : 'var(--red)'}">
-        ${data.trend_delta >= 0 ? '+' : ''}${data.trend_delta}% за месяц
-       </div>` : '';
+  // Блок сравнения с прошлым месяцем
+  const cmp = data.prev_month_compare || null;
+  let compareHtml = '';
+  if (cmp) {
+    const cleanDelta = cmp.clean_delta || 0;
+    const offDelta = cmp.off_delta || 0;
+    const cleanUp = cleanDelta >= 0;
+    const offGood = offDelta <= 0;
+    const cmpBg = (cleanUp && offGood) ? 'var(--green-bg)' : (!cleanUp && !offGood) ? 'var(--red-bg)' : '#F5F0EB';
+    const cmpTitle = (cleanUp && offGood) ? 'color:#1A5C33' : (!cleanUp && !offGood) ? 'color:#7C1A1A' : 'color:var(--ink-soft)';
+    const daysNote = cmp.days_diff !== 0 ? `<div style="font-size:10px;color:var(--ink-soft);margin-top:5px">⚠️ Прошлый месяц на ${Math.abs(cmp.days_diff)} дн. ${cmp.days_diff > 0 ? 'длиннее' : 'короче'} — учтено при сравнении</div>` : '';
+    compareHtml = `
+      <div style="border-radius:10px;padding:9px 11px;margin-top:10px;background:${cmpBg}">
+        <div style="font-size:10px;font-weight:700;margin-bottom:7px;${cmpTitle}">${cmp.current_label} (${cmp.current_days} дн) vs ${cmp.prev_label} (${cmp.prev_days} дн)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:baseline;font-size:12px;font-weight:600;margin-bottom:5px">
+          <span style="color:var(--ink)">Чистая: <b>${cmp.current_clean}%</b></span>
+          <span style="color:var(--ink-soft);text-align:center">${cmp.prev_label_short}: ${cmp.prev_clean}%</span>
+          <span style="text-align:right;font-size:13px;font-weight:800;color:${cleanUp ? 'var(--green)' : 'var(--red)'}">${cleanUp ? '↑' : '↓'} ${cleanUp ? '+' : ''}${cleanDelta}%</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:baseline;font-size:12px;font-weight:600">
+          <span style="color:var(--ink)">Вне: <b style="color:var(--red)">−${cmp.current_off}</b></span>
+          <span style="color:var(--ink-soft);text-align:center">${cmp.prev_label_short}: −${cmp.prev_off}</span>
+          <span style="text-align:right;font-size:13px;font-weight:800;color:${offGood ? 'var(--green)' : 'var(--red)'}">${offGood ? '↓' : '↑'} ${offGood ? '' : '+'}${offDelta} вне</span>
+        </div>
+        ${daysNote}
+      </div>`;
+  }
+
+  const deltaHtml = '';
 
   return `
     <div class="summary-card">
@@ -539,7 +575,11 @@ function renderStt(data) {
     </div>
 
     <div id="view-rating" class="sub-view active">
-      <div class="card" style="padding:6px 0">
+      <div class="card">
+        <div class="rating-header">
+          <span class="rh-name">Агент</span>
+          <span class="rh-metrics"><span class="rh-metric">Сист</span><span class="rh-metric">Чист</span></span>
+        </div>
         ${ratingHtml}
       </div>
     </div>
@@ -548,7 +588,7 @@ function renderStt(data) {
       <div class="weeks-chart">
         <div class="weeks-label">Чистая по неделям</div>
         <div class="weeks-bars">${barsHtml}</div>
-        ${deltaHtml}
+        ${compareHtml}
       </div>
     </div>`;
 }
@@ -783,57 +823,6 @@ async function sendFeedback(rating) {
 }
 
 // ============================================================
-// RENDER — Итог дня
-// ============================================================
-function renderDay(data) {
-  const team = data.team || {};
-  const agents = data.agents || [];
-  const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
-  const statsHtml = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.planned || 0}</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">плановых</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.orders || 0} <span style="font-size:13px;color:var(--red);font-weight:700">−${team.off || 0} вне</span></div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">заказов</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:var(--amber)">${team.system_stt || 0}%</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">системная</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:var(--amber)">${team.clean_stt || 0}%</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">чистая</div></div>
-    </div>`;
-  const agentsHtml = agents.map(a => {
-    const clean = a.planned > 0 ? Math.round(Math.max(0, a.orders - a.off) / a.planned * 100) : 0;
-    const dotColor = clean >= 75 ? 'var(--green)' : clean >= 50 ? 'var(--yellow)' : 'var(--red)';
-    const sttColor = clean >= 75 ? 'var(--green)' : clean >= 50 ? 'var(--yellow)' : 'var(--red)';
-    const shortName = a.name.split(' ').slice(0, 2).join(' ');
-    const ptCount = (a.control_points || []).length;
-    const ptLabel = ptCount > 0 ? ptCount + ' контрольных точек' : 'нет контрольных точек';
-    const aTile = 'background:var(--bg);border-radius:8px;padding:7px 10px;text-align:center;';
-    const tilesHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;">
-      <div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.planned}</div><div style="font-size:9px;color:var(--ink-soft)">визитов</div></div>
-      <div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.orders}</div><div style="font-size:9px;color:var(--ink-soft)">заказов</div></div>
-      <div style="${aTile}"><div style="font-size:15px;font-weight:700;color:var(--red)">−${a.off}</div><div style="font-size:9px;color:var(--ink-soft)">вне</div></div>
-    </div>`;
-    const pointsHtml = (a.control_points || []).map(p => {
-      const result = p.had_order ? '<span style="color:var(--green);font-weight:700;font-size:14px">✓</span>' : '<span style="color:var(--red);font-weight:700;font-size:14px">✕</span>';
-      const clientLine = p.client ? `<div style="font-size:10px;color:var(--ink-soft)">${p.client}</div>` : '';
-      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div><div style="font-size:12px">${p.name}</div>${clientLine}</div>${result}</div>`;
-    }).join('');
-    return `<details style="border-bottom:1.5px solid var(--line)">
-      <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 0">
-        <div style="display:flex;align-items:center;gap:8px;flex:1">
-          <span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span>
-          <div><div style="font-size:13px;font-weight:700">${shortName}</div><div style="font-size:11px;color:var(--ink-soft)">${ptLabel}</div></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-          <span style="font-size:15px;font-weight:700;color:${sttColor}">${clean}%</span>
-          <span style="font-size:10px;color:var(--ink-soft)">▶</span>
-        </div>
-      </summary>
-      <div style="padding:4px 0 10px 16px">${tilesHtml}${pointsHtml}</div>
-    </details>`;
-  }).join('');
-  const cardStyle = 'background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;';
-  const labelStyle = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin-bottom:10px;';
-  return `<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div><div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
-}
-
-// ============================================================
 // MAIN — загрузка данных
 // ============================================================
 async function main() {
@@ -850,8 +839,7 @@ async function main() {
     <div id="screen-route" class="screen-panel active"></div>
     <div id="screen-stt"   class="screen-panel"></div>
     <div id="screen-history" class="screen-panel"></div>
-    <div id="screen-training" class="screen-panel"></div>
-    <div id="screen-day" class="screen-panel"></div>`;
+    <div id="screen-training" class="screen-panel"></div>`;
   document.getElementById('tabbar').style.display = 'flex';
 
   const err = (screenId, msg) => {
@@ -859,13 +847,12 @@ async function main() {
     if (el) el.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
   };
 
-  // Загружаем все 5 вкладок параллельно
-  const [routeRes, sttRes, historyRes, coachRes, dayRes] = await Promise.allSettled([
+  // Загружаем все 4 вкладки параллельно
+  const [routeRes, sttRes, historyRes, coachRes] = await Promise.allSettled([
     fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/history`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/coach/week`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
   ]);
 
   if (routeRes.status === 'fulfilled') {
@@ -892,17 +879,8 @@ async function main() {
     err('screen-training', 'Ошибка загрузки ИИ-коуча');
   }
 
-  if (dayRes.status === 'fulfilled') {
-    document.getElementById('screen-day').innerHTML = renderDay(dayRes.value);
-  } else {
-    err('screen-day', 'Ошибка загрузки итога дня');
-  }
-
-  const tabParam = new URLSearchParams(window.location.search).get('tab');
-  if (tabParam) switchTab(tabParam);
-
   // Обновляем заголовок первой вкладки
-  document.getElementById('topTitle').textContent = 'Улучшить систему';
+  document.getElementById('topTitle').textContent = 'Точки контроля на сегодня';
   const pill = document.getElementById('topPill');
   pill.textContent = formatDate();
   pill.style.display = 'block';
