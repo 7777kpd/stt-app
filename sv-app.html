@@ -23,9 +23,9 @@
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; background: #DAD2BC;
+    margin: 0; background: var(--bg);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--ink); display: flex; justify-content: center; padding: 32px 12px;
+    color: var(--ink);
   }
   .phone {
     width: 100%; max-width: 480px; background: var(--bg);
@@ -285,10 +285,12 @@
 </div>
 
 <script>
-const API = 'https://worker-production-1dfb.up.railway.app';
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
 
 const screenMeta = {
-  route:    { title: 'Точки контроля на сегодня', pill: () => formatDate() },
+  route:    { title: 'Улучшить систему', pill: () => formatDate() },
   stt:      { title: 'СТТ команды',               pill: () => _sttMonth || '' },
   history:  { title: 'История команды',           pill: () => '' },
   training: { title: 'ИИ-коуч',                   pill: () => _coachPeriod || '7 дней' },
@@ -387,7 +389,7 @@ function renderRoute(data) {
       ? `<span class="unfilled-badge">опросник не заполнен</span>` : '';
 
     html += `
-      <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}" ${agent.severity === 'high' ? 'open' : ''}>
+      <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}" >
         <summary>
           <span class="name">${agent.name}</span>
           <span class="meta">${badgeHtml}<span class="count">${points.length} точки</span><span class="chevron">▶</span></span>
@@ -880,7 +882,7 @@ async function main() {
   }
 
   // Обновляем заголовок первой вкладки
-  document.getElementById('topTitle').textContent = 'Точки контроля на сегодня';
+  document.getElementById('topTitle').textContent = 'Улучшить систему';
   const pill = document.getElementById('topPill');
   pill.textContent = formatDate();
   pill.style.display = 'block';
