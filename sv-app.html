@@ -120,7 +120,6 @@ body{background:var(--bg);font-family:-apple-system,sans-serif;color:var(--ink);
 </nav>
 
 <script>
-// ── Config ──────────────────────────────────────────────────────────────
 const params = new URLSearchParams(location.search);
 const SV_ID  = params.get('id') || '';
 const IS_DEV = params.has('dev');
@@ -128,7 +127,6 @@ const API    = IS_DEV
   ? 'https://develop-production-0a2d.up.railway.app'
   : 'https://worker-production-1dfb.up.railway.app';
 
-// ── Helpers ──────────────────────────────────────────────────────────────
 const titles = {route:'Улучшить систему', stt:'СТТ команды', coach:'ИИ-коуч', day:'Итог дня'};
 
 function show(id, btn) {
@@ -146,10 +144,7 @@ function sw(n) {
   });
 }
 
-function pct(v) {
-  if (v == null) return '—';
-  return Math.round(v) + '%';
-}
+function pct(v) { return v == null ? '—' : Math.round(v) + '%'; }
 
 function catColor(p) {
   if (p >= 75) return 'var(--green)';
@@ -164,7 +159,6 @@ function agentColor(clean) {
   return 'var(--red)';
 }
 
-// ── Date pill ─────────────────────────────────────────────────────────────
 (function() {
   const d = new Date();
   const days = ['вс','пн','вт','ср','чт','пт','сб'];
@@ -179,16 +173,13 @@ async function loadRoute() {
     const r = await fetch(API + '/api/sv/' + SV_ID + '/route');
     const d = await r.json();
 
-    // Recommended agent to ride with
-    const rec = d.recommended_ride;
-    document.getElementById('ride-name').textContent = rec ? rec.name : 'Нет рекомендации';
+    const rec = d.recommended_ride || d.ride_with;
+    document.getElementById('ride-name').textContent = rec ? rec.agent || rec.name : 'Нет рекомендации';
     document.getElementById('ride-reason').textContent = rec ? rec.reason : '';
 
-    // Control points count
     const ctrlPts = d.agents ? d.agents.reduce((s, a) => s + (a.control_points || []).length, 0) : 0;
     document.getElementById('ctrl-count').textContent = ctrlPts;
 
-    // Agent cards
     const list = document.getElementById('agents-list');
     if (!d.agents || d.agents.length === 0) {
       list.innerHTML = '<div class="loading">Нет данных по агентам</div>';
@@ -196,17 +187,15 @@ async function loadRoute() {
     }
     list.innerHTML = d.agents.map(ag => {
       const pts = ag.control_points || [];
-      const color = (ag.miss_streak >= 3) ? 'var(--red)' : 'var(--amber)';
-      const badgeHtml = ag.survey_missing
+      const color = ag.severity === 'high' ? 'var(--red)' : 'var(--amber)';
+      const badgeHtml = ag.survey && !ag.survey.filled
         ? '<span class="badge">опросник не заполнен</span>' : '';
       const rowsHtml = pts.map(pt => {
         const offHtml = pt.off_route > 0
           ? `<span class="off">${pt.off_route}</span>`
           : `<span class="off" style="color:var(--soft);opacity:.4">—</span>`;
-        const m2 = pt.misses >= 2
-          ? '<div class="d3"></div>' : '';
-        const m3 = pt.misses >= 3
-          ? '<div class="d3"></div>' : '';
+        const m2 = pt.missed_2 ? '<div class="d3"></div>' : '';
+        const m3 = pt.missed_3plus ? '<div class="d3"></div>' : '';
         return `<div class="grid-row">
           <span class="pt">${pt.name}</span>
           <span class="mk">${m2}</span>
@@ -238,10 +227,9 @@ async function loadStt() {
   try {
     const r = await fetch(API + '/api/sv/' + SV_ID + '/stt');
     const d = await r.json();
-
     renderSttSummary(d);
     renderRating(d.rating || []);
-    renderTrend(d.trend || [], d.prev_month_compare);
+    renderTrend(d.trend_weeks || [], d.prev_month_compare);
   } catch(e) {
     document.getElementById('stt-summary').innerHTML =
       '<div class="loading" style="color:var(--red)">Ошибка загрузки СТТ</div>';
@@ -249,16 +237,15 @@ async function loadStt() {
 }
 
 function renderSttSummary(d) {
-  const sys   = d.systemic_pct   != null ? Math.round(d.systemic_pct)   : 0;
-  const clean = d.clean_pct      != null ? Math.round(d.clean_pct)      : 0;
-  const off   = d.off_route_total != null ? d.off_route_total            : 0;
-  const sysOrders   = d.systemic_orders   || 0;
-  const cleanOrders = d.clean_orders      || 0;
-  const planned     = d.planned_total     || 0;
+  const sys   = d.system_stt   != null ? Math.round(d.system_stt)   : 0;
+  const clean = d.clean_stt    != null ? Math.round(d.clean_stt)    : 0;
+  const off   = d.off_route    != null ? d.off_route                : 0;
+  const sysOrders   = d.system_orders  || 0;
+  const cleanOrders = d.clean_orders   || 0;
+  const planned     = d.planned_visits || 0;
   const sysColor   = sys   >= 75 ? 'var(--green)' : sys   >= 50 ? 'var(--yellow)' : 'var(--red)';
   const cleanColor = clean >= 75 ? 'var(--green)' : clean >= 50 ? 'var(--yellow)' : 'var(--red)';
 
-  // Categories
   const cats = d.categories || [];
   const catsHtml = cats.length ? cats.map(c => {
     const p   = Math.round(c.pct || 0);
@@ -266,7 +253,6 @@ function renderSttSummary(d) {
     return `<div class="cat-row">
       <span class="cat-name">${c.name}</span>
       <div class="cat-track"><div class="cat-fill" style="width:${p}%;background:${col}"></div></div>
-      <span style="font-size:11px;color:var(--soft);white-space:nowrap">${c.orders} из ${c.total}</span>
       <span style="font-size:12px;font-weight:700;color:${col};width:32px;text-align:right">${p}%</span>
     </div>`;
   }).join('') : '';
@@ -302,13 +288,13 @@ function renderRating(agents) {
     return;
   }
   const rows = agents.map(a => {
-    const clean = a.clean_pct != null ? Math.round(a.clean_pct) : null;
+    const clean = a.net != null ? Math.round(a.net) : null;
     const col   = agentColor(clean);
     return `<tr>
-      <td><span class="rdot" style="background:${col}"></span>${a.name}</td>
+      <td><span class="rdot" style="background:${col}"></span>${a.agent}</td>
       <td>${a.visits || 0}</td>
       <td>${a.orders || 0}</td>
-      <td style="color:var(--red)">−${a.off_route || 0}</td>
+      <td style="color:var(--red)">−${a.off || 0}</td>
       <td style="font-weight:800;color:${col}">${pct(clean)}</td>
     </tr>`;
   }).join('');
@@ -329,64 +315,57 @@ function renderTrend(weeks, cmp) {
     return;
   }
 
-  // Find best week (non-zero max clean_pct)
-  const nonZero = weeks.filter(w => (w.clean_pct || 0) > 0);
-  const bestPct = nonZero.length ? Math.max(...nonZero.map(w => w.clean_pct)) : -1;
-  const maxPct  = Math.max(...weeks.map(w => w.clean_pct || 0), 1);
+  const nonZero = weeks.filter(w => (w.clean_stt || 0) > 0);
+  const bestPct = nonZero.length ? Math.max(...nonZero.map(w => w.clean_stt)) : -1;
+  const maxPct  = Math.max(...weeks.map(w => w.clean_stt || 0), 1);
 
   const barsHtml = weeks.map(w => {
-    const pctVal  = Math.round(w.clean_pct || 0);
-    const isBest  = pctVal === bestPct && bestPct > 0;
+    const pctVal    = Math.round(w.clean_stt || 0);
+    const isBest    = pctVal === bestPct && bestPct > 0;
     const isCurrent = !!w.current;
-    const isZero  = pctVal === 0;
-    const barH    = Math.max(14, Math.round((pctVal / maxPct) * 60));
-    const offText = (w.week_off || 0) > 0 ? `−${w.week_off}` : '';
+    const isZero    = pctVal === 0;
+    const barH      = Math.max(14, Math.round((pctVal / maxPct) * 60));
 
-    let barStyle, barClass;
+    let barStyle;
     if (isCurrent) {
       barStyle = `height:${barH}px;border:1.5px dashed #C4B89A;border-bottom:none;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center`;
-      barClass = '';
     } else if (isZero) {
-      barStyle = `height:14px;background:#FAE7E4;border:1px solid #F1C9C2;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center`;
-      barClass = '';
+      barStyle = `height:14px;background:#FAE7E4;border:1px solid #F1C9C2;border-radius:4px 4px 0 0`;
     } else {
       const bg = isBest ? 'var(--green)' : 'var(--ink)';
-      barStyle = `height:${barH}px;background:${bg};border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center;overflow:hidden`;
-      barClass = '';
+      barStyle = `height:${barH}px;background:${bg};border-radius:4px 4px 0 0`;
     }
 
     const pctColor = isCurrent ? 'var(--soft)' : isZero ? 'var(--red)' : isBest ? 'var(--green)' : 'var(--ink)';
     const starHtml = isBest ? ' <span style="color:var(--green)">✦</span>' : '';
-    const offHtml  = offText
-      ? `<span style="font-size:8px;font-weight:800;color:${isCurrent ? '#C4B89A' : isZero ? 'var(--red)' : 'rgba(255,255,255,.8)'}">${offText}</span>`
-      : '';
 
     return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;height:80px;justify-content:flex-end">
       <div style="font-size:10px;font-weight:800;color:${pctColor}">${pctVal}%${starHtml}</div>
-      <div style="${barStyle}">${offHtml}</div>
+      <div style="${barStyle}"></div>
       <div style="font-size:9px;color:var(--soft)">${w.label || ''}</div>
     </div>`;
   }).join('');
 
-  // Comparison block
   let cmpHtml = '';
   if (cmp) {
-    const diff    = (cmp.clean_pct || 0) - (cmp.prev_clean_pct || 0);
-    const diffOff = (cmp.off_route || 0) - (cmp.prev_off_route || 0);
+    const diff    = (cmp.current_clean || 0) - (cmp.prev_clean || 0);
+    const diffOff = (cmp.current_off   || 0) - (cmp.prev_off   || 0);
     const diffSign  = diff > 0 ? '↑+' : diff < 0 ? '↓' : '=';
     const diffColor = diff > 0 ? 'var(--green)' : diff < 0 ? 'var(--red)' : 'var(--soft)';
     const offSign   = diffOff < 0 ? '↓' : diffOff > 0 ? '↑+' : '=';
     const offColor  = diffOff < 0 ? 'var(--green)' : diffOff > 0 ? 'var(--red)' : 'var(--soft)';
+    const curLabel  = cmp.current_label || '';
+    const prevLabel = cmp.prev_label    || '';
     cmpHtml = `<div style="border-radius:8px;padding:8px 10px;background:#FAE7E4;margin-top:10px">
-      <div style="font-size:10px;font-weight:700;color:#7C1A1A;margin-bottom:6px">${cmp.label || ''}</div>
+      <div style="font-size:10px;font-weight:700;color:#7C1A1A;margin-bottom:6px">1–${cmp.current_days} ${curLabel} vs 1–${cmp.prev_days} ${prevLabel}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:11px;font-weight:600;margin-bottom:4px">
-        <span>Чистая: <b>${Math.round(cmp.clean_pct||0)}%</b></span>
-        <span style="color:var(--soft);text-align:center">май: ${Math.round(cmp.prev_clean_pct||0)}%</span>
+        <span>Чистая: <b>${cmp.current_clean}%</b></span>
+        <span style="color:var(--soft);text-align:center">${prevLabel}: ${cmp.prev_clean}%</span>
         <span style="text-align:right;font-size:12px;font-weight:800;color:${diffColor}">${diffSign}${Math.abs(Math.round(diff))}%</span>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;font-size:11px;font-weight:600">
-        <span>Вне: <b style="color:var(--red)">−${cmp.off_route||0}</b></span>
-        <span style="color:var(--soft);text-align:center">май: −${cmp.prev_off_route||0}</span>
+        <span>Вне: <b style="color:var(--red)">−${cmp.current_off}</b></span>
+        <span style="color:var(--soft);text-align:center">${prevLabel}: −${cmp.prev_off}</span>
         <span style="text-align:right;font-size:12px;font-weight:800;color:${offColor}">${offSign}${Math.abs(diffOff)}</span>
       </div>
     </div>`;
@@ -406,27 +385,21 @@ async function loadCoach() {
     const r = await fetch(API + '/api/sv/' + SV_ID + '/coach/week');
     const d = await r.json();
 
-    let act = 0, grow = 0, wait = 0;
-    const agents = d.agents || [];
-    agents.forEach(a => {
-      const s = a.state || '';
-      if (s === 'Действует') act++;
-      else if (s === 'Видит') grow++;
-      else wait++;
-    });
-    document.getElementById('coach-act').textContent  = act;
-    document.getElementById('coach-grow').textContent = grow;
-    document.getElementById('coach-wait').textContent = wait;
+    const summary = d.team_summary || {};
+    document.getElementById('coach-act').textContent  = summary.acts  || 0;
+    document.getElementById('coach-grow').textContent = summary.grows || 0;
+    document.getElementById('coach-wait').textContent = summary.waits || 0;
 
-    const stateColor = {'Действует':'var(--green)','Видит':'var(--yellow)','Ждёт':'var(--red)'};
-    const stateBg    = {'Действует':'#E6F4EC','Видит':'#FBF1DF','Ждёт':'#FAE7E4'};
+    const statusColor = {'Действует':'var(--green)','Растёт':'var(--yellow)','Ждёт':'var(--red)'};
+    const statusBg    = {'Действует':'#E6F4EC','Растёт':'#FBF1DF','Ждёт':'#FAE7E4'};
+    const dotColor    = {1:'var(--red)', 2:'var(--yellow)', 3:'var(--green)'};
 
-    document.getElementById('coach-agents').innerHTML = agents.map(a => {
-      const s    = a.state || 'Нет данных';
-      const col  = stateColor[s] || 'var(--soft)';
-      const bg   = stateBg[s]   || '#F0EADC';
-      const dots = (a.trend || []).map(t => {
-        const dc = stateColor[t] || 'var(--soft)';
+    document.getElementById('coach-agents').innerHTML = (d.agents || []).map(a => {
+      const s   = a.status || 'Нет данных';
+      const col = statusColor[s] || 'var(--soft)';
+      const bg  = statusBg[s]   || '#F0EADC';
+      const dots = (a.trend_dots || []).map(t => {
+        const dc = t != null ? (dotColor[t] || 'var(--soft)') : '#D3CBBA';
         return `<span style="width:8px;height:8px;border-radius:50%;background:${dc};display:inline-block"></span>`;
       }).join('');
       return `<div style="background:var(--card);border-radius:12px;margin-bottom:8px;border-left:3px solid ${col};padding:12px 14px;display:flex;justify-content:space-between;align-items:center">
@@ -462,24 +435,30 @@ async function loadDay() {
 }
 
 function renderDay(d) {
-  const team    = d.team    || {};
-  const agents  = d.agents  || [];
+  const team   = d.team   || {};
+  const agents = d.agents || [];
 
-  const sys   = Math.round(team.systemic_pct || 0);
-  const clean = Math.round(team.clean_pct    || 0);
+  const sys   = Math.round(team.system_pct || 0);
+  const clean = Math.round(team.clean_pct  || 0);
   const sysC  = sys   >= 75 ? 'var(--green)' : sys   >= 50 ? 'var(--yellow)' : 'var(--red)';
   const clnC  = clean >= 75 ? 'var(--green)' : clean >= 50 ? 'var(--yellow)' : 'var(--red)';
 
   const agentsHtml = agents.map(a => {
-    const aPct = Math.round(a.clean_pct || 0);
-    const aCol = agentColor(a.clean_pct);
-    const ctrlPts  = a.control_points || [];
-    const ctrlHtml = ctrlPts.map(pt =>
-      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid var(--line);font-size:12px">
-         <span>${pt.name}</span>
-         <span style="color:${pt.visited ? 'var(--green)' : 'var(--red)'};font-weight:700">${pt.visited ? '✓' : '✕'}</span>
-       </div>`
-    ).join('');
+    const aPct    = Math.round(a.clean_pct || 0);
+    const aCol    = agentColor(a.clean_pct);
+    const ctrlPts = a.control_points || [];
+
+    const ctrlHtml = ctrlPts.map(pt => {
+      const icon     = pt.visited_today ? '✓' : '✕';
+      const iCol     = pt.visited_today ? 'var(--green)' : 'var(--red)';
+      const offBadge = pt.off_route > 0
+        ? `<span style="font-size:10px;color:var(--amber);font-weight:700;margin-left:6px">вне ${pt.off_route}</span>`
+        : '';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:0.5px solid var(--line);font-size:12px">
+        <span>${pt.name}${offBadge}</span>
+        <span style="color:${iCol};font-weight:700;flex-shrink:0;margin-left:8px">${icon}</span>
+      </div>`;
+    }).join('');
 
     return `<details class="day-details">
       <summary>
@@ -487,7 +466,7 @@ function renderDay(d) {
           <span style="width:8px;height:8px;border-radius:50%;background:${aCol};flex-shrink:0;display:inline-block"></span>
           <div>
             <div style="font-size:13px;font-weight:700">${a.name}</div>
-            <div style="font-size:11px;color:var(--soft)">${ctrlPts.length} контрольных точек</div>
+            <div style="font-size:11px;color:var(--soft)">${a.planned || 0} план · ${ctrlPts.length} контрольных</div>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:5px">
@@ -498,15 +477,15 @@ function renderDay(d) {
       <div style="padding:4px 0 8px 14px">
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px">
           <div style="background:var(--bg);border-radius:7px;padding:6px;text-align:center">
-            <div style="font-size:13px;font-weight:700">${a.visits || 0}</div>
-            <div style="font-size:9px;color:var(--soft)">визитов</div>
+            <div style="font-size:13px;font-weight:700">${a.planned || 0}</div>
+            <div style="font-size:9px;color:var(--soft)">план</div>
           </div>
           <div style="background:var(--bg);border-radius:7px;padding:6px;text-align:center">
             <div style="font-size:13px;font-weight:700">${a.orders || 0}</div>
             <div style="font-size:9px;color:var(--soft)">заказов</div>
           </div>
           <div style="background:var(--bg);border-radius:7px;padding:6px;text-align:center">
-            <div style="font-size:13px;font-weight:700;color:var(--red)">−${a.off_route || 0}</div>
+            <div style="font-size:13px;font-weight:700;color:${(a.off_route||0)>0?'var(--red)':'var(--ink)'}">−${a.off_route || 0}</div>
             <div style="font-size:9px;color:var(--soft)">вне</div>
           </div>
         </div>
@@ -515,28 +494,31 @@ function renderDay(d) {
     </details>`;
   }).join('');
 
+  const teamOrdersHtml = `
+    <div style="background:var(--bg);border-radius:10px;padding:10px">
+      <div style="font-size:18px;font-weight:700">${team.orders || 0} <span style="font-size:12px;color:var(--red)">−${team.off_route || 0} вне</span></div>
+      <div style="font-size:10px;color:var(--soft)">заказов</div>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:10px">
+      <div style="font-size:18px;font-weight:700;color:${sysC}">${sys}%</div>
+      <div style="font-size:10px;color:var(--soft)">системная</div>
+    </div>
+    <div style="background:var(--bg);border-radius:10px;padding:10px">
+      <div style="font-size:18px;font-weight:700;color:${clnC}">${clean}%</div>
+      <div style="font-size:10px;color:var(--soft)">чистая</div>
+    </div>`;
+
   document.getElementById('day-content').innerHTML = `
     <div class="card">
       <div class="lbl">Команда за день</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <div style="background:var(--bg);border-radius:10px;padding:10px">
           <div style="font-size:18px;font-weight:700">${team.planned || 0}</div>
-          <div style="font-size:10px;color:var(--soft)">плановых</div>
+          <div style="font-size:10px;color:var(--soft)">плановых визитов</div>
         </div>
-        <div style="background:var(--bg);border-radius:10px;padding:10px">
-          <div style="font-size:18px;font-weight:700">${team.orders || 0} <span style="font-size:12px;color:var(--red)">−${team.off_route || 0} вне</span></div>
-          <div style="font-size:10px;color:var(--soft)">заказов</div>
-        </div>
-        <div style="background:var(--bg);border-radius:10px;padding:10px">
-          <div style="font-size:18px;font-weight:700;color:${sysC}">${sys}%</div>
-          <div style="font-size:10px;color:var(--soft)">системная</div>
-        </div>
-        <div style="background:var(--bg);border-radius:10px;padding:10px">
-          <div style="font-size:18px;font-weight:700;color:${clnC}">${clean}%</div>
-          <div style="font-size:10px;color:var(--soft)">чистая</div>
-        </div>
+        ${teamOrdersHtml}
       </div>
-    </div>
+    </div>`;
     <div class="card">
       <div class="lbl">По торговым</div>
       ${agentsHtml || '<div class="loading">Нет данных по агентам</div>'}
