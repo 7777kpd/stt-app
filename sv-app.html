@@ -301,7 +301,7 @@ function renderRating(agents) {
   }).join('');
   document.getElementById('v-r').innerHTML = `
     <table class="rtable">
-      <colgroup><col style="width:38%"><col style="width:15%"><col style="width:15%"><col style="width:16%"><col style="width:16%"></colgroup>
+      <colgroup><col style="width:36%"><col style="width:16%"><col style="width:16%"><col style="width:16%"><col style="width:16%"></colgroup>
       <thead><tr>
         <th>Торговый</th><th>Визиты</th><th>Заказы</th><th>Вне</th><th>Чистая</th>
       </tr></thead>
@@ -329,12 +329,12 @@ function renderTrend(weeks, cmp) {
 
     let barStyle;
     if (isCurrent) {
-      barStyle = `height:${barH}px;border:1.5px dashed #C4B89A;border-bottom:none;border-radius:4px 4px 0 0;display:flex;align-items:center;justify-content:center`;
+      barStyle = `height:${barH}px;width:100%;border:1.5px dashed #C4B89A;border-bottom:none;border-radius:4px 4px 0 0`;
     } else if (isZero) {
-      barStyle = `height:14px;background:#FAE7E4;border:1px solid #F1C9C2;border-radius:4px 4px 0 0`;
+      barStyle = `height:14px;width:100%;background:#FAE7E4;border:1px solid #F1C9C2;border-radius:4px 4px 0 0`;
     } else {
       const bg = isBest ? 'var(--green)' : 'var(--ink)';
-      barStyle = `height:${barH}px;background:${bg};border-radius:4px 4px 0 0`;
+      barStyle = `height:${barH}px;width:100%;background:${bg};border-radius:4px 4px 0 0`;
     }
 
     const pctColor = isCurrent ? 'var(--soft)' : isZero ? 'var(--red)' : isBest ? 'var(--green)' : 'var(--ink)';
