@@ -178,7 +178,7 @@ async function loadRoute() {
     document.getElementById('ride-name').textContent = rec ? rec.agent || rec.name : 'Нет рекомендации';
     document.getElementById('ride-reason').textContent = rec ? rec.reason : '';
 
-    const ctrlPts = d.agents ? d.agents.reduce((s, a) => s + (a.control_points || []).length, 0) : 0;
+    const ctrlPts = d.agents ? d.agents.reduce((s, a) => s + (a.points || []).length, 0) : 0;
     document.getElementById('ctrl-count').textContent = ctrlPts;
 
     const list = document.getElementById('agents-list');
@@ -187,7 +187,7 @@ async function loadRoute() {
       return;
     }
     list.innerHTML = d.agents.map(ag => {
-      const pts = ag.control_points || [];
+      const pts = ag.points || [];
       const color = ag.severity === 'high' ? 'var(--red)' : 'var(--amber)';
       const badgeHtml = ag.survey && !ag.survey.filled
         ? '<span class="badge">опросник не заполнен</span>' : '';
