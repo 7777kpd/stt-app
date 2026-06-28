@@ -533,8 +533,8 @@ function buildHistoryScreen(data) {
       <div class="month-row">
         <div class="month-name">${mName}${isCurrent ? ' <span style="font-size:10px;color:#6b7280;font-weight:400">· в процессе</span>' : ''}</div>
         <div class="month-pct-wrap">
-          <div class="month-pct" style="color:${colorOf(lv)}">${mo.stt}%</div>
-          ${cleanStt === null ? '' : `<div class="month-clean" style="color:${cleanColor}">чистая ${cleanStt}%</div>`}
+          <div class="month-pct" style="color:${cleanStt !== null ? cleanColor : colorOf(lv)}">${cleanStt !== null ? cleanStt : mo.stt}%</div>
+          ${cleanStt === null ? '' : `<div class="month-clean" style="color:${colorOf(lv)}">системная ${mo.stt}%</div>`}
         </div>
       </div>
       <div class="seg-bar">
