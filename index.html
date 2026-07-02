@@ -221,8 +221,17 @@ function formatDate() {
   return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} · ${days[d.getDay()]}`;
 }
 
+function shortAddr(addr) {
+  if (!addr) return '';
+  const parts = addr.split(',').map(s => s.trim());
+  const filtered = parts.filter(p => !/район|область/i.test(p));
+  if (filtered.length >= 3) return filtered.slice(-3).join(', ');
+  if (filtered.length >= 2) return filtered.slice(-2).join(', ');
+  return addr;
+}
+
 function normalizePoint(pt) {
-  pt.address = pt.tt_short || pt.tt || '';
+  pt.address = pt.tt_short || pt.tt || pt.address || '';
   pt.visits_done = pt.passed_planned !== undefined ? pt.passed_planned : (pt.visits_done || 0);
   pt.visits_total = pt.total_planned !== undefined ? pt.total_planned : (pt.visits_total || 0);
   pt.misses = pt.missed !== undefined ? pt.missed : (pt.misses || 0);
@@ -311,8 +320,8 @@ function renderCard(pt) {
   return `<div class="card level-${lv}">
     <div class="card-top">
       <div>
-        <div class="card-addr">${pt.address}</div>
-        ${pt.client ? `<div class="card-client">${pt.client}</div>` : ''}
+        <div class="card-addr">${pt.client || pt.address}</div>
+        ${pt.client ? `<div class="card-client" style="font-style:normal">${pt.address}</div>` : ''}
       </div>
       <div class="card-stt">${pt.stt}%</div>
     </div>
@@ -375,8 +384,8 @@ function buildRouteScreen(data) {
           ${focusPoints.map(p => `
             <div class="focus-point">
               <div>
-                <div class="focus-point-name">${p.address}</div>
-                ${p.client ? `<div class="focus-point-client">${p.client}</div>` : ''}
+                <div class="focus-point-name">${p.client || p.address}</div>
+                ${p.client ? `<div class="focus-point-client">${p.address}</div>` : ''}
                 <div class="focus-point-reason">${getFocusReason(p)}</div>
               </div>
               <div class="focus-point-stt" style="color:${colorOf(levelOf(p.stt))}">${p.stt}%</div>
@@ -601,10 +610,12 @@ function buildDayScreen(data) {
         const res = p.had_order
           ? '<span style="color:#2D5A1B;font-weight:700;font-size:15px;flex-shrink:0">✓</span>'
           : '<span style="color:#8B1A1A;font-weight:700;font-size:15px;flex-shrink:0">✕</span>';
-        const cl = p.client ? `<div style="font-size:10px;color:var(--muted);margin-top:1px">${p.client}</div>` : '';
         const border = i < focusPts.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+        const ptLabel = p.client
+          ? `<div style="font-size:12px;font-weight:700;line-height:1.3">${p.client}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">${p.name}</div>`
+          : `<div style="font-size:12px;font-weight:600;line-height:1.3">${p.name}</div>`;
         return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;${border}gap:8px">
-          <div><div style="font-size:12px;font-weight:600;line-height:1.3">${p.name}</div>${cl}</div>${res}</div>`;
+          <div>${ptLabel}</div>${res}</div>`;
       }).join('')
     : '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет точек контроля от СВ</div>';
 
