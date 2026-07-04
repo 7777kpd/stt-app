@@ -53,8 +53,8 @@ body {
 .card.level-yellow { border-left-color: var(--yellow); }
 .card.level-green  { border-left-color: var(--green); }
 .card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.card-addr { font-weight: 700; font-size: 13px; flex: 1; line-height: 1.3; }
-.card-client { font-size: 12px; color: var(--muted); font-style: normal; margin-top: 2px; }
+.card-addr { font-weight: 400; font-size: 12px; color: var(--muted); flex: 1; line-height: 1.3; margin-top: 2px; }
+.card-client { font-size: 13px; font-weight: 700; font-style: normal; line-height: 1.3; }
 .card-stt { font-weight: 900; font-size: 19px; flex-shrink: 0; line-height: 1.1; }
 .level-red    .card-stt { color: var(--red); }
 .level-yellow .card-stt { color: var(--yellow); }
@@ -320,10 +320,8 @@ function renderCard(pt) {
   return `<div class="card level-${lv}">
     <div class="card-top">
       <div>
-        ${pt.client
-          ? `<div class="card-addr">${pt.client}</div><div class="card-client">${pt.address}</div>`
-          : `<div class="card-addr">${pt.address}</div>`
-        }
+        ${pt.client ? `<div class="card-client">${pt.client}</div>` : ''}
+        <div class="card-addr">${pt.address}</div>
       </div>
       <div class="card-stt">${pt.stt}%</div>
     </div>
