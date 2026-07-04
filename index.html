@@ -358,12 +358,16 @@ function buildRouteScreen(data) {
   const agentName = data.agent || data.agent_name || '';
 
   // Строим блок фокуса СВ
-  const focusPoints = allPoints.filter(p =>
+  // Use cross-month focus points from /day endpoint
+  const focusPoints = _dayFocusPoints.length > 0 ? _dayFocusPoints : allPoints.filter(p =>
     calcMissedStreak(p.visits) >= 2 || (p.off_schedule_orders||0) > 0
   );
 
   function getFocusReason(p) {
-    const streak = calcMissedStreak(p.visits);
+    if (p.missed_streak >= 3) return '3+ пропуска подряд';
+    if (p.missed_streak >= 2) return '2 пропуска подряд';
+    if (p.off_route > 0) return 'вне маршрута';
+    const streak = calcMissedStreak(p.visits || []);
     if (streak >= 3) return '3+ пропуска подряд';
     if (streak >= 2) return '2 пропуска подряд';
     return 'вне маршрута';
@@ -670,6 +674,8 @@ function activateScreen(name) {
   document.querySelector(`[data-screen="${name}"]`).classList.add('active');
 }
 
+let _dayFocusPoints = [];
+
 async function main() {
   const id = getTelegramId();
   const urlParams = new URLSearchParams(window.location.search);
@@ -815,7 +821,13 @@ async function main() {
     document.getElementById(sid).innerHTML = `<div class="loader"><div style="font-size:28px">⚠️</div><div>${msg}</div></div>`;
   };
 
-  fetch(`${API}/api/agent/${id}/today`)
+  // Load /day first to get cross-month focus points, then build route
+  fetch(`${API}/api/agent/${id}/day`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(dayData => {
+      _dayFocusPoints = dayData.focus_points || [];
+      return fetch(`${API}/api/agent/${id}/today`);
+    })
     .then(r => r.ok ? r.json() : Promise.reject())
     .then(buildRouteScreen)
     .catch(() => err('screen-route', 'Ошибка загрузки маршрута'));
