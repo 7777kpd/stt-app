@@ -483,19 +483,19 @@ function renderStt(data) {
   // Тренд по неделям
   const weeks = data.trend_weekdays || data.trend_weeks || [];
   const posWeeks = weeks.filter(w => !w.is_current && !w.current && (w.clean_stt || w.clean_pct) !== null && (w.clean_stt || w.clean_pct) > 0);
-  const maxVal = Math.max(...weeks.filter(w => w.clean_stt !== null && w.clean_stt > 0).map(w => w.clean_stt), 1);
-  const bestWeek = posWeeks.length > 0 ? posWeeks.reduce((a, b) => a.clean_stt > b.clean_stt ? a : b) : null;
+  const maxVal = Math.max(...weeks.filter(w => (w.clean_pct || w.clean_stt) != null && (w.clean_pct || w.clean_stt) > 0).map(w => w.clean_pct || w.clean_stt || 0), 1);
+  const bestWeek = posWeeks.length > 0 ? posWeeks.reduce((a, b) => (a.clean_pct||a.clean_stt||0) > (b.clean_pct||b.clean_stt||0) ? a : b) : null;
 
   const barsHtml = weeks.map(w => {
     const isCurrent = w.is_current;
     const isBest = bestWeek && w.week === bestWeek.week;
-    const isZero = w.clean_stt === 0 || w.clean_stt === null;
+    const isZero = (w.clean_pct || w.clean_stt) === 0 || (w.clean_pct ?? w.clean_stt) === null;
     const lbl = w.label ? w.label.split(' ')[0] : 'Нед ' + w.week;
     const offTxt = w.week_off > 0 ? `<span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.85)">−${w.week_off}</span>` : '';
     const offTxtRed = w.week_off > 0 ? `<span style="font-size:9px;font-weight:800;color:var(--red)">−${w.week_off}</span>` : '';
     const offTxtDash = w.week_off > 0 ? `<span style="font-size:9px;font-weight:800;color:#C4B89A">−${w.week_off}</span>` : '';
 
-    if (w.clean_stt === null) {
+    if ((w.clean_pct ?? w.clean_stt) === null) {
       return `<div class="week-col">
         <div class="week-pct" style="color:var(--ink-soft)">—</div>
         <div class="week-bar" style="height:14px;background:var(--line);opacity:.4;border-radius:6px 6px 0 0"></div>
@@ -503,7 +503,7 @@ function renderStt(data) {
       </div>`;
     }
     if (isCurrent) {
-      const h = isZero ? 14 : Math.max(16, Math.round(w.clean_stt / maxVal * 70));
+      const h = isZero ? 14 : Math.max(16, Math.round((w.clean_pct || w.clean_stt || 0) / maxVal * 70));
       const pctColor = isZero ? 'var(--ink-soft)' : 'var(--ink-soft)';
       return `<div class="week-col">
         <div class="week-pct" style="color:${pctColor}">${w.clean_stt}%</div>
@@ -518,7 +518,7 @@ function renderStt(data) {
         <div class="week-num">${lbl}</div>
       </div>`;
     }
-    const h = Math.max(16, Math.round(w.clean_stt / maxVal * 70));
+    const h = Math.max(16, Math.round((w.clean_pct || w.clean_stt || 0) / maxVal * 70));
     const barBg = isBest ? 'var(--green)' : 'var(--amber)';
     const pctColor = isBest ? 'var(--green)' : 'var(--amber)';
     const bestMark = isBest ? ' ✦' : '';
