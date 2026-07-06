@@ -318,6 +318,9 @@ function formatDate() {
   return `${d.getDate()} ${months[d.getMonth()]} · ${days[d.getDay()]}`;
 }
 
+function safe(v, def=0) { return (v != null && !isNaN(v)) ? v : def; }
+function safePct(v) { return (v != null && !isNaN(v)) ? Math.round(v) + '%' : '—'; }
+
 function levelClass(pct) {
   return pct >= 75 ? 'green' : pct >= 50 ? 'yellow' : 'red';
 }
@@ -469,8 +472,8 @@ function renderStt(data) {
     const off = r.off > 0 ? '−' + r.off : '—';
     return '<tr style="border-bottom:0.5px solid var(--line)">' +
       '<td style="padding:9px 8px;text-align:left"><span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>' + shortName + '</td>' +
-      '<td style="padding:9px 8px;text-align:right">' + (r.planned || '—') + '</td>' +
-      '<td style="padding:9px 8px;text-align:right">' + (r.orders || '—') + '</td>' +
+      '<td style="padding:9px 8px;text-align:right">' + (r.visits != null ? r.visits : '—') + '</td>' +
+      '<td style="padding:9px 8px;text-align:right">' + (r.orders != null ? r.orders : '—') + '</td>' +
       '<td style="padding:9px 8px;text-align:right;color:var(--red)">' + off + '</td>' +
       '<td style="padding:9px 8px;text-align:right;font-weight:800;color:' + netColor + '">' + r.net + '%</td>' +
       '</tr>';
@@ -478,8 +481,8 @@ function renderStt(data) {
   const ratingHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed"><colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Визиты</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чистая</th></tr></thead><tbody>' + ratingRows + '</tbody></table>';
 
   // Тренд по неделям
-  const weeks = data.trend_weeks || [];
-  const posWeeks = weeks.filter(w => !w.is_current && w.clean_stt !== null && w.clean_stt > 0);
+  const weeks = data.trend_weekdays || data.trend_weeks || [];
+  const posWeeks = weeks.filter(w => !w.is_current && !w.current && (w.clean_stt || w.clean_pct) !== null && (w.clean_stt || w.clean_pct) > 0);
   const maxVal = Math.max(...weeks.filter(w => w.clean_stt !== null && w.clean_stt > 0).map(w => w.clean_stt), 1);
   const bestWeek = posWeeks.length > 0 ? posWeeks.reduce((a, b) => a.clean_stt > b.clean_stt ? a : b) : null;
 
@@ -544,12 +547,12 @@ function renderStt(data) {
         <div style="font-size:10px;font-weight:700;margin-bottom:7px;${cmpTitle}">${cmp.current_label} (${cmp.current_days} дн) vs ${cmp.prev_label} (${cmp.prev_days} дн)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:baseline;font-size:12px;font-weight:600;margin-bottom:5px">
           <span style="color:var(--ink)">Чистая: <b>${cmp.current_clean}%</b></span>
-          <span style="color:var(--ink-soft);text-align:center">${cmp.prev_label_short}: ${cmp.prev_clean}%</span>
+          <span style="color:var(--ink-soft);text-align:center">${cmp.prev_label || cmp.prev_label_short || ''}: ${cmp.prev_clean}%</span>
           <span style="text-align:right;font-size:13px;font-weight:800;color:${cleanUp ? 'var(--green)' : 'var(--red)'}">${cleanUp ? '↑' : '↓'} ${cleanUp ? '+' : ''}${cleanDelta}%</span>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;align-items:baseline;font-size:12px;font-weight:600">
           <span style="color:var(--ink)">Вне: <b style="color:var(--red)">−${cmp.current_off}</b></span>
-          <span style="color:var(--ink-soft);text-align:center">${cmp.prev_label_short}: −${cmp.prev_off}</span>
+          <span style="color:var(--ink-soft);text-align:center">${cmp.prev_label || cmp.prev_label_short || ''}: −${cmp.prev_off || 0}</span>
           <span style="text-align:right;font-size:13px;font-weight:800;color:${offGood ? 'var(--green)' : 'var(--red)'}">${offGood ? '↓' : '↑'} ${offGood ? '' : '+'}${offDelta} вне</span>
         </div>
         ${daysNote}
@@ -841,23 +844,23 @@ function renderDay(data) {
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
   const statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.planned || 0}</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">плановых</div></div>
-    <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.orders || 0} <span style="font-size:13px;color:var(--red);font-weight:700">−${team.off || 0} вне</span></div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">заказов</div></div>
-    <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:var(--amber)">${team.system_stt || 0}%</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">системная</div></div>
-    <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:var(--amber)">${team.clean_stt || 0}%</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">чистая</div></div>
+    <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.orders || 0} <span style="font-size:13px;color:var(--red);font-weight:700">−${team.off_route || team.off || 0} вне</span></div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">заказов</div></div>
+    <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:var(--amber)">${team.system_pct || team.system_stt || 0}%</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">системная</div></div>
+    <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:var(--amber)">${team.clean_pct || team.clean_stt || 0}%</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">чистая</div></div>
   </div>`;
   const agentsHtml = agents.map(a => {
-    const clean = a.planned > 0 ? Math.round(Math.max(0, a.orders - a.off) / a.planned * 100) : 0;
+    const clean = a.clean_pct != null ? a.clean_pct : (a.planned > 0 ? Math.round(Math.max(0, a.orders - (a.off_route || a.off || 0)) / a.planned * 100) : 0);
     const dotColor = clean >= 75 ? 'var(--green)' : clean >= 50 ? 'var(--yellow)' : 'var(--red)';
     const sttColor = dotColor;
     const shortName = a.name.split(' ').slice(0, 2).join(' ');
     const ptCount = (a.control_points || []).length;
     const ptLabel = ptCount > 0 ? ptCount + ' контрольных точек' : 'нет контрольных точек';
     const aTile = 'background:var(--bg);border-radius:8px;padding:7px 10px;text-align:center;';
-    const tilesHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;"><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.planned}</div><div style="font-size:9px;color:var(--ink-soft)">визитов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.orders}</div><div style="font-size:9px;color:var(--ink-soft)">заказов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700;color:var(--red)">−${a.off}</div><div style="font-size:9px;color:var(--ink-soft)">вне</div></div></div>`;
+    const tilesHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;"><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.planned}</div><div style="font-size:9px;color:var(--ink-soft)">визитов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.orders}</div><div style="font-size:9px;color:var(--ink-soft)">заказов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700;color:var(--red)">−${a.off_route || a.off || 0}</div><div style="font-size:9px;color:var(--ink-soft)">вне</div></div></div>`;
     const pointsHtml = (a.control_points || []).map(p => {
-      const result = p.had_order ? '<span style="color:var(--green);font-weight:700;font-size:14px">✓</span>' : '<span style="color:var(--red);font-weight:700;font-size:14px">✕</span>';
-      const clientLine = p.client ? `<div style="font-size:10px;color:var(--ink-soft)">${p.client}</div>` : '';
-      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div><div style="font-size:12px">${p.name}</div>${clientLine}</div>${result}</div>`;
+      const result = (p.had_order || p.visited) ? '<span style="color:var(--green);font-weight:700;font-size:14px">✓</span>' : '<span style="color:var(--red);font-weight:700;font-size:14px">✕</span>';
+      const nameLine = p.client ? `<div style="font-size:12px;font-weight:700">${p.client}</div><div style="font-size:10px;color:var(--ink-soft)">${p.name}</div>` : `<div style="font-size:12px">${p.name}</div>`;
+      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div>${nameLine}</div>${result}</div>`;
     }).join('');
     return `<details style="border-bottom:1.5px solid var(--line)"><summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 0"><div style="display:flex;align-items:center;gap:8px;flex:1"><span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span><div><div style="font-size:13px;font-weight:700">${shortName}</div><div style="font-size:11px;color:var(--ink-soft)">${ptLabel}</div></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span style="font-size:15px;font-weight:700;color:${sttColor}">${clean}%</span><span style="font-size:10px;color:var(--ink-soft)">▶</span></div></summary><div style="padding:4px 0 10px 16px">${tilesHtml}${pointsHtml}</div></details>`;
   }).join('');
