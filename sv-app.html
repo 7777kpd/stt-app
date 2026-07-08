@@ -524,10 +524,13 @@ function renderStt(data) {
     const bestMark = isBest ? ' ✦' : '';
     const wkStyle = isBest ? `color:var(--green);font-weight:800` : '';
     const colWrap = isBest ? `style="background:var(--green-bg);border-radius:6px;padding:2px 0"` : '';
+    const deltaVal = w.delta != null ? (w.delta > 0 ? '+' + w.delta : String(w.delta)) : '';
+    const deltaColor = w.delta > 0 ? 'var(--green)' : w.delta < 0 ? 'var(--red)' : 'var(--ink-soft)';
     return `<div class="week-col" ${colWrap}>
       <div class="week-pct" style="color:${pctColor}">${Math.round(w.clean_pct ?? w.clean_stt ?? 0)}%${bestMark}</div>
       <div class="week-bar" style="height:${h}px;background:${barBg};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center">${offTxt}</div>
       <div class="week-num" style="${wkStyle}">${lbl}</div>
+      ${deltaVal ? `<div style="font-size:9px;font-weight:700;color:${deltaColor}">${deltaVal}</div>` : '<div style="font-size:9px"> </div>'}
     </div>`;
   }).join('');
 
@@ -541,7 +544,7 @@ function renderStt(data) {
     const offGood = offDelta <= 0;
     const cmpBg = (cleanUp && offGood) ? 'var(--green-bg)' : (!cleanUp && !offGood) ? 'var(--red-bg)' : '#F5F0EB';
     const cmpTitle = (cleanUp && offGood) ? 'color:#1A5C33' : (!cleanUp && !offGood) ? 'color:#7C1A1A' : 'color:var(--ink-soft)';
-    const daysNote = cmp.days_diff !== 0 ? `<div style="font-size:10px;color:var(--ink-soft);margin-top:5px">⚠️ Прошлый месяц на ${Math.abs(cmp.days_diff)} дн. ${cmp.days_diff > 0 ? 'длиннее' : 'короче'} — учтено при сравнении</div>` : '';
+    const daysNote = '';
     compareHtml = `
       <div style="border-radius:10px;padding:9px 11px;margin-top:10px;background:${cmpBg}">
         <div style="font-size:10px;font-weight:700;margin-bottom:7px;${cmpTitle}">${cmp.current_label} (${cmp.current_days} дн) vs ${cmp.prev_label} (${cmp.prev_days} дн)</div>
