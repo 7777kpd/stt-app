@@ -519,11 +519,12 @@ function renderStt(data) {
       </div>`;
     }
     const h = Math.max(16, Math.round((w.clean_pct || w.clean_stt || 0) / maxVal * 70));
-    const barBg = isBest ? 'var(--green)' : 'var(--amber)';
-    const pctColor = isBest ? 'var(--green)' : 'var(--amber)';
+    const isWorst = bestWeek && weeks.length > 1 && (w.clean_pct || w.clean_stt || 0) === Math.min(...weeks.filter(x => (x.clean_pct || x.clean_stt || 0) > 0).map(x => x.clean_pct || x.clean_stt || 0));
+    const barBg = isBest ? 'var(--green)' : isWorst ? 'var(--red)' : '#C4B89A';
+    const pctColor = isBest ? 'var(--green)' : isWorst ? 'var(--red)' : '#6B6358';
     const bestMark = isBest ? ' ✦' : '';
-    const wkStyle = isBest ? `color:var(--green);font-weight:800` : '';
-    const colWrap = isBest ? `style="background:var(--green-bg);border-radius:6px;padding:2px 0"` : '';
+    const wkStyle = isBest ? `color:var(--green);font-weight:800` : isWorst ? `color:var(--red);font-weight:800` : '';
+    const colWrap = isBest ? `style="background:var(--green-bg);border-radius:6px;padding:2px 0"` : isWorst ? `style="background:var(--red-bg);border-radius:6px;padding:2px 0"` : '';
     const deltaVal = w.delta != null ? (w.delta > 0 ? '+' + w.delta : String(w.delta)) : '';
     const deltaColor = w.delta > 0 ? 'var(--green)' : w.delta < 0 ? 'var(--red)' : 'var(--ink-soft)';
     return `<div class="week-col" ${colWrap}>
