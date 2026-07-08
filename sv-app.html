@@ -506,7 +506,7 @@ function renderStt(data) {
       const h = isZero ? 14 : Math.max(16, Math.round((w.clean_pct || w.clean_stt || 0) / maxVal * 70));
       const pctColor = isZero ? 'var(--ink-soft)' : 'var(--ink-soft)';
       return `<div class="week-col">
-        <div class="week-pct" style="color:${pctColor}">${w.clean_stt}%</div>
+        <div class="week-pct" style="color:${pctColor}">${Math.round(w.clean_pct ?? w.clean_stt ?? 0)}%</div>
         <div class="week-bar" style="height:${h}px;border-radius:6px 6px 0 0;border:1.5px dashed #C4B89A;border-bottom:none;display:flex;align-items:center;justify-content:center">${offTxtDash}</div>
         <div class="week-num">${lbl}</div>
       </div>`;
@@ -525,7 +525,7 @@ function renderStt(data) {
     const wkStyle = isBest ? `color:var(--green);font-weight:800` : '';
     const colWrap = isBest ? `style="background:var(--green-bg);border-radius:6px;padding:2px 0"` : '';
     return `<div class="week-col" ${colWrap}>
-      <div class="week-pct" style="color:${pctColor}">${w.clean_stt}%${bestMark}</div>
+      <div class="week-pct" style="color:${pctColor}">${Math.round(w.clean_pct ?? w.clean_stt ?? 0)}%${bestMark}</div>
       <div class="week-bar" style="height:${h}px;background:${barBg};border-radius:6px 6px 0 0;display:flex;align-items:center;justify-content:center">${offTxt}</div>
       <div class="week-num" style="${wkStyle}">${lbl}</div>
     </div>`;
