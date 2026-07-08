@@ -487,8 +487,8 @@ function renderStt(data) {
   const bestWeek = posWeeks.length > 0 ? posWeeks.reduce((a, b) => (a.clean_pct||a.clean_stt||0) > (b.clean_pct||b.clean_stt||0) ? a : b) : null;
 
   const barsHtml = weeks.map(w => {
-    const isCurrent = w.is_current;
-    const isBest = bestWeek && w.week === bestWeek.week;
+    const isCurrent = w.is_current || w.current;
+    const isBest = bestWeek && (w.weekday === bestWeek.weekday || w.week === bestWeek.week);
     const isZero = (w.clean_pct || w.clean_stt) === 0 || (w.clean_pct ?? w.clean_stt) === null;
     const lbl = w.label ? w.label.split(' ')[0] : 'Нед ' + w.week;
     const offTxt = w.week_off > 0 ? `<span style="font-size:9px;font-weight:800;color:rgba(255,255,255,.85)">−${w.week_off}</span>` : '';
