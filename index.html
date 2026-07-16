@@ -56,6 +56,8 @@ body {
 .card-addr { font-weight: 400; font-size: 12px; color: var(--muted); flex: 1; line-height: 1.3; margin-top: 2px; }
 .card-client { font-size: 13px; font-weight: 700; font-style: normal; line-height: 1.3; }
 .card-stt { font-weight: 900; font-size: 19px; flex-shrink: 0; line-height: 1.1; }
+.card-stt-wrap { text-align: right; flex-shrink: 0; }
+.card-stt-label { font-size: 9px; font-weight: 600; color: var(--muted, #8a8478); text-transform: uppercase; letter-spacing: .04em; margin-top: 1px; }
 .level-red    .card-stt { color: var(--red); }
 .level-yellow .card-stt { color: var(--yellow); }
 .level-green  .card-stt { color: var(--green); }
@@ -323,7 +325,10 @@ function renderCard(pt) {
         ${pt.client ? `<div class="card-client">${pt.client}</div>` : ''}
         <div class="card-addr">${pt.address}</div>
       </div>
-      <div class="card-stt">${pt.stt}%</div>
+      <div class="card-stt-wrap">
+        <div class="card-stt">${pt.stt}%</div>
+        <div class="card-stt-label">система</div>
+      </div>
     </div>
     <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}${offRoute > 0 ? ` · <span class="off-route">${offRoute} вне маршрута</span>` : ''}</div>
     ${renderVisits(pt.visits)}
