@@ -569,7 +569,10 @@ function renderStt(data) {
     <div class="summary-card">
       <div class="summary-top-row">
         <p class="summary-label">Итог по команде</p>
-        <span class="period-caption">${data.planned_visits} плановых визитов</span>
+        <span class="period-caption">${data.passed_visits} плановых визитов</span>
+      </div>
+      <div style="font-size:10px;color:var(--ink-soft);margin:-4px 0 8px;line-height:1.3">
+        За период с начала месяца по вчера включительно (без сегодняшнего дня — по нему заказы ещё не закрыты)
       </div>
       <div class="dist-row">
         <div class="dist-tile">
