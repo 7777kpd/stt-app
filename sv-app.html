@@ -409,11 +409,15 @@ function renderRoute(data) {
           <div class="coach-context-label">🧠 Вчера про ${survey.hard_point || '—'}</div>
           <div class="coach-context-row">
             <span class="coach-context-key">Что помешало:</span>
-            <span class="coach-context-val">«${survey.obstacle || '—'}»</span>
+            <span class="coach-context-val">«${survey.reason || '—'}»</span>
           </div>
           <div class="coach-context-row">
             <span class="coach-context-key">Действие:</span>
             <span class="coach-context-val">«${survey.action || '—'}»</span>
+          </div>
+          <div class="coach-context-row">
+            <span class="coach-context-key">Помощь коллеге:</span>
+            <span class="coach-context-val">«${survey.seed || '—'}»</span>
           </div>
           <div class="coach-context-divider"></div>
           <div class="coach-context-score ${scoreClass}">${scoreLabel}</div>
@@ -728,7 +732,7 @@ function renderCoach(data) {
       </div>
       <div class="coach-stat yellow">
         <div class="coach-stat-num">${ts.grows || 0}</div>
-        <div class="coach-stat-cap">Растёт</div>
+        <div class="coach-stat-cap">Анализирует</div>
       </div>
       <div class="coach-stat red">
         <div class="coach-stat-num">${ts.waits || 0}</div>
@@ -764,7 +768,7 @@ async function generateProgram() {
   area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Генерирую программу...</div>';
 
   const patternsText = _coachPatterns.slice(0, 10).map(p =>
-    `— «${p.obstacle}» (${p.agent}, оценка ${p.ai_score || '?'}/3)`
+    `— «${p.reason}» (${p.agent}, оценка ${p.ai_score || '?'}/3)`
   ).join('\n');
 
   const topic = document.getElementById('coach-topic')?.textContent || 'работа с возражениями';
