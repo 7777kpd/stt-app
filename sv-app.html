@@ -767,11 +767,9 @@ async function generateProgram() {
   const area = document.getElementById('program-area');
   area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Генерирую программу...</div>';
 
-  const topic = document.getElementById('coach-topic')?.textContent || 'работа с возражениями';
-
   try {
     const res = await fetch(
-      `${API}/api/sv/${_telegramId}/coach/generate-program?topic=${encodeURIComponent(topic)}`,
+      `${API}/api/sv/${_telegramId}/coach/generate-program`,
       { method: 'POST' }
     );
     if (!res.ok) throw new Error(`request failed: ${res.status}`);
@@ -779,6 +777,9 @@ async function generateProgram() {
     const data = await res.json();
     const steps = data.steps || [];
     if (!steps.length) throw new Error('no steps');
+
+    const topicEl = document.getElementById('coach-topic');
+    if (topicEl && data.topic) topicEl.textContent = data.topic;
 
     let html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:2px;">';
     steps.forEach(s => {
