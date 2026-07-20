@@ -503,6 +503,8 @@ function renderStt(data) {
 
     const catRows = rowsWithAvg.map(({r, avg}) => {
       const shortName = r.agent.split(' ').slice(0, 2).join(' ');
+      const dotColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
+      const dotHtml = '<span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>';
       const cells = catNames.map(n => {
         const v = (r.categories || {})[n];
         if (v == null) return '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>';
@@ -512,7 +514,7 @@ function renderStt(data) {
       const avgCell = avg == null
         ? '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>'
         : `<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avg>=75?'var(--green)':avg>=50?'var(--yellow)':'var(--red)'}">${avg}%</td>`;
-      return `<tr style="border-bottom:0.5px solid var(--line)"><td style="padding:9px 8px;text-align:left">${shortName}</td>${cells}${avgCell}</tr>`;
+      return `<tr style="border-bottom:0.5px solid var(--line)"><td style="padding:9px 8px;text-align:left">${dotHtml}${shortName}</td>${cells}${avgCell}</tr>`;
     }).join('');
     catsTableHtml = `
       <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:14px 0 6px;">Категории — текущий период</div>
@@ -685,24 +687,54 @@ async function loadSvRating() {
 
     const headCells = cats.map(c => `<th style="padding:7px 3px;text-align:right;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${c.length > 6 ? c.slice(0,6) : c}</th>`).join('');
 
+    // Лучший показатель по каждой колонке (кроме Вне) — одна звезда на колонку
+    function bestSvName(getVal) {
+      let best = null, bestVal = -1;
+      rows.forEach(r => {
+        const v = getVal(r);
+        if (v != null && v > bestVal) { bestVal = v; best = r.sv; }
+      });
+      return best;
+    }
+    const bestSys = bestSvName(r => r.system_stt);
+    const bestClean = bestSvName(r => r.clean_stt);
+    const bestByCat = {};
+    cats.forEach(c => { bestByCat[c] = bestSvName(r => r.categories[c]); });
+
+    function fmtCellStar(v, isBest) {
+      const cell = fmtCell(v);
+      if (!isBest || v == null) return cell;
+      return cell.replace('</td>', ' ★</td>');
+    }
+
     const bodyRows = rows.map(r => {
       const shortName = r.sv.split(' ').slice(0, 2).join(' ');
-      const catCells = cats.map(c => fmtCell(r.categories[c] != null ? r.categories[c] : null)).join('');
+      const dotColor = r.level === 'green' ? 'var(--green)' : r.level === 'red' ? 'var(--red)' : 'var(--yellow)';
+      const dotHtml = '<span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>';
+      const catCells = cats.map(c => fmtCellStar(r.categories[c] != null ? r.categories[c] : null, r.sv === bestByCat[c])).join('');
+      const offCell = r.off > 0
+        ? `<td style="padding:6px 3px;text-align:right;color:var(--red);font-weight:700">−${r.off}</td>`
+        : '<td style="padding:6px 3px;text-align:right;color:var(--ink-soft)">—</td>';
       const bestBadge = r.is_best ? ' <span style="color:var(--green);font-weight:800">✦</span>' : '';
       const rowStyle = r.is_best ? 'border-bottom:0.5px solid var(--line);background:var(--green-bg)' : 'border-bottom:0.5px solid var(--line)';
       return `<tr style="${rowStyle}">
-        <td style="padding:6px 4px;text-align:left;font-size:11px;font-weight:${r.is_best?'800':'400'}">${shortName}${bestBadge}</td>
-        ${fmtCell(r.system_stt)}
-        ${fmtCell(r.clean_stt)}
+        <td style="padding:6px 4px;text-align:left;font-size:11px;font-weight:${r.is_best?'800':'400'}">${dotHtml}${shortName}${bestBadge}</td>
+        ${fmtCellStar(r.system_stt, r.sv === bestSys)}
+        ${fmtCellStar(r.clean_stt, r.sv === bestClean)}
+        ${offCell}
         ${catCells}
       </tr>`;
     }).join('');
 
     const summaryCatCells = cats.map(c => fmtCell(summary.categories ? summary.categories[c] : null)).join('');
+    const summaryOffCell = summary.off_total > 0
+      ? `<td style="padding:7px 3px;text-align:right;color:var(--red)">−${summary.off_total}</td>`
+      : '<td style="padding:7px 3px;text-align:right;color:var(--ink-soft)">—</td>';
     const summaryRow = `<tr style="border-top:1px solid var(--line);background:var(--card-2, #F5F0EB);font-weight:700">
       <td style="padding:7px 4px;text-align:left;font-size:11px;">Итог (среднее)</td>
       ${fmtCell(summary.system_stt)}
       ${fmtCell(summary.clean_stt)}
+      ${summaryOffCell}
       ${summaryCatCells}
     </tr>`;
 
@@ -719,6 +751,7 @@ async function loadSvRating() {
             <th style="padding:7px 4px;text-align:left;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">СВ</th>
             <th style="padding:7px 3px;text-align:right;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Сист.</th>
             <th style="padding:7px 3px;text-align:right;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чист.</th>
+            <th style="padding:7px 3px;text-align:right;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th>
             ${headCells}
           </tr></thead>
           <tbody>${bodyRows}${summaryRow}</tbody>
