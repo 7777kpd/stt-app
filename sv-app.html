@@ -484,6 +484,46 @@ function renderStt(data) {
   }).join('');
   const ratingHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed"><colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Визиты</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чистая</th></tr></thead><tbody>' + ratingRows + '</tbody></table>';
 
+  // Категории по каждому торговому (текущий период) — до 3 колонок под мобильную ширину
+  // + колонка "Средняя" (среднее по ВСЕМ категориям агента, не только по видимым) —
+  // по ней и сортируем таблицу, лучший по категориям агент — сверху
+  const catNames = (data.categories || []).map(c => c.name).slice(0, 3);
+  let catsTableHtml = '';
+  if (catNames.length) {
+    const catHeadCells = catNames.map(n =>
+      `<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${n}</th>`
+    ).join('') + '<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Средняя</th>';
+
+    const rowsWithAvg = (data.rating || []).map(r => {
+      const allVals = Object.values(r.categories || {});
+      const avg = allVals.length ? Math.round(allVals.reduce((a,b) => a+b, 0) / allVals.length) : null;
+      return { r, avg };
+    });
+    rowsWithAvg.sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
+
+    const catRows = rowsWithAvg.map(({r, avg}) => {
+      const shortName = r.agent.split(' ').slice(0, 2).join(' ');
+      const cells = catNames.map(n => {
+        const v = (r.categories || {})[n];
+        if (v == null) return '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>';
+        const color = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--yellow)' : 'var(--red)';
+        return `<td style="padding:7px 6px;text-align:right;color:${color};font-weight:700">${v}%</td>`;
+      }).join('');
+      const avgCell = avg == null
+        ? '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>'
+        : `<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avg>=75?'var(--green)':avg>=50?'var(--yellow)':'var(--red)'}">${avg}%</td>`;
+      return `<tr style="border-bottom:0.5px solid var(--line)"><td style="padding:9px 8px;text-align:left">${shortName}</td>${cells}${avgCell}</tr>`;
+    }).join('');
+    catsTableHtml = `
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:14px 0 6px;">Категории — текущий период</div>
+      <div class="card" style="padding:6px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
+          <thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th>${catHeadCells}</tr></thead>
+          <tbody>${catRows}</tbody>
+        </table>
+      </div>`;
+  }
+
   // Тренд по неделям
   const weeks = data.trend_weekdays || data.trend_weeks || [];
   const posWeeks = weeks.filter(w => !w.is_current && !w.current && (w.clean_stt || w.clean_pct) !== null && (w.clean_stt || w.clean_pct) > 0);
@@ -598,21 +638,20 @@ function renderStt(data) {
     </div>
 
     <div class="segment">
-      <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг</button>
-      <button id="btn-trend" onclick="sttView('trend')">Тренд</button>
+      <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг торговых</button>
+      <button id="btn-trend" onclick="sttView('trend')">Рейтинг СВ</button>
     </div>
 
     <div id="view-rating" class="sub-view active">
       <div class="card" style="padding:6px 0">
         ${ratingHtml}
       </div>
+      ${catsTableHtml}
     </div>
 
     <div id="view-trend" class="sub-view">
-      <div class="weeks-chart">
-        <div class="weeks-label">Чистая по неделям</div>
-        <div class="weeks-bars">${barsHtml}</div>
-        ${compareHtml}
+      <div id="sv-rating-area">
+        <div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Загрузка...</div>
       </div>
     </div>`;
 }
@@ -622,6 +661,73 @@ function sttView(name) {
     document.getElementById('view-'+n).classList.toggle('active', n === name);
     document.getElementById('btn-'+n).classList.toggle('active', n === name);
   });
+  if (name === 'trend' && !_svRatingLoaded) {
+    loadSvRating();
+  }
+}
+
+let _svRatingLoaded = false;
+
+async function loadSvRating() {
+  const area = document.getElementById('sv-rating-area');
+  try {
+    const res = await fetch(`${API}/api/sv/${_telegramId}/rating-sv`);
+    const data = await res.json();
+    _svRatingLoaded = true;
+
+    const cats = data.categories || [];
+    const rows = data.rows || [];
+    const summary = data.summary || {};
+
+    const fmtCell = (v) => v == null
+      ? '<td style="padding:6px 3px;text-align:right;color:var(--ink-soft)">—</td>'
+      : `<td style="padding:6px 3px;text-align:right;color:${v>=75?'var(--green)':v>=50?'var(--yellow)':'var(--red)'};font-weight:700">${v}%</td>`;
+
+    const headCells = cats.map(c => `<th style="padding:7px 3px;text-align:right;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${c.length > 6 ? c.slice(0,6) : c}</th>`).join('');
+
+    const bodyRows = rows.map(r => {
+      const shortName = r.sv.split(' ').slice(0, 2).join(' ');
+      const catCells = cats.map(c => fmtCell(r.categories[c] != null ? r.categories[c] : null)).join('');
+      const bestBadge = r.is_best ? ' <span style="color:var(--green);font-weight:800">✦</span>' : '';
+      const rowStyle = r.is_best ? 'border-bottom:0.5px solid var(--line);background:var(--green-bg)' : 'border-bottom:0.5px solid var(--line)';
+      return `<tr style="${rowStyle}">
+        <td style="padding:6px 4px;text-align:left;font-size:11px;font-weight:${r.is_best?'800':'400'}">${shortName}${bestBadge}</td>
+        ${fmtCell(r.system_stt)}
+        ${fmtCell(r.clean_stt)}
+        ${catCells}
+      </tr>`;
+    }).join('');
+
+    const summaryCatCells = cats.map(c => fmtCell(summary.categories ? summary.categories[c] : null)).join('');
+    const summaryRow = `<tr style="border-top:1px solid var(--line);background:var(--card-2, #F5F0EB);font-weight:700">
+      <td style="padding:7px 4px;text-align:left;font-size:11px;">Итог (среднее)</td>
+      ${fmtCell(summary.system_stt)}
+      ${fmtCell(summary.clean_stt)}
+      ${summaryCatCells}
+    </tr>`;
+
+    if (!rows.length) {
+      area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Нет других СВ с той же номенклатурной группой</div>';
+      return;
+    }
+
+    area.innerHTML = `
+      <div style="font-size:12.5px;font-weight:700;margin:2px 0 8px;">${data.group || 'Номенклатурная группа не определена'}</div>
+      <div class="card" style="padding:6px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:11px;table-layout:fixed">
+          <thead><tr style="border-bottom:1px solid var(--line)">
+            <th style="padding:7px 4px;text-align:left;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">СВ</th>
+            <th style="padding:7px 3px;text-align:right;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Сист.</th>
+            <th style="padding:7px 3px;text-align:right;font-size:9.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чист.</th>
+            ${headCells}
+          </tr></thead>
+          <tbody>${bodyRows}${summaryRow}</tbody>
+        </table>
+      </div>`;
+
+  } catch(e) {
+    area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);font-size:13px;">Не удалось загрузить рейтинг СВ</div>';
+  }
 }
 
 // ============================================================
