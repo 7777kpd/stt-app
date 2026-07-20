@@ -767,49 +767,21 @@ async function generateProgram() {
   const area = document.getElementById('program-area');
   area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Генерирую программу...</div>';
 
-  const patternsText = _coachPatterns.slice(0, 10).map(p =>
-    `— «${p.reason}» (${p.agent}, оценка ${p.ai_score || '?'}/3)`
-  ).join('\n');
-
   const topic = document.getElementById('coach-topic')?.textContent || 'работа с возражениями';
 
-  const prompt = `Ты тренер торговых представителей в FMCG дистрибуции.
-
-Тема обучения: «${topic}»
-
-Реальные ответы торговых этой команды за неделю:
-${patternsText || '— данных нет, используй общую тематику'}
-
-Напиши программу обучения РОВНО 4 шага. Требования:
-- Бей точно в реальные паттерны команды
-- Язык простой и конкретный — как говорят в поле, без теории
-- Каждый шаг: короткое название (до 5 слов) + одно конкретное действие которое торговый может сделать завтра
-- Каждый шаг начинается с глагола
-- Максимум 2 предложения на шаг
-- Без вводных слов и заключений
-
-Верни ТОЛЬКО JSON без markdown:
-{"steps":[{"num":1,"title":"...","action":"..."},{"num":2,"title":"...","action":"..."},{"num":3,"title":"...","action":"..."},{"num":4,"title":"...","action":"..."}]}`;
-
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
+    const res = await fetch(
+      `${API}/api/sv/${_telegramId}/coach/generate-program?topic=${encodeURIComponent(topic)}`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error(`request failed: ${res.status}`);
 
     const data = await res.json();
-    const text = data.content.map(i => i.text || '').join('');
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('JSON not found');
-    const parsed = JSON.parse(match[0]);
+    const steps = data.steps || [];
+    if (!steps.length) throw new Error('no steps');
 
     let html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:2px;">';
-    parsed.steps.forEach(s => {
+    steps.forEach(s => {
       html += `
         <div style="background:#fff;border-radius:10px;padding:10px 12px;border:1px solid #F1C9C2;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
