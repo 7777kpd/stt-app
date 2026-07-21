@@ -409,11 +409,15 @@ function renderRoute(data) {
           <div class="coach-context-label">🧠 Вчера про ${survey.hard_point || '—'}</div>
           <div class="coach-context-row">
             <span class="coach-context-key">Что помешало:</span>
-            <span class="coach-context-val">«${survey.obstacle || '—'}»</span>
+            <span class="coach-context-val">«${survey.reason || '—'}»</span>
           </div>
           <div class="coach-context-row">
             <span class="coach-context-key">Действие:</span>
             <span class="coach-context-val">«${survey.action || '—'}»</span>
+          </div>
+          <div class="coach-context-row">
+            <span class="coach-context-key">Помощь коллеге:</span>
+            <span class="coach-context-val">«${survey.seed || '—'}»</span>
           </div>
           <div class="coach-context-divider"></div>
           <div class="coach-context-score ${scoreClass}">${scoreLabel}</div>
@@ -479,6 +483,48 @@ function renderStt(data) {
       '</tr>';
   }).join('');
   const ratingHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed"><colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Визиты</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чистая</th></tr></thead><tbody>' + ratingRows + '</tbody></table>';
+
+  // Категории по каждому торговому (текущий период) — до 3 колонок под мобильную ширину
+  // + колонка "Средняя" (среднее по ВСЕМ категориям агента, не только по видимым) —
+  // по ней и сортируем таблицу, лучший по категориям агент — сверху
+  const catNames = (data.categories || []).map(c => c.name).slice(0, 3);
+  let catsTableHtml = '';
+  if (catNames.length) {
+    const catHeadCells = catNames.map(n =>
+      `<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${n}</th>`
+    ).join('') + '<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Средняя</th>';
+
+    const rowsWithAvg = (data.rating || []).map(r => {
+      const allVals = Object.values(r.categories || {});
+      const avg = allVals.length ? Math.round(allVals.reduce((a,b) => a+b, 0) / allVals.length) : null;
+      return { r, avg };
+    });
+    rowsWithAvg.sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
+
+    const catRows = rowsWithAvg.map(({r, avg}) => {
+      const shortName = r.agent.split(' ').slice(0, 2).join(' ');
+      const dotColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
+      const dotHtml = '<span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>';
+      const cells = catNames.map(n => {
+        const v = (r.categories || {})[n];
+        if (v == null) return '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>';
+        const color = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--yellow)' : 'var(--red)';
+        return `<td style="padding:7px 6px;text-align:right;color:${color};font-weight:700">${v}%</td>`;
+      }).join('');
+      const avgCell = avg == null
+        ? '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>'
+        : `<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avg>=75?'var(--green)':avg>=50?'var(--yellow)':'var(--red)'}">${avg}%</td>`;
+      return `<tr style="border-bottom:0.5px solid var(--line)"><td style="padding:9px 8px;text-align:left">${dotHtml}${shortName}</td>${cells}${avgCell}</tr>`;
+    }).join('');
+    catsTableHtml = `
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:14px 0 6px;">Категории — текущий период</div>
+      <div class="card" style="padding:6px 0">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
+          <thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th>${catHeadCells}</tr></thead>
+          <tbody>${catRows}</tbody>
+        </table>
+      </div>`;
+  }
 
   // Тренд по неделям
   const weeks = data.trend_weekdays || data.trend_weeks || [];
@@ -569,7 +615,10 @@ function renderStt(data) {
     <div class="summary-card">
       <div class="summary-top-row">
         <p class="summary-label">Итог по команде</p>
-        <span class="period-caption">${data.planned_visits} плановых визитов</span>
+        <span class="period-caption">${data.passed_visits} плановых визитов</span>
+      </div>
+      <div style="font-size:10px;color:var(--ink-soft);margin:-4px 0 8px;line-height:1.3">
+        За период с начала месяца по вчера включительно (без сегодняшнего дня — по нему заказы ещё не закрыты)
       </div>
       <div class="dist-row">
         <div class="dist-tile">
@@ -591,21 +640,20 @@ function renderStt(data) {
     </div>
 
     <div class="segment">
-      <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг</button>
-      <button id="btn-trend" onclick="sttView('trend')">Тренд</button>
+      <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг торговых</button>
+      <button id="btn-trend" onclick="sttView('trend')">Рейтинг СВ</button>
     </div>
 
     <div id="view-rating" class="sub-view active">
       <div class="card" style="padding:6px 0">
         ${ratingHtml}
       </div>
+      ${catsTableHtml}
     </div>
 
     <div id="view-trend" class="sub-view">
-      <div class="weeks-chart">
-        <div class="weeks-label">Чистая по неделям</div>
-        <div class="weeks-bars">${barsHtml}</div>
-        ${compareHtml}
+      <div id="sv-rating-area">
+        <div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Загрузка...</div>
       </div>
     </div>`;
 }
@@ -615,6 +663,90 @@ function sttView(name) {
     document.getElementById('view-'+n).classList.toggle('active', n === name);
     document.getElementById('btn-'+n).classList.toggle('active', n === name);
   });
+  if (name === 'trend' && !_svRatingLoaded) {
+    loadSvRating();
+  }
+}
+
+let _svRatingLoaded = false;
+
+async function loadSvRating() {
+  const area = document.getElementById('sv-rating-area');
+  try {
+    const res = await fetch(`${API}/api/sv/${_telegramId}/rating-sv`);
+    const data = await res.json();
+    _svRatingLoaded = true;
+
+    const rows = data.rows || [];
+
+    if (!rows.length) {
+      area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Нет других СВ с той же номенклатурной группой</div>';
+      return;
+    }
+
+    const top3 = rows.slice(0, 1);
+    const rest = rows.slice(1);
+
+    function catChipsHtml(categories, muted) {
+      return Object.entries(categories || {}).map(([cat, v]) => {
+        if (muted) {
+          return `<span style="font-size:11px;background:#F5F0E6;color:var(--ink-soft);padding:4px 9px;border-radius:8px;font-weight:600;">${cat} ${v}%</span>`;
+        }
+        const chipColor = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--yellow)' : 'var(--red)';
+        const chipBg = v >= 75 ? 'var(--green-bg)' : v >= 50 ? 'var(--yellow-bg)' : 'var(--red-bg)';
+        return `<span style="font-size:11px;background:${chipBg};color:${chipColor};padding:4px 9px;border-radius:8px;font-weight:600;">${cat} ${v}%</span>`;
+      }).join('');
+    }
+
+    const top3Html = top3.map(r => {
+      const shortName = r.sv.split(' ').slice(0, 2).join(' ');
+      const offText = r.off > 0
+        ? `<span style="color:var(--red);margin-left:4px;">(-${r.off} вне)</span>`
+        : '';
+      return `
+        <div style="border-radius:18px;background:var(--green-bg);border:0.5px solid #3FAE6A33;padding:14px 16px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-weight:700;font-size:15px;color:var(--ink);">${shortName}</span>
+            <span style="font-size:20px;font-weight:700;color:var(--green);">${r.avg}%</span>
+          </div>
+          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
+            Системная ${r.system_stt}% · Чистая ${r.clean_stt}%${offText}
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false)}</div>
+        </div>`;
+    }).join('');
+
+    const restHtml = rest.length ? `
+      <div style="border-radius:18px;background:var(--card);border:0.5px solid var(--line);overflow:hidden;">
+        ${rest.map((r, i) => {
+          const shortName = r.sv.split(' ').slice(0, 2).join(' ');
+          const offText = r.off > 0
+            ? `<span style="color:var(--red);margin-left:4px;">(-${r.off} вне)</span>`
+            : '';
+          const borderBottom = i < rest.length - 1 ? 'border-bottom:0.5px solid var(--line);' : '';
+          return `
+            <div style="padding:13px 16px;${borderBottom}">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+                <span style="font-size:13.5px;font-weight:600;color:var(--ink);">${shortName}</span>
+                <span style="font-size:15px;font-weight:700;color:var(--ink-soft);">${r.avg}%</span>
+              </div>
+              <div style="font-size:12px;color:var(--ink-soft);margin-bottom:9px;">
+                Системная ${r.system_stt}% · Чистая ${r.clean_stt}%${offText}
+              </div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}</div>
+            </div>`;
+        }).join('')}
+      </div>` : '';
+
+    area.innerHTML = `
+      <div style="font-size:13px;font-weight:700;margin:2px 0 12px;color:var(--ink);">${data.group || 'Номенклатурная группа не определена'}</div>
+      <div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;">Лучший результат — ${data.month || 'этот месяц'}</div>
+      ${top3Html}
+      ${rest.length ? '<div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 8px;">Команда</div>' + restHtml : ''}`;
+
+  } catch(e) {
+    area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--red);font-size:13px;">Не удалось загрузить рейтинг СВ</div>';
+  }
 }
 
 // ============================================================
@@ -725,7 +857,7 @@ function renderCoach(data) {
       </div>
       <div class="coach-stat yellow">
         <div class="coach-stat-num">${ts.grows || 0}</div>
-        <div class="coach-stat-cap">Растёт</div>
+        <div class="coach-stat-cap">Анализирует</div>
       </div>
       <div class="coach-stat red">
         <div class="coach-stat-num">${ts.waits || 0}</div>
@@ -760,49 +892,22 @@ async function generateProgram() {
   const area = document.getElementById('program-area');
   area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Генерирую программу...</div>';
 
-  const patternsText = _coachPatterns.slice(0, 10).map(p =>
-    `— «${p.obstacle}» (${p.agent}, оценка ${p.ai_score || '?'}/3)`
-  ).join('\n');
-
-  const topic = document.getElementById('coach-topic')?.textContent || 'работа с возражениями';
-
-  const prompt = `Ты тренер торговых представителей в FMCG дистрибуции.
-
-Тема обучения: «${topic}»
-
-Реальные ответы торговых этой команды за неделю:
-${patternsText || '— данных нет, используй общую тематику'}
-
-Напиши программу обучения РОВНО 4 шага. Требования:
-- Бей точно в реальные паттерны команды
-- Язык простой и конкретный — как говорят в поле, без теории
-- Каждый шаг: короткое название (до 5 слов) + одно конкретное действие которое торговый может сделать завтра
-- Каждый шаг начинается с глагола
-- Максимум 2 предложения на шаг
-- Без вводных слов и заключений
-
-Верни ТОЛЬКО JSON без markdown:
-{"steps":[{"num":1,"title":"...","action":"..."},{"num":2,"title":"...","action":"..."},{"num":3,"title":"...","action":"..."},{"num":4,"title":"...","action":"..."}]}`;
-
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
+    const res = await fetch(
+      `${API}/api/sv/${_telegramId}/coach/generate-program`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error(`request failed: ${res.status}`);
 
     const data = await res.json();
-    const text = data.content.map(i => i.text || '').join('');
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('JSON not found');
-    const parsed = JSON.parse(match[0]);
+    const steps = data.steps || [];
+    if (!steps.length) throw new Error('no steps');
+
+    const topicEl = document.getElementById('coach-topic');
+    if (topicEl && data.topic) topicEl.textContent = data.topic;
 
     let html = '<div style="display:flex;flex-direction:column;gap:8px;margin-top:2px;">';
-    parsed.steps.forEach(s => {
+    steps.forEach(s => {
       html += `
         <div style="background:#fff;border-radius:10px;padding:10px 12px;border:1px solid #F1C9C2;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
