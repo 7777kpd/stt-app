@@ -302,6 +302,27 @@ let _telegramId = null;
 let _sttMonth = '';
 let _coachPeriod = '';
 let _coachPatterns = [];
+let _dayDate = new Date();   // текущая просматриваемая дата на вкладке "Итог дня"
+
+// ГГГГ-ММ-ДД по МЕСТНОМУ времени (не toISOString — та берёт UTC и может
+// сдвинуть дату на день назад/вперёд ближе к полуночи)
+function _localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function _fmtDayLabel(d) {
+  const days = ['вс','пн','вт','ср','чт','пт','сб'];
+  const months = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+  return `${d.getDate()} ${months[d.getMonth()]} · ${days[d.getDay()]}`;
+}
+
+function _isToday(d) {
+  const t = new Date();
+  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+}
 
 function getTelegramId() {
   const p = new URLSearchParams(window.location.search);
@@ -323,6 +344,36 @@ function safePct(v) { return (v != null && !isNaN(v)) ? Math.round(v) + '%' : '�
 
 function levelClass(pct) {
   return pct >= 75 ? 'green' : pct >= 50 ? 'yellow' : 'red';
+}
+
+// ВАЖНО (26.07.2026): перелистывание дат на вкладке "Итог дня".
+// delta: -1 назад, +1 вперёд. Не пускаем в будущее и не даём уйти
+// дальше 7 дней назад (столько хранится готовых снимков в базе —
+// см. daily_snapshot.py RETENTION_DAYS; более старую дату сервер
+// всё равно попробует посчитать на лету, но это уже медленно).
+async function navDay(delta) {
+  const next = new Date(_dayDate);
+  next.setDate(next.getDate() + delta);
+  if (next > new Date()) return;               // нельзя в будущее
+  const daysBack = Math.round((new Date() - next) / 86400000);
+  if (daysBack > 7) return;                     // дальше недели пока не пускаем
+  _dayDate = next;
+  await loadDay();
+}
+
+async function loadDay() {
+  const el = document.getElementById('screen-day');
+  if (!el) return;
+  el.innerHTML = `<div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>`;
+  try {
+    const ds = _localDateStr(_dayDate);
+    const r = await fetch(`${API}/api/sv/${_telegramId}/today?d=${ds}`);
+    if (!r.ok) throw new Error('bad response');
+    const data = await r.json();
+    el.innerHTML = renderDay(data);
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ Ошибка загрузки итога дня</div>`;
+  }
 }
 
 function switchTab(name) {
@@ -951,6 +1002,17 @@ function renderDay(data) {
   const team = data.team || {};
   const agents = data.agents || [];
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
+
+  // Панель "‹ дата ›" — стрелка вперёд скрыта, если уже смотрим сегодня
+  const navStyle = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
+  const arrowStyle = 'background:var(--card);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;font-weight:700;color:var(--ink);cursor:pointer;';
+  const isToday = _isToday(_dayDate);
+  const navHtml = `<div style="${navStyle}">
+    <button style="${arrowStyle}" onclick="navDay(-1)">‹</button>
+    <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${_fmtDayLabel(_dayDate)}</span>
+    <button style="${arrowStyle}${isToday ? ';opacity:0.3;cursor:default' : ''}" ${isToday ? 'disabled' : ''} onclick="navDay(1)">›</button>
+  </div>`;
+
   const statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.planned || 0}</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">плановых</div></div>
     <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.orders || 0} <span style="font-size:13px;color:var(--red);font-weight:700">−${team.off_route || team.off || 0} вне</span></div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">заказов</div></div>
@@ -975,7 +1037,7 @@ function renderDay(data) {
   }).join('');
   const cardStyle = 'background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;';
   const labelStyle = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin-bottom:10px;';
-  return `<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div><div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
+  return `${navHtml}<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div><div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
 }
 
 // ============================================================
