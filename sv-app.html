@@ -219,17 +219,25 @@
   #screen-history .extra-line { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
 
   /* ============ SCREEN: ИИ-КОУЧ ============ */
-  #screen-training .coach-summary-row { display: flex; gap: 8px; margin-bottom: 18px; }
-  #screen-training .coach-stat { flex: 1; border-radius: 14px; padding: 12px 10px; text-align: center; }
+  #screen-training .coach-intro { font-size: 11.5px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 14px; }
+  #screen-training .coach-week-toggle { display: flex; gap: 6px; background: var(--card); padding: 4px; border-radius: 12px; margin-bottom: 16px; }
+  #screen-training .coach-week-btn { flex: 1; text-align: center; padding: 8px 4px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft); }
+  #screen-training .coach-week-btn.active { background: var(--ink); color: #fff; }
+  #screen-training .coach-summary-cap { font-size: 11px; color: var(--ink-soft); line-height: 1.4; margin: 0 0 8px; }
+  #screen-training .coach-summary-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  #screen-training .coach-stat { flex: 1; border-radius: 14px; padding: 12px 8px; text-align: center; }
   #screen-training .coach-stat.green { background: var(--green-bg); }
   #screen-training .coach-stat.yellow { background: var(--yellow-bg); }
   #screen-training .coach-stat.red { background: var(--red-bg); }
-  #screen-training .coach-stat-num { font-size: 24px; font-weight: 800; line-height: 1; }
+  #screen-training .coach-stat.gray { background: var(--line); }
+  #screen-training .coach-stat-num { font-size: 22px; font-weight: 800; line-height: 1; }
   #screen-training .coach-stat.green .coach-stat-num { color: var(--green); }
   #screen-training .coach-stat.yellow .coach-stat-num { color: var(--yellow); }
   #screen-training .coach-stat.red .coach-stat-num { color: var(--red); }
-  #screen-training .coach-stat-cap { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
-  #screen-training .coach-section-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin: 0 0 10px; }
+  #screen-training .coach-stat.gray .coach-stat-num { color: var(--ink-soft); }
+  #screen-training .coach-stat-cap { font-size: 10px; font-weight: 700; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
+  #screen-training .coach-section-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin: 18px 0 4px; }
+  #screen-training .coach-section-cap { font-size: 11px; color: var(--ink-soft); line-height: 1.4; margin: 0 0 10px; }
   #screen-training details.coach-agent-card {
     background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden;
     border-left: 4px solid var(--line);
@@ -237,30 +245,46 @@
   #screen-training details.coach-agent-card.level-red { border-left-color: var(--red); }
   #screen-training details.coach-agent-card.level-yellow { border-left-color: var(--yellow); }
   #screen-training details.coach-agent-card.level-green { border-left-color: var(--green); }
+  #screen-training details.coach-agent-card.level-gray { border-left-color: var(--line); }
   #screen-training details.coach-agent-card summary {
-    list-style: none; display: flex; align-items: center; justify-content: space-between;
+    list-style: none; display: flex; align-items: center; gap: 8px; justify-content: space-between;
     padding: 13px 16px; cursor: pointer;
   }
   #screen-training details.coach-agent-card summary::-webkit-details-marker { display: none; }
-  #screen-training .ca-name { font-size: 14px; font-weight: 700; }
+  #screen-training .ca-name { font-size: 14px; font-weight: 700; flex: 1; }
+  #screen-training .ca-days { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); }
+  #screen-training .ca-trend { font-size: 14px; font-weight: 800; }
+  #screen-training .ca-trend.up { color: var(--green); }
+  #screen-training .ca-trend.flat { color: var(--yellow); }
+  #screen-training .ca-trend.down { color: var(--red); }
   #screen-training .ca-status { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 100px; }
   #screen-training .ca-status.red { background: var(--red-bg); color: var(--red); }
   #screen-training .ca-status.yellow { background: var(--yellow-bg); color: var(--yellow); }
   #screen-training .ca-status.green { background: var(--green-bg); color: var(--green); }
-  #screen-training .ca-body { padding: 10px 16px 14px; border-top: 1px solid var(--line); }
-  #screen-training .ca-dots { display: flex; gap: 6px; margin-bottom: 8px; }
-  #screen-training .ca-dot { width: 12px; height: 12px; border-radius: 50%; }
-  #screen-training .ca-dot.d1 { background: var(--red); }
-  #screen-training .ca-dot.d2 { background: var(--yellow); }
-  #screen-training .ca-dot.d3 { background: var(--green); }
-  #screen-training .ca-dot.dn { background: var(--line); }
-  #screen-training .ca-pattern { font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
+  #screen-training .ca-status.gray { background: var(--line); color: var(--ink-soft); }
+  #screen-training .ca-body { padding: 4px 16px 14px; border-top: 1px solid var(--line); }
+  #screen-training .ca-body-cap { font-size: 10.5px; color: var(--ink-soft); line-height: 1.4; margin: 10px 0 10px; }
+  #screen-training .ca-response { background: var(--bg); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+  #screen-training .ca-response:last-child { margin-bottom: 0; }
+  #screen-training .ca-response-date { font-size: 10.5px; font-weight: 800; color: var(--ink-soft); margin-bottom: 8px; letter-spacing: 0.02em; }
+  #screen-training .ca-row { display: flex; gap: 8px; margin-bottom: 7px; }
+  #screen-training .ca-row:last-child { margin-bottom: 0; }
+  #screen-training .ca-row-label { flex-shrink: 0; width: 60px; font-size: 9.5px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.02em; padding-top: 1px; }
+  #screen-training .ca-row-text { font-size: 12.5px; line-height: 1.4; flex: 1; color: var(--ink); }
+  #screen-training .ca-row.conclusion { border-top: 1px solid var(--line); padding-top: 7px; margin-top: 2px; }
+  #screen-training .ca-row.conclusion .ca-row-text { font-weight: 600; }
+  #screen-training .ca-score-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  #screen-training .ca-score-dot.d1 { background: var(--red); }
+  #screen-training .ca-score-dot.d2 { background: var(--yellow); }
+  #screen-training .ca-score-dot.d3 { background: var(--green); }
+  #screen-training .ca-no-responses { font-size: 12px; color: var(--ink-soft); text-align: center; padding: 12px 0; }
   #screen-training .coach-sv-card {
     background: #FAE7E4; border: 1px solid #F1C9C2; border-radius: 16px;
-    padding: 14px 16px; margin-bottom: 16px; margin-top: 16px;
+    padding: 14px 16px; margin-bottom: 16px; margin-top: 4px;
   }
   #screen-training .coach-sv-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--red); margin-bottom: 5px; }
   #screen-training .coach-sv-text { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; margin-bottom: 4px; }
+  #screen-training .coach-sv-cap { font-size: 10.5px; color: #99694F; line-height: 1.4; margin-bottom: 4px; }
   #screen-training .coach-feedback-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
   #screen-training .coach-fb-btn { background: rgba(255,255,255,0.6); border: 1px solid #F1C9C2; border-radius: 8px; padding: 5px 10px; font-size: 14px; cursor: pointer; }
 </style>
@@ -876,31 +900,81 @@ function renderHistory(data) {
 // ============================================================
 // РЕНДЕР: ИИ-КОУЧ
 // ============================================================
+let _coachWeek = 'current';
+
+function _coachTrendArrow(dots) {
+  if (!dots || dots.length < 2) return '';
+  const half = Math.floor(dots.length / 2) || 1;
+  const firstAvg = dots.slice(0, half).reduce((a, b) => a + b, 0) / half;
+  const lastAvg = dots.slice(-half).reduce((a, b) => a + b, 0) / half;
+  if (lastAvg > firstAvg) return '<span class="ca-trend up">↑</span>';
+  if (lastAvg < firstAvg) return '<span class="ca-trend down">↓</span>';
+  return '<span class="ca-trend flat">→</span>';
+}
+
 function renderCoach(data) {
   _coachPeriod = data.period || '7 дней';
   _coachPatterns = data.patterns_for_topic || [];
+  _coachWeek = data.week || 'current';
   const ts = data.team_summary || {};
 
   const agentsHtml = (data.agents || []).map(a => {
-    const dotsHtml = (a.trend_dots || []).map(d => {
-      const cls = d === null ? 'dn' : d === 1 ? 'd1' : d === 2 ? 'd2' : 'd3';
-      return `<span class="ca-dot ${cls}"></span>`;
-    }).join('');
+    const responses = a.last_responses || [];
+    const bodyHtml = responses.length === 0
+      ? `<div class="ca-no-responses">Ещё не отвечал(а) на этой неделе.</div>`
+      : responses.map(r => {
+          const scoreCls = r.ai_score >= 3 ? 'd3' : r.ai_score === 2 ? 'd2' : 'd1';
+          return `
+            <div class="ca-response">
+              <div class="ca-response-date">${r.date || ''}</div>
+              <div class="ca-row">
+                <div class="ca-row-label">Причина</div>
+                <div class="ca-row-text">${r.reason || '—'}</div>
+              </div>
+              <div class="ca-row">
+                <div class="ca-row-label">Действие</div>
+                <div class="ca-row-text">${r.action || '—'}</div>
+              </div>
+              <div class="ca-row">
+                <div class="ca-row-label">Помощь</div>
+                <div class="ca-row-text">${r.seed || '—'}</div>
+              </div>
+              ${r.ai_reasoning ? `
+              <div class="ca-row conclusion">
+                <div class="ca-row-label">Вывод ИИ</div>
+                <div class="ca-row-text"><span class="ca-score-dot ${scoreCls}"></span>${r.ai_reasoning}</div>
+              </div>` : ''}
+            </div>`;
+        }).join('');
 
     return `
       <details class="coach-agent-card level-${a.status_color}">
         <summary>
           <span class="ca-name">${a.name}</span>
+          <span class="ca-days">${a.days_answered} ${a.days_answered === 1 ? 'день' : 'дн.'}</span>
+          ${_coachTrendArrow(a.trend_dots)}
           <span class="ca-status ${a.status_color}">${a.status}</span>
         </summary>
         <div class="ca-body">
-          <div class="ca-dots">${dotsHtml}</div>
-          <div class="ca-pattern">${a.pattern}</div>
+          <div class="ca-body-cap">Последние ответы — что написал(а) агент и вывод ИИ по каждому дню:</div>
+          ${bodyHtml}
         </div>
       </details>`;
   }).join('');
 
   return `
+    <p class="coach-intro">
+      Как думает команда, а не только что сделала. Каждый вечер агент
+      отвечает на 3 коротких вопроса — ИИ определяет, в каком состоянии
+      он сейчас: ждёт, разбирается или уже действует.
+    </p>
+
+    <div class="coach-week-toggle">
+      <div class="coach-week-btn ${_coachWeek === 'current' ? 'active' : ''}" onclick="switchCoachWeek('current')">Текущая неделя</div>
+      <div class="coach-week-btn ${_coachWeek === 'previous' ? 'active' : ''}" onclick="switchCoachWeek('previous')">Прошлая неделя</div>
+    </div>
+
+    <p class="coach-summary-cap">Считается по всем накопленным ответам — без правила «минимум 3 из 5». Один ответ есть — уже есть статус.</p>
     <div class="coach-summary-row">
       <div class="coach-stat green">
         <div class="coach-stat-num">${ts.acts || 0}</div>
@@ -914,14 +988,21 @@ function renderCoach(data) {
         <div class="coach-stat-num">${ts.waits || 0}</div>
         <div class="coach-stat-cap">Ждёт</div>
       </div>
+      <div class="coach-stat gray">
+        <div class="coach-stat-num">${ts.collecting || 0}</div>
+        <div class="coach-stat-cap">Нет ответов</div>
+      </div>
     </div>
 
-    <div class="coach-section-label">По агентам — тренд 5 дней</div>
+    <div class="coach-section-label">По агентам</div>
+    <p class="coach-section-cap">Нажмите на агента — увидите его последние ответы и что решил ИИ.</p>
     ${agentsHtml}
 
+    <div class="coach-section-label">Программа обучения на неделю</div>
+    <p class="coach-section-cap">Собирается из реальных слов команды — не из общей теории.</p>
     <div class="coach-sv-card">
       <div class="coach-sv-label">Тема обучения по результатам недели</div>
-      <div class="coach-sv-text" id="coach-topic">Генерируется по итогам недели...</div>
+      <div class="coach-sv-text" id="coach-topic">Ещё не сформирована</div>
       <div style="border-top:1px solid #F1C9C2;margin:10px 0;"></div>
       <div id="program-area">
         <button onclick="generateProgram()" style="width:100%;background:#A93B30;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">
@@ -931,9 +1012,23 @@ function renderCoach(data) {
       <div class="coach-feedback-row">
         <button class="coach-fb-btn" onclick="sendFeedback('up')">👍</button>
         <button class="coach-fb-btn" onclick="sendFeedback('down')">👎</button>
-        <span style="font-size:11px;color:#993C1D;font-weight:600;margin-left:4px;">Материал обучения практичный?</span>
+        <span style="font-size:11px;color:#993C1D;font-weight:600;margin-left:4px;">Провели встречу по этой теме?</span>
       </div>
     </div>`;
+}
+
+async function switchCoachWeek(week) {
+  if (week === _coachWeek) return;
+  const container = document.getElementById('screen-training');
+  if (!container) return;
+  try {
+    const res = await fetch(`${API}/api/sv/${_telegramId}/coach/week?week=${week}`);
+    if (!res.ok) throw new Error(`request failed: ${res.status}`);
+    const data = await res.json();
+    container.innerHTML = renderCoach(data);
+  } catch (e) {
+    console.error('switchCoachWeek error', e);
+  }
 }
 
 // ============================================================
@@ -941,11 +1036,11 @@ function renderCoach(data) {
 // ============================================================
 async function generateProgram() {
   const area = document.getElementById('program-area');
-  area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Генерирую программу...</div>';
+  area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Анализирую ответы команды…</div>';
 
   try {
     const res = await fetch(
-      `${API}/api/sv/${_telegramId}/coach/generate-program`,
+      `${API}/api/sv/${_telegramId}/coach/generate-program?week=${_coachWeek}`,
       { method: 'POST' }
     );
     if (!res.ok) throw new Error(`request failed: ${res.status}`);
@@ -1071,7 +1166,7 @@ async function main() {
     fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/history`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/coach/week`).then(r => r.ok ? r.json() : Promise.reject()),
+    fetch(`${API}/api/sv/${_telegramId}/coach/week?week=current`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
   ]);
 
