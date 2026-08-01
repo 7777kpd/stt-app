@@ -645,31 +645,38 @@ function buildDayScreen(data) {
       }).join('')
     : '<div style="font-size:13px;color:#8B6914;padding:8px 0">Нет точек контроля от СВ</div>';
 
-  function dayChip(label, val) {
+  function dayCell(val, isTotal) {
     const lv = levelOf80(val);
-    return `<div style="background:${bgOf(lv)};border-radius:8px;padding:4px 6px;text-align:center;min-width:44px;">
-      <div style="font-size:8.5px;color:${colorOf(lv)};opacity:0.85;">${label}</div>
-      <div style="font-size:12px;font-weight:700;color:${colorOf(lv)};">${val}%</div>
+    if (isTotal) {
+      return `<div style="flex:1;background:${colorOf(lv)};border-radius:6px;padding:5px 2px;text-align:center;margin:0 2px;border:2px solid ${colorOf(lv)};">
+        <span style="font-size:13px;font-weight:800;color:#fff;">${val}%</span>
+      </div>`;
+    }
+    return `<div style="flex:1;background:${bgOf(lv)};border-radius:6px;padding:5px 2px;text-align:center;margin:0 2px;">
+      <span style="font-size:12px;font-weight:500;color:${colorOf(lv)};">${val}%</span>
     </div>`;
   }
 
+  // 01.08.2026: подписи колонок (Сист/Чист/категории/Итог) выводятся ОДИН
+  // РАЗ сверху, не под каждым числом у каждого агента — при 5-7 торговых
+  // подряд повторение убивает читаемость. Строка визитов/заказов/вне
+  // рядом с именем убрана полностью по просьбе.
+  const teamCatNames = team.length ? Object.keys(team[0].cat_shares || {}) : [];
+  const teamHeaderHtml = team.length ? `<div style="display:flex;gap:5px;padding:0 2px 6px;">
+      <div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">Сист</div>
+      <div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">Чист</div>
+      ${teamCatNames.map(n => `<div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">${n}</div>`).join('')}
+      <div style="flex:1;text-align:center;font-size:10px;font-weight:800;color:#3730A3;text-transform:uppercase;">Итог</div>
+    </div>` : '';
+
   const teamHtml = team.map((a, i) => {
     const short = a.name.split(' ').slice(0,2).join(' ');
-    const catChips = Object.entries(a.cat_shares || {}).map(([name, v]) => dayChip(name, v.pct)).join('');
+    const catCells = teamCatNames.map(n => dayCell((a.cat_shares || {})[n]?.pct ?? 0)).join('');
     const border = i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : '';
-    return `<div style="padding:8px 0;${border}">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
-        <span style="font-size:12.5px;font-weight:700;color:#1e1b4b">${short}</span>
-        <span style="color:#6366F1;font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
-      </div>
-      <div style="display:flex;flex-wrap:wrap;gap:5px;">
-        ${dayChip('Сист', a.sys_stt)}
-        ${dayChip('Чист', a.clean_stt)}
-        ${catChips}
-        <div style="background:#6366F1;border-radius:8px;padding:4px 6px;text-align:center;min-width:44px;">
-          <div style="font-size:8.5px;color:#fff;opacity:0.85;">Средн</div>
-          <div style="font-size:12px;font-weight:700;color:#fff;">${a.average}%</div>
-        </div>
+    return `<div style="padding:7px 0;${border}">
+      <div style="font-size:12.5px;font-weight:700;color:#1e1b4b;margin-bottom:5px;">${short}</div>
+      <div style="display:flex;">
+        ${dayCell(a.sys_stt)}${dayCell(a.clean_stt)}${catCells}${dayCell(a.average, true)}
       </div>
     </div>`;
   }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет данных по команде</div>';
@@ -717,7 +724,7 @@ function buildDayScreen(data) {
             <span style="font-size:13px;font-weight:700;color:#3730A3">👥 Команда сегодня</span>
             <span style="font-size:10px;color:#6366F1">▶</span>
           </summary>
-          <div style="padding-top:8px">${teamHtml}</div>
+          <div style="padding-top:8px">${teamHeaderHtml}${teamHtml}</div>
         </details>
       </div>
     </div>`;
