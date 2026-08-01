@@ -20,6 +20,8 @@
     --red-dark: #A93B30;
     --amber: #D98A3D;
     --amber-bg: #F8EBDB;
+    --blue: #3B7DDB;
+    --blue-bg: #E7EFFB;
   }
   * { box-sizing: border-box; }
   body {
@@ -262,6 +264,21 @@
   #screen-training .ca-status.yellow { background: var(--yellow-bg); color: var(--yellow); }
   #screen-training .ca-status.green { background: var(--green-bg); color: var(--green); }
   #screen-training .ca-status.gray { background: var(--line); color: var(--ink-soft); }
+  #screen-training .ca-new-signal {
+    font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 100px;
+    background: var(--blue-bg); color: var(--blue); white-space: nowrap;
+  }
+  #screen-training .coach-signals-card {
+    background: var(--blue-bg); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px;
+  }
+  #screen-training .coach-signals-label {
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--blue); margin-bottom: 8px;
+  }
+  #screen-training .coach-signal-row { font-size: 12.5px; line-height: 1.5; color: var(--ink); margin-bottom: 6px; }
+  #screen-training .coach-signal-row:last-child { margin-bottom: 0; }
+  #screen-training .coach-signal-agent { font-weight: 700; }
+  #screen-training .coach-signals-empty { font-size: 12px; color: var(--ink-soft); }
   #screen-training .ca-body { padding: 4px 16px 14px; border-top: 1px solid var(--line); }
   #screen-training .ca-body-cap { font-size: 10.5px; color: var(--ink-soft); line-height: 1.4; margin: 10px 0 10px; }
   #screen-training .ca-response { background: var(--bg); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
@@ -918,6 +935,14 @@ function renderCoach(data) {
   _coachWeek = data.week || 'current';
   const ts = data.team_summary || {};
 
+  const newSignals = data.new_signals || [];
+  const newSignalsHtml = newSignals.length === 0
+    ? `<div class="coach-signals-empty">Новых сигналов на этой неделе нет.</div>`
+    : newSignals.map(s => `
+        <div class="coach-signal-row">
+          <span class="coach-signal-agent">${s.agent}:</span> ${s.reason}
+        </div>`).join('');
+
   const agentsHtml = (data.agents || []).map(a => {
     const responses = a.last_responses || [];
     const bodyHtml = responses.length === 0
@@ -953,6 +978,7 @@ function renderCoach(data) {
           <span class="ca-name">${a.name}</span>
           <span class="ca-days">${a.days_answered} ${a.days_answered === 1 ? 'день' : 'дн.'}</span>
           ${_coachTrendArrow(a.trend_dots)}
+          ${a.new_signal ? '<span class="ca-new-signal">новый сигнал</span>' : ''}
           <span class="ca-status ${a.status_color}">${a.status}</span>
         </summary>
         <div class="ca-body">
@@ -992,6 +1018,11 @@ function renderCoach(data) {
         <div class="coach-stat-num">${ts.collecting || 0}</div>
         <div class="coach-stat-cap">Нет ответов</div>
       </div>
+    </div>
+
+    <div class="coach-signals-card">
+      <div class="coach-signals-label">Новые сигналы за неделю</div>
+      ${newSignalsHtml}
     </div>
 
     <div class="coach-section-label">По агентам</div>
