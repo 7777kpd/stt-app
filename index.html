@@ -578,6 +578,28 @@ function buildSttScreen(data) {
   });
 }
 
+function _dayChipsHtml() {
+  const dow = ['вс','пн','вт','ср','чт','пт','сб'];
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    days.push(d);
+  }
+  return `<div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">${_fmtDayLabel(_dayDate)}</div>
+    <div style="display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;">
+      ${days.map(d => {
+        const active = d.getFullYear() === _dayDate.getFullYear() && d.getMonth() === _dayDate.getMonth() && d.getDate() === _dayDate.getDate();
+        const isFuture = d > new Date();
+        const ds = _localDateStr(d);
+        return `<div style="width:38px;flex-shrink:0;text-align:center;padding:7px 0;border-radius:12px;${isFuture ? 'opacity:0.3;pointer-events:none;' : 'cursor:pointer;'}background:${active ? 'var(--text)' : 'transparent'};" onclick="jumpToDay('${ds}')">
+          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:${active ? '#fff' : 'var(--muted)'}">${dow[d.getDay()]}</div>
+          <div style="font-size:13px;font-weight:700;margin-top:2px;color:${active ? '#fff' : 'inherit'}">${d.getDate()}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function buildDayScreen(data) {
   if (!data || !data.my) {
     document.getElementById('screen-day').innerHTML = '<div class="empty">Данные итога дня недоступны</div>';
@@ -661,7 +683,10 @@ function buildDayScreen(data) {
         <div class="header-date">${formatDate()}</div>
       </div>
     </div>
-    <div style="padding:12px 16px 80px">
+    <div style="padding:12px 16px 0">
+      ${_dayChipsHtml()}
+    </div>
+    <div style="padding:0 16px 80px">
       <div style="${cardStyle}border-left:3px solid var(--green)">
         <span style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Мой итог</span>
         ${myHtml}
@@ -707,6 +732,36 @@ function activateScreen(name) {
 }
 
 let _dayFocusPoints = [];
+let _dayDate = new Date();   // текущая просматриваемая дата на "Итоги дня" (агент)
+
+function _localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function _fmtDayLabel(d) {
+  const days = ['вс','пн','вт','ср','чт','пт','сб'];
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} · ${days[d.getDay()]}`;
+}
+
+// 01.08.2026: тот же чип-переключатель на 7 дней, что уже сделан у СВ.
+async function jumpToDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const next = new Date(y, m - 1, d);
+  if (next > new Date()) return;
+  _dayDate = next;
+  const el = document.getElementById('screen-day');
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>';
+  try {
+    const r = await fetch(`${API}/api/agent/${_telegramId}/day?d=${dateStr}`);
+    if (!r.ok) throw new Error('bad response');
+    buildDayScreen(await r.json());
+  } catch (e) {
+    el.innerHTML = '<div class="empty">⚠️ Ошибка загрузки итога дня</div>';
+  }
+}
 let _telegramId = null;
 let _sttMonthOffset = 0;
 let _sttOpenCat = null;
