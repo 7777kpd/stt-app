@@ -218,6 +218,11 @@ function getTelegramId() {
 
 function levelOf(pct) { return pct >= 75 ? 'green' : pct >= 50 ? 'yellow' : 'red'; }
 function colorOf(l)   { return l==='green' ? '#2D5A1B' : l==='yellow' ? '#8B6914' : '#8B1A1A'; }
+// 01.08.2026: для чипов "Команда сегодня" (Сист/Чист/категории/Средн)
+// зелёный только выше 80% — специально ниже порога всего остального
+// приложения (75%), это не опечатка.
+function levelOf80(pct) { return pct > 80 ? 'green' : pct >= 50 ? 'yellow' : 'red'; }
+function bgOf(l)        { return l==='green' ? '#E3F0DB' : l==='yellow' ? '#F7ECD0' : '#F3DEDE'; }
 function barColor(l)  { return l==='green' ? '#4caf50' : l==='yellow' ? '#f59e0b' : '#ef4444'; }
 
 function missLabel(n) {
@@ -582,6 +587,8 @@ function buildDayScreen(data) {
   const my = data.my;
   const focusPts = data.focus_points || [];
   const team = data.team || [];
+  const myCatShares = data.cat_shares_today || {};
+  const myTotalOrdersToday = data.total_orders_today || 0;
 
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
   const myHtml = `
@@ -591,6 +598,15 @@ function buildDayScreen(data) {
       <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.sys_stt))}">${my.sys_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">системная</div></div>
       <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.clean_stt))}">${my.clean_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">чистая</div></div>
     </div>`;
+
+  const myCatEntries = Object.entries(myCatShares);
+  const catsHtml = myCatEntries.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${myCatEntries.map(([name, v]) => `
+        <div style="flex:1 1 30%;min-width:90px;${tileStyle}text-align:center;">
+          <div style="font-size:10px;color:var(--muted);">${name}</div>
+          <div style="font-size:16px;font-weight:700;">${v.pct}%</div>
+        </div>`).join('')}</div>`
+    : '<div style="font-size:12px;color:var(--muted);">Категории не заданы</div>';
 
   const focusDoneCount = focusPts.filter(p => p.had_order).length;
   const focusHtml = focusPts.length > 0
@@ -607,16 +623,32 @@ function buildDayScreen(data) {
       }).join('')
     : '<div style="font-size:13px;color:#8B6914;padding:8px 0">Нет точек контроля от СВ</div>';
 
+  function dayChip(label, val) {
+    const lv = levelOf80(val);
+    return `<div style="background:${bgOf(lv)};border-radius:8px;padding:4px 6px;text-align:center;min-width:44px;">
+      <div style="font-size:8.5px;color:${colorOf(lv)};opacity:0.85;">${label}</div>
+      <div style="font-size:12px;font-weight:700;color:${colorOf(lv)};">${val}%</div>
+    </div>`;
+  }
+
   const teamHtml = team.map((a, i) => {
     const short = a.name.split(' ').slice(0,2).join(' ');
-    const col = colorOf(levelOf(a.clean_stt));
-    const dotCol = a.level === 'green' ? '#2D5A1B' : a.level === 'yellow' ? '#8B6914' : '#8B1A1A';
+    const catChips = Object.entries(a.cat_shares || {}).map(([name, v]) => dayChip(name, v.pct)).join('');
     const border = i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : '';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${border}gap:6px;font-size:12px">
-      <span style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;display:inline-block"></span>
-      <span style="flex:1;font-weight:500;color:#1e1b4b">${short}</span>
-      <span style="color:#6366F1;font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
-      <span style="font-weight:700;font-size:13px;color:${col};min-width:36px;text-align:right">${a.clean_stt}%</span>
+    return `<div style="padding:8px 0;${border}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:12.5px;font-weight:700;color:#1e1b4b">${short}</span>
+        <span style="color:#6366F1;font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:5px;">
+        ${dayChip('Сист', a.sys_stt)}
+        ${dayChip('Чист', a.clean_stt)}
+        ${catChips}
+        <div style="background:#6366F1;border-radius:8px;padding:4px 6px;text-align:center;min-width:44px;">
+          <div style="font-size:8.5px;color:#fff;opacity:0.85;">Средн</div>
+          <div style="font-size:12px;font-weight:700;color:#fff;">${a.average}%</div>
+        </div>
+      </div>
     </div>`;
   }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет данных по команде</div>';
 
@@ -633,6 +665,15 @@ function buildDayScreen(data) {
       <div style="${cardStyle}border-left:3px solid var(--green)">
         <span style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Мой итог</span>
         ${myHtml}
+      </div>
+
+      <div style="${cardStyle}border-left:3px solid #7c4fbf">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span>🏷️</span>
+          <span style="font-size:11px;font-weight:700;color:#7c4fbf;text-transform:uppercase;letter-spacing:.06em;">Категории</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px;">доля заказов с категорией от всех заказов сегодня (${myTotalOrdersToday})</div>
+        ${catsHtml}
       </div>
 
       <div style="background:#fff3cd;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #f59e0b;">
