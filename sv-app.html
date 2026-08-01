@@ -318,10 +318,9 @@
     </div>
     <div class="tabbar" id="tabbar" style="display:none">
       <button class="tab active" data-screen="route" onclick="switchTab('route')"><span class="icon">🗺️</span>Маршрут</button>
-      <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>СТТ</button>
-      <button class="tab" data-screen="history" onclick="switchTab('history')"><span class="icon">📈</span>История</button>
+      <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итоги дня</button>
+      <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>Итоги месяца</button>
       <button class="tab" data-screen="training" onclick="switchTab('training')"><span class="icon">🧠</span>ИИ-коуч</button>
-      <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итог дня</button>
     </div>
   </div>
 </div>
@@ -333,14 +332,14 @@ const API = new URLSearchParams(window.location.search).get('dev') === '1'
 
 const screenMeta = {
   route:    { title: 'Улучшить систему', pill: () => formatDate() },
-  stt:      { title: 'СТТ команды',               pill: () => _sttMonth || '' },
-  history:  { title: 'История команды',           pill: () => '' },
+  stt:      { title: 'Итоги месяца',               pill: () => _sttMonth || '' },
   training: { title: 'ИИ-коуч',                   pill: () => _coachPeriod || '7 дней' },
-  day:      { title: 'Итог дня',                     pill: () => formatDate() },
+  day:      { title: 'Итоги дня',                     pill: () => formatDate() },
 };
 
 let _telegramId = null;
 let _sttMonth = '';
+let _sttMonthOffset = 0;   // 0 = текущий месяц, 1 = прошлый — переключатель на "Итоги месяца"
 let _coachPeriod = '';
 let _coachPatterns = [];
 let _dayDate = new Date();   // текущая просматриваемая дата на вкладке "Итог дня"
@@ -402,6 +401,32 @@ async function navDay(delta) {
   await loadDay();
 }
 
+// 01.08.2026: переключатель "Текущий месяц/Прошлый месяц" на "Итоги
+// месяца" — /api/sv/{id}/stt уже принимал month/year, тут только
+// вызываем его правильно и сбрасываем кеш "Рейтинг СВ", чтобы он тоже
+// пересчитался за нужный период при следующем открытии той вкладки.
+async function switchSttMonth(offset) {
+  _sttMonthOffset = offset;
+  _svRatingLoaded = false;
+  const el = document.getElementById('screen-stt');
+  el.innerHTML = `<div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>`;
+  try {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const r = await fetch(`${API}/api/sv/${_telegramId}/stt?month=${d.getMonth() + 1}&year=${d.getFullYear()}`);
+    if (!r.ok) throw new Error('bad response');
+    const data = await r.json();
+    el.innerHTML = renderStt(data);
+    // Если сейчас открыт "Рейтинг СВ" — перезагрузить сразу, не дожидаясь
+    // повторного переключения вкладки.
+    if (document.getElementById('view-trend')?.classList.contains('active')) {
+      loadSvRating();
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ Ошибка загрузки Итогов месяца</div>`;
+  }
+}
+
 async function loadDay() {
   const el = document.getElementById('screen-day');
   if (!el) return;
@@ -415,6 +440,16 @@ async function loadDay() {
   } catch (e) {
     el.innerHTML = `<div class="empty">⚠️ Ошибка загрузки итога дня</div>`;
   }
+}
+
+// 01.08.2026: прыжок на конкретный день по клику на чип (тот же путь,
+// что navDay(), просто на абсолютную дату, а не на +1/-1 от текущей).
+async function jumpToDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const next = new Date(y, m - 1, d);
+  if (next > new Date()) return;
+  _dayDate = next;
+  await loadDay();
 }
 
 function switchTab(name) {
@@ -704,6 +739,11 @@ function renderStt(data) {
   const deltaHtml = '';
 
   return `
+    <div class="segment">
+      <button class="${_sttMonthOffset === 0 ? 'active' : ''}" onclick="switchSttMonth(0)">Текущий месяц</button>
+      <button class="${_sttMonthOffset === 1 ? 'active' : ''}" onclick="switchSttMonth(1)">Прошлый месяц</button>
+    </div>
+
     <div class="summary-card">
       <div class="summary-top-row">
         <p class="summary-label">Итог по команде</p>
@@ -765,7 +805,9 @@ let _svRatingLoaded = false;
 async function loadSvRating() {
   const area = document.getElementById('sv-rating-area');
   try {
-    const res = await fetch(`${API}/api/sv/${_telegramId}/rating-sv`);
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - _sttMonthOffset, 1);
+    const res = await fetch(`${API}/api/sv/${_telegramId}/rating-sv?month=${d.getMonth() + 1}&year=${d.getFullYear()}`);
     const data = await res.json();
     _svRatingLoaded = true;
 
@@ -1129,15 +1171,29 @@ function renderDay(data) {
   const agents = data.agents || [];
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
 
-  // Панель "‹ дата ›" — стрелка вперёд скрыта, если уже смотрим сегодня
-  const navStyle = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
-  const arrowStyle = 'background:var(--card);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;font-weight:700;color:var(--ink);cursor:pointer;';
-  const isToday = _isToday(_dayDate);
-  const navHtml = `<div style="${navStyle}">
-    <button style="${arrowStyle}" onclick="navDay(-1)">‹</button>
-    <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${_fmtDayLabel(_dayDate)}</span>
-    <button style="${arrowStyle}${isToday ? ';opacity:0.3;cursor:default' : ''}" ${isToday ? 'disabled' : ''} onclick="navDay(1)">›</button>
-  </div>`;
+  // 01.08.2026: строка чипов на 7 дней назад вместо стрелок ‹ ›.
+  // Тот же лимит "не дальше 7 дней", что уже был в navDay().
+  const dow = ['вс','пн','вт','ср','чт','пт','сб'];
+  const chipDays = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    chipDays.push(d);
+  }
+  const navHtml = `<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
+      <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${_fmtDayLabel(_dayDate)}</span>
+    </div>
+    <div style="display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;">
+      ${chipDays.map(d => {
+        const active = d.getFullYear() === _dayDate.getFullYear() && d.getMonth() === _dayDate.getMonth() && d.getDate() === _dayDate.getDate();
+        const isFuture = d > new Date();
+        const ds = _localDateStr(d);
+        return `<div style="width:38px;flex-shrink:0;text-align:center;padding:7px 0;border-radius:12px;${isFuture ? 'opacity:0.3;pointer-events:none;' : 'cursor:pointer;'}background:${active ? 'var(--ink)' : 'transparent'};" onclick="jumpToDay('${ds}')">
+          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:${active ? '#fff' : 'var(--ink-soft)'}">${dow[d.getDay()]}</div>
+          <div style="font-size:13px;font-weight:700;margin-top:2px;color:${active ? '#fff' : 'var(--ink)'}">${d.getDate()}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
 
   const statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.planned || 0}</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">плановых</div></div>
@@ -1163,7 +1219,24 @@ function renderDay(data) {
   }).join('');
   const cardStyle = 'background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;';
   const labelStyle = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin-bottom:10px;';
-  return `${navHtml}<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div><div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
+
+  // 01.08.2026: доля заказов с категорией от всех заказов команды за
+  // день — сразу после блока "Команда за день", до списка по торговым.
+  const catShares = data.cat_shares_today || {};
+  const totalOrdersToday = data.total_orders_today || 0;
+  const catRows = Object.entries(catShares).map(([name, v]) => {
+    const barColor = v.pct >= 75 ? 'var(--green)' : v.pct >= 50 ? 'var(--yellow)' : 'var(--red)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
+      <span style="width:70px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--ink-soft);">${name}</span>
+      <div style="flex:1;height:7px;background:var(--bg);border-radius:100px;overflow:hidden;"><div style="height:100%;border-radius:100px;width:${v.pct}%;background:${barColor}"></div></div>
+      <span style="width:34px;text-align:right;font-size:12.5px;font-weight:700;">${v.pct}%</span>
+    </div>`;
+  }).join('');
+  const categoriesHtml = Object.keys(catShares).length
+    ? `<div style="${cardStyle}"><div style="${labelStyle}">🏷️ Категории</div><div style="font-size:10.5px;color:var(--ink-soft);margin:-6px 0 8px;">доля заказов с категорией от всех заказов команды сегодня (${totalOrdersToday})</div>${catRows}</div>`
+    : '';
+
+  return `${navHtml}<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div>${categoriesHtml}<div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
 }
 
 // ============================================================
@@ -1182,7 +1255,6 @@ async function main() {
   document.getElementById('mainContent').innerHTML = `
     <div id="screen-route" class="screen-panel active"></div>
     <div id="screen-stt"   class="screen-panel"></div>
-    <div id="screen-history" class="screen-panel"></div>
     <div id="screen-training" class="screen-panel"></div>
     <div id="screen-day" class="screen-panel"></div>`;
   document.getElementById('tabbar').style.display = 'flex';
@@ -1192,11 +1264,10 @@ async function main() {
     if (el) el.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
   };
 
-  // Загружаем все 5 вкладок параллельно
-  const [routeRes, sttRes, historyRes, coachRes, dayRes] = await Promise.allSettled([
+  // Загружаем все 4 вкладки параллельно ("История" убрана 01.08.2026)
+  const [routeRes, sttRes, coachRes, dayRes] = await Promise.allSettled([
     fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/history`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/coach/week?week=current`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
   ]);
@@ -1211,12 +1282,6 @@ async function main() {
     document.getElementById('screen-stt').innerHTML = renderStt(sttRes.value);
   } else {
     err('screen-stt', 'Ошибка загрузки СТТ');
-  }
-
-  if (historyRes.status === 'fulfilled') {
-    document.getElementById('screen-history').innerHTML = renderHistory(historyRes.value);
-  } else {
-    err('screen-history', 'Ошибка загрузки истории');
   }
 
   if (coachRes.status === 'fulfilled') {
