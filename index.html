@@ -9,6 +9,7 @@
 :root {
   --bg: #F5F0EB; --card: #FFFFFF;
   --red: #8B1A1A; --yellow: #8B6914; --green: #2D5A1B;
+  --green-bright: #22C55E; --yellow-bright: #F5A623; --red-bright: #EF4444;
   --blue-light: #E8F0FE; --blue: #1a56db;
   --text: #1a1a1a; --muted: #6b7280; --border: #e5e7eb;
   --nav-h: 64px;
@@ -71,6 +72,7 @@ body {
 .v-miss   { background: #fee2e2; color: #991b1b; }
 .v-future { background: #f3f4f6; color: #9ca3af; }
 .v-sep    { color: #d1d5db; font-size: 16px; margin: 0 2px; }
+.v-off    { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 700; padding: 0 8px; height: 26px; display: flex; align-items: center; border-radius: 6px; margin-left: 4px; white-space: nowrap; }
 
 /* HINT */
 .hint { font-size: 12px; margin-top: 7px; font-weight: 600; }
@@ -92,28 +94,37 @@ body {
 /* STT SCREEN */
 .stt-screen { padding: 16px; max-width: 720px; }
 .stt-top-label { font-size: 13px; color: var(--muted); margin-bottom: 1rem; }
-.stt-formula-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; margin-bottom: 1.25rem; }
-.stt-block { background: var(--card); border: 2px solid #c7c3b8; border-radius: 14px; padding: 0.9rem 1rem; text-align: center; }
-.stt-block-label { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
-.stt-block-pct { font-size: 30px; font-weight: 500; line-height: 1; }
-.stt-block-sub { font-size: 11px; color: #9c998f; margin: 4px 0 0; }
-.stt-minus { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.stt-minus-sign { font-size: 18px; color: var(--red); font-weight: 500; }
-.stt-minus-text { font-size: 11px; color: var(--red); text-align: center; line-height: 1.2; white-space: nowrap; }
 
-.trio { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-bottom: 1.25rem; }
-.trio-item { border-radius: 10px; padding: 12px; text-align: center; }
-.trio-item.lv-green  { background: #e3f0db; }
-.trio-item.lv-yellow { background: #f7ecd0; }
-.trio-item.lv-red    { background: #f3dede; }
-.trio-n   { font-size: 20px; font-weight: 500; }
-.trio-item.lv-green  .trio-n { color: var(--green); }
-.trio-item.lv-yellow .trio-n { color: var(--yellow); }
-.trio-item.lv-red    .trio-n { color: var(--red); }
-.trio-lbl { font-size: 11px; margin-top: 2px; }
-.trio-item.lv-green  .trio-lbl { color: var(--green); }
-.trio-item.lv-yellow .trio-lbl { color: var(--yellow); }
-.trio-item.lv-red    .trio-lbl { color: var(--red); }
+.stt-card { background: var(--card); border-radius: 14px; padding: 14px; margin-bottom: 12px; border-left: 3px solid var(--border); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.stt-card.c-green  { border-left-color: var(--green); }
+.stt-card.c-blue   { border-left-color: var(--blue); }
+.stt-card.c-purple { border-left-color: #7c4fbf; }
+.stt-card-head { display: flex; align-items: center; gap: 7px; margin-bottom: 12px; }
+.stt-card-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.stt-card.c-green  .stt-card-title { color: var(--green); }
+.stt-card.c-blue   .stt-card-title { color: var(--blue); }
+.stt-card.c-purple .stt-card-title { color: #7c4fbf; }
+
+.pakb-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
+.pakb-bar { display: flex; height: 8px; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
+.pakb-list-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+.pakb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pakb-list-row .n { font-weight: 700; }
+.pakb-list-row .p { color: var(--muted); font-size: 12px; width: 34px; text-align: right; }
+
+.stt-formula-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; }
+.stt-block { background: var(--bg); border-radius: 12px; padding: 0.8rem; text-align: center; }
+.stt-block-label { font-size: 11px; color: var(--muted); margin: 0 0 4px; }
+.stt-block-pct { font-size: 26px; font-weight: 500; line-height: 1; }
+.stt-block-sub { font-size: 10.5px; color: #9c998f; margin: 4px 0 0; }
+.stt-minus { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.stt-minus-sign { font-size: 16px; color: var(--red); font-weight: 500; }
+.stt-minus-text { font-size: 10.5px; color: var(--red); text-align: center; line-height: 1.2; white-space: nowrap; }
+.stt-month-note { font-size: 10.5px; color: var(--muted); margin-bottom: 10px; line-height: 1.3; }
+
+.month-toggle { display: flex; gap: 6px; background: var(--bg); padding: 4px; border-radius: 12px; margin-bottom: 14px; }
+.month-toggle-btn { flex: 1; text-align: center; padding: 8px 4px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--muted); }
+.month-toggle-btn.active { background: var(--text); color: #fff; }
 
 .sec-title { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin: 0; }
 .cats-header { display: flex; align-items: baseline; justify-content: space-between; margin: 16px 0 8px; }
@@ -208,6 +219,11 @@ function getTelegramId() {
 
 function levelOf(pct) { return pct >= 75 ? 'green' : pct >= 50 ? 'yellow' : 'red'; }
 function colorOf(l)   { return l==='green' ? '#2D5A1B' : l==='yellow' ? '#8B6914' : '#8B1A1A'; }
+// 01.08.2026: для чипов "Команда сегодня" (Сист/Чист/категории/Средн)
+// зелёный только выше 80% — специально ниже порога всего остального
+// приложения (75%), это не опечатка.
+function levelOf80(pct) { return pct > 80 ? 'green' : pct >= 50 ? 'yellow' : 'red'; }
+function bgOf(l)        { return l==='green' ? '#E3F0DB' : l==='yellow' ? '#F7ECD0' : '#F3DEDE'; }
 function barColor(l)  { return l==='green' ? '#4caf50' : l==='yellow' ? '#f59e0b' : '#ef4444'; }
 
 function missLabel(n) {
@@ -264,22 +280,25 @@ function normalizePoint(pt) {
     pt.cats = Object.entries(pt.cat_stts).map(([name, pct]) => ({
       name,
       pct,
-      misses: (pt.cat_missed || {})[name] || 0
+      misses: pct === null ? null : ((pt.cat_missed || {})[name] ?? 0)
     }));
   }
 
   return pt;
 }
 
-function renderVisits(visits) {
-  if (!visits?.length) return '';
+function renderVisits(visits, offRoute) {
+  if (!visits?.length && !offRoute) return '';
   let html = '<div class="visits">';
   let sepDone = false;
-  for (const v of visits) {
+  for (const v of (visits || [])) {
     if (!sepDone && v.is_future) { html += '<span class="v-sep">|</span>'; sepDone = true; }
     if (v.is_future)      html += '<span class="v v-future">·</span>';
     else if (v.has_order) html += '<span class="v v-ok">✓</span>';
     else                  html += '<span class="v v-miss">✕</span>';
+  }
+  if (offRoute > 0) {
+    html += `<span class="v-off">+${offRoute} вне</span>`;
   }
   return html + '</div>';
 }
@@ -295,6 +314,12 @@ function renderHint(pt) {
 function renderCats(cats) {
   if (!cats?.length) return '';
   return '<div class="cats">' + cats.map(c => {
+    if (c.pct === null || c.pct === undefined) {
+      return `<div class="cat">
+        <div class="cat-name">${c.name}</div>
+        <div class="cat-pct" style="color:var(--muted)">—</div>
+      </div>`;
+    }
     const lv = levelOf(c.pct);
     const bad = c.misses > 0;
     return `<div class="cat">
@@ -316,22 +341,29 @@ function calcMissedStreak(visits) {
   return streak;
 }
 
+function bucketOf(pt) {
+  const totalWorked = (pt.orders || 0) + (pt.off_schedule_orders || 0);
+  if (totalWorked === 0) return 'red';
+  return pt.stt >= 75 ? 'green' : 'yellow';
+}
+
 function renderCard(pt) {
-  const lv = levelOf(pt.stt);
+  const lv = bucketOf(pt);
   const offRoute = pt.off_schedule_orders || 0;
+  const badgeLabel = lv === 'red' ? 'Не АКБ' : lv === 'yellow' ? 'АКБ' : 'СТТ';
+  const sttBlock = lv === 'red'
+    ? `<div class="card-stt" style="font-size:14px">Не АКБ</div>`
+    : `<div class="card-stt">${pt.stt}%</div><div class="card-stt-label">${badgeLabel}</div>`;
   return `<div class="card level-${lv}">
     <div class="card-top">
       <div>
         ${pt.client ? `<div class="card-client">${pt.client}</div>` : ''}
         <div class="card-addr">${pt.address}</div>
       </div>
-      <div class="card-stt-wrap">
-        <div class="card-stt">${pt.stt}%</div>
-        <div class="card-stt-label">система</div>
-      </div>
+      <div class="card-stt-wrap">${sttBlock}</div>
     </div>
-    <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}${offRoute > 0 ? ` · <span class="off-route">${offRoute} вне маршрута</span>` : ''}</div>
-    ${renderVisits(pt.visits)}
+    <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}</div>
+    ${renderVisits(pt.visits, offRoute)}
     ${renderHint(pt)}
     ${renderCats(pt.cats)}
   </div>`;
@@ -341,7 +373,7 @@ function buildRouteScreen(data) {
   const grouped = { red:[], yellow:[], green:[] };
   for (const pt of (data.points||[])) {
     normalizePoint(pt);
-    grouped[levelOf(pt.stt)].push(pt);
+    grouped[bucketOf(pt)].push(pt);
   }
 
   // Сортируем: фокусные точки (2+ пропуска или вне) наверх
@@ -409,9 +441,9 @@ function buildRouteScreen(data) {
           <div class="header-date">${formatDate()}</div>
         </div>
         <div class="tabs" id="tabs">
-          <button class="tab ${tab==='red'?'active-red':''}" data-t="red">Провал<span class="badge">${grouped.red.length}</span></button>
-          <button class="tab ${tab==='yellow'?'active-yellow':''}" data-t="yellow">Потенциал<span class="badge">${grouped.yellow.length}</span></button>
-          <button class="tab ${tab==='green'?'active-green':''}" data-t="green">В системе<span class="badge">${grouped.green.length}</span></button>
+          <button class="tab ${tab==='red'?'active-red':''}" data-t="red">Не АКБ<span class="badge">${grouped.red.length}</span></button>
+          <button class="tab ${tab==='yellow'?'active-yellow':''}" data-t="yellow">АКБ<span class="badge">${grouped.yellow.length}</span></button>
+          <button class="tab ${tab==='green'?'active-green':''}" data-t="green">СТТ<span class="badge">${grouped.green.length}</span></button>
         </div>
       </div>
 
@@ -433,10 +465,12 @@ function buildRouteScreen(data) {
 }
 
 function buildSttScreen(data) {
+  _lastSttData = data;
   const mName = data.month || MONTHS[new Date().getMonth() + 1];
   const systemStt = data.system_stt ?? 0;
   const cleanStt = data.clean_stt ?? 0;
-  const plannedVisits = data.passed_visits ?? 0;
+  const plannedVisits = data.planned_visits ?? 0;
+  const passedVisits = data.passed_visits ?? 0;
   const systemOrders = data.system_orders ?? 0;
   const cleanOrders = data.clean_orders ?? 0;
   const offRouteOrders = data.off_route_orders ?? 0;
@@ -445,156 +479,126 @@ function buildSttScreen(data) {
   const catsData = data.cat_shares
     ? Object.entries(data.cat_shares).map(([name, v]) => ({name, pct: v.pct||0, count: v.count||0}))
     : [];
-
-  const catHtml = catsData.map(c => {
-    return `<div class="cat-stt-card">
+  const catHtml = catsData.map(c => `<div class="cat-stt-card">
       <div class="cat-stt-name">${c.name}</div>
       <div class="cat-stt-pct">${c.pct}%</div>
       <div class="cat-stt-count">${c.count} заказов</div>
-    </div>`;
+    </div>`).join('');
+
+  const green = data.green ?? 0, yellow = data.yellow ?? 0, red = data.red ?? 0;
+  const pakbTotal = green + yellow + red;
+  const pctOfPakb = n => pakbTotal ? Math.round(n / pakbTotal * 100) : 0;
+  const barPct = n => pakbTotal ? (n / pakbTotal * 100) : 0;
+
+  const pakbSections = [
+    { key: 'stt',    n: green,  label: 'СТТ',    color: 'var(--green-bright)',  points: data.points_stt || [] },
+    { key: 'akb',    n: yellow, label: 'АКБ',    color: 'var(--yellow-bright)', points: data.points_akb || [] },
+    { key: 'ne_akb', n: red,    label: 'Не АКБ', color: 'var(--red-bright)',    points: data.points_ne_akb || [] },
+  ];
+  const pakbRows = pakbSections.map(s => {
+    const isOpen = _sttOpenCat === s.key;
+    const ptsHtml = isOpen ? `<div style="background:var(--bg);border-radius:10px;margin:4px 0 6px;overflow:hidden;">
+        ${s.points.length ? s.points.map((p,i) => `<div style="padding:8px 10px;${i>0?'border-top:1px solid var(--border);':''}">
+            ${p.client ? `<div style="font-size:12px;font-weight:700;">${p.client}</div><div style="font-size:10.5px;color:var(--muted);margin-top:1px">${p.name}</div>` : `<div style="font-size:12px;font-weight:600;">${p.name}</div>`}
+          </div>`).join('')
+        : `<div style="padding:8px 10px;font-size:12px;color:var(--muted);">Точек нет</div>`}
+      </div>` : '';
+    return `<div>
+      <div class="pakb-list-row" data-cat="${s.key}" style="cursor:pointer;">
+        <span class="pakb-dot" style="background:${s.color}"></span>
+        <span style="flex:1;font-weight:700;color:${s.color}">${s.label}</span>
+        <span class="n">${s.n}</span>
+        <span class="p">${pctOfPakb(s.n)}%</span>
+        <span style="font-size:11px;color:var(--muted);transition:transform .15s;transform:rotate(${isOpen?'180deg':'0deg'});display:inline-block">▾</span>
+      </div>${ptsHtml}</div>`;
   }).join('');
 
   document.getElementById('screen-stt').innerHTML = `
     <div class="header">
       <div class="header-top">
-        <div class="header-name">Мой СТТ</div>
+        <div class="header-name">Итоги месяца</div>
         <div class="header-date">${mName}</div>
       </div>
     </div>
     <div class="stt-screen">
-      <div class="stt-top-label">${mName} · план визитов ${plannedVisits}</div>
-      <div style="font-size:10px;color:var(--ink-soft, #8a8478);margin:-6px 0 8px;line-height:1.3">
-        За период с начала месяца по вчера включительно (без сегодняшнего дня — по нему заказы ещё не закрыты)
+      <div class="month-toggle">
+        <div class="month-toggle-btn ${_sttMonthOffset===0?'active':''}" onclick="fetchAndBuildStt(0)">Текущий месяц</div>
+        <div class="month-toggle-btn ${_sttMonthOffset===1?'active':''}" onclick="fetchAndBuildStt(1)">Прошлый месяц</div>
       </div>
 
-      <div class="stt-formula-row">
-        <div class="stt-block">
-          <div class="stt-block-label">Системная дистрибуция</div>
-          <div class="stt-block-pct" style="color:${colorOf(levelOf(systemStt))}">${systemStt}%</div>
-          <div class="stt-block-sub">${systemOrders} заказ${systemOrders===1?'':'а'}</div>
+      <div class="stt-card c-green">
+        <div class="stt-card-head">
+          <span>🏬</span><span class="stt-card-title">Клиентская база</span>
         </div>
-        <div class="stt-minus">
-          <span class="stt-minus-sign">−</span>
-          <span class="stt-minus-text">${offRouteOrders}<br>вне</span>
+        <div class="pakb-row"><span>База точек</span><span style="font-weight:700;color:var(--text)">${pakbTotal} · ПАКБ</span></div>
+        <div class="pakb-bar">
+          <div style="width:${barPct(green)}%;background:var(--green-bright)"></div>
+          <div style="width:${barPct(yellow)}%;background:var(--yellow-bright)"></div>
+          <div style="width:${barPct(red)}%;background:var(--red-bright)"></div>
         </div>
-        <div class="stt-block">
-          <div class="stt-block-label">Чистая дистрибуция</div>
-          <div class="stt-block-pct" style="color:${colorOf(levelOf(cleanStt))}">${cleanStt}%</div>
-          <div class="stt-block-sub">${cleanOrders} заказов</div>
+        ${pakbRows}
+      </div>
+
+      <div class="stt-card c-blue">
+        <div class="stt-card-head">
+          <span>📊</span><span class="stt-card-title">Система</span>
+        </div>
+        <div class="stt-month-note">${mName} · план визитов ${plannedVisits} · прошло ${passedVisits}</div>
+        <div class="stt-formula-row">
+          <div class="stt-block">
+            <div class="stt-block-label">Системная дистрибуция</div>
+            <div class="stt-block-pct" style="color:${colorOf(levelOf(systemStt))}">${systemStt}%</div>
+            <div class="stt-block-sub">${systemOrders} заказ${systemOrders===1?'':'а'}</div>
+          </div>
+          <div class="stt-minus">
+            <span class="stt-minus-sign">−</span>
+            <span class="stt-minus-text">${offRouteOrders}<br>вне</span>
+          </div>
+          <div class="stt-block">
+            <div class="stt-block-label">Чистая дистрибуция</div>
+            <div class="stt-block-pct" style="color:${colorOf(levelOf(cleanStt))}">${cleanStt}%</div>
+            <div class="stt-block-sub">${cleanOrders} заказов</div>
+          </div>
         </div>
       </div>
 
-      <div class="trio">
-        <div class="trio-item lv-green"><div class="trio-n">${data.green??0}</div><div class="trio-lbl">В системе</div></div>
-        <div class="trio-item lv-yellow"><div class="trio-n">${data.yellow??0}</div><div class="trio-lbl">Потенциал</div></div>
-        <div class="trio-item lv-red"><div class="trio-n">${data.red??0}</div><div class="trio-lbl">Провал</div></div>
+      <div class="stt-card c-purple">
+        <div class="stt-card-head">
+          <span>🏷️</span><span class="stt-card-title">Категории</span>
+        </div>
+        <div class="stt-month-note">Доля заказов с категорией от всех заказов (${totalAllOrders})</div>
+        <div class="cats-stt">${catHtml}</div>
       </div>
-
-      <div class="cats-header">
-        <span class="sec-title">Доля заказов по категориям</span>
-        <span class="cats-total">всего ${totalAllOrders}</span>
-      </div>
-      <div class="cats-stt">${catHtml}</div>
     </div>`;
+
+  document.querySelectorAll('#screen-stt [data-cat]').forEach(el => {
+    el.addEventListener('click', () => {
+      _sttOpenCat = _sttOpenCat === el.dataset.cat ? null : el.dataset.cat;
+      buildSttScreen(_lastSttData);
+    });
+  });
 }
 
-function buildHistoryScreen(data) {
-  const months = data.history || data.months || [];
-  let trendHtml = '';
-  const tr = data.trend;
-  if (tr && typeof tr === 'object') {
-    const avg = tr.avg_per_month;
-    const mtg = tr.months_to_goal;
-    const cur = tr.current_stt;
-    let arrow, avgText, goalText;
+function _dayChipsHtml() {
+  const dow = ['вс','пн','вт','ср','чт','пт','сб'];
+  const today = new Date();
+  const periods = [
+    { key: 'today',     label: 'Сегодня',      date: today },
+    { key: 'yesterday', label: 'Прошлый день', date: (() => { const d = new Date(); d.setDate(d.getDate()-1); return d; })() },
+    { key: 'weekago',   label: 'Неделя назад', date: (() => { const d = new Date(); d.setDate(d.getDate()-7); return d; })() },
+  ];
+  const active = periods.find(p =>
+    p.date.getFullYear() === _dayDate.getFullYear() &&
+    p.date.getMonth()    === _dayDate.getMonth()    &&
+    p.date.getDate()     === _dayDate.getDate()
+  );
+  const activeKey = active ? active.key : null;
 
-    if (cur >= 75) {
-      trendHtml = `<div class="trend-banner"><span class="trend-arrow">✅</span><span class="trend-text">Цель 75% достигнута</span></div>`;
-    } else {
-      arrow = avg >= 0 ? '↗' : '↘';
-      avgText = avg >= 0 ? `+${avg}% в мес` : `${avg}% в мес`;
-      if (mtg === null || mtg === undefined) {
-        goalText = 'до цели — снижение';
-      } else if (mtg === 0) {
-        goalText = 'цель достигнута';
-      } else {
-        goalText = `до цели ${mtg} мес`;
-      }
-      const closedNames = months.filter(m => !m.is_current).map(m => {
-        const parts = (m.month || '').split(' ');
-        return parts[0] || '';
-      }).reverse().join(' → ');
-      const trendSub = closedNames ? `<div style="font-size:11px;color:#3b5bdb;margin-top:2px;">тренд по закрытым: ${closedNames}</div>` : '';
-      trendHtml = `<div class="trend-banner"><span class="trend-arrow">${arrow}</span><div><div class="trend-text">${avgText} · ${goalText}</div>${trendSub}</div></div>`;
-    }
-  } else if (months.length >= 2) {
-    const diff = typeof tr === 'number' ? tr : (months[0].stt - months[months.length-1].stt);
-    const arrow = diff >= 0 ? '↗' : '↘';
-    trendHtml = `<div class="trend-banner"><span class="trend-arrow">${arrow}</span><span class="trend-text">${diff >= 0 ? '+' : ''}${diff}% за период</span></div>`;
-  }
-
-  const monthCards = months.map(mo => {
-    const lv = levelOf(mo.stt);
-    const cleanStt = mo.clean_stt ?? null;
-    const cleanColor = cleanStt === null ? null : (cleanStt < 0 ? '#8B1A1A' : colorOf(levelOf(cleanStt)));
-    const total = (mo.total) || (mo.green||0)+(mo.yellow||0)+(mo.red||0);
-    const gn = mo.green || mo.green_n || 0;
-    const yn = mo.yellow || mo.yellow_n || 0;
-    const rn = mo.red || mo.red_n || 0;
-    const notInRoute = mo.not_in_route || 0;
-    const notWorked = mo.not_worked || 0;
-    const gf = total ? gn/total*100 : 0;
-    const yf = total ? yn/total*100 : 0;
-    const rf = total ? rn/total*100 : 0;
-    const mName = mo.month || MONTHS[mo.month_num] || mo.month_label || '';
-    const isCurrent = mo.is_current;
-    return `<div class="month-card">
-      <div class="month-row">
-        <div class="month-name">${mName}${isCurrent ? ' <span style="font-size:10px;color:#6b7280;font-weight:400">· в процессе</span>' : ''}</div>
-        <div class="month-pct-wrap">
-          <div class="month-pct" style="color:${cleanStt !== null ? cleanColor : colorOf(lv)}">${cleanStt !== null ? cleanStt : mo.stt}%</div>
-          ${cleanStt === null ? '' : `<div class="month-clean" style="color:${colorOf(lv)}">системная ${mo.stt}%</div>`}
-        </div>
-      </div>
-      <div class="seg-bar">
-        <div class="seg" style="flex:${gf};background:#4caf50"></div>
-        <div class="seg" style="flex:${yf};background:#f59e0b"></div>
-        <div class="seg" style="flex:${rf};background:#ef4444"></div>
-      </div>
-      <div class="month-leg">
-        <span class="leg-item"><span class="leg-dot" style="background:#4caf50"></span>${gn} в сис.</span>
-        <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>${yn} пот.</span>
-        <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>${rn} пров.</span>
-        ${notInRoute > 0 ? `<span class="leg-item leg-item-muted"><span class="leg-dot" style="background:#c7c2b8"></span>${notInRoute} не в маршруте</span>` : ''}
-        ${notWorked > 0 ? `<span class="leg-item leg-item-warn"><span class="leg-dot" style="background:#b35c5c"></span>${notWorked} не сработало</span>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-
-  const currentStt = (typeof tr === 'object' && tr) ? tr.current_stt : (months[0]?.stt || 0);
-  const goalPct = Math.min(100, Math.round(currentStt / 75 * 100));
-  const goalBarHtml = `<div class="goal-bar-wrap">
-    <div class="goal-bar-track">
-      <div class="goal-bar-fill" style="width:${goalPct}%"></div>
-      <div class="goal-marker"></div>
-    </div>
-    <div class="goal-label">цель 75%</div>
-  </div>`;
-
-  document.getElementById('screen-history').innerHTML = `
-    <div class="header">
-      <div class="header-top">
-        <div class="header-name">История</div>
-        <div class="header-date">4 месяца</div>
-      </div>
-    </div>
-    <div class="hist-screen">
-      ${trendHtml}
-      ${goalBarHtml}
-      ${monthCards||'<div class="empty">Данные отсутствуют</div>'}
+  return `<div style="font-size:12px;font-weight:700;color:var(--muted);margin-bottom:8px;">${_fmtDayLabel(_dayDate)}</div>
+    <div style="display:flex;gap:6px;background:var(--card);padding:4px;border-radius:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);">
+      ${periods.map(p => `<div style="flex:1;text-align:center;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;${p.key===activeKey?'background:var(--text);color:#fff;':'color:var(--muted);'}" onclick="jumpToDay('${_localDateStr(p.date)}')">${p.label}</div>`).join('')}
     </div>`;
 }
-
 
 function buildDayScreen(data) {
   if (!data || !data.my) {
@@ -605,6 +609,8 @@ function buildDayScreen(data) {
   const my = data.my;
   const focusPts = data.focus_points || [];
   const team = data.team || [];
+  const myCatShares = data.cat_shares_today || {};
+  const myTotalOrdersToday = data.total_orders_today || 0;
 
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
   const myHtml = `
@@ -615,59 +621,118 @@ function buildDayScreen(data) {
       <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.clean_stt))}">${my.clean_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">чистая</div></div>
     </div>`;
 
+  const myCatEntries = Object.entries(myCatShares);
+  const catsHtml = myCatEntries.length
+    ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${myCatEntries.map(([name, v]) => `
+        <div style="flex:1 1 30%;min-width:90px;${tileStyle}text-align:center;">
+          <div style="font-size:10px;color:var(--muted);">${name}</div>
+          <div style="font-size:16px;font-weight:700;">${v.pct}%</div>
+        </div>`).join('')}</div>`
+    : '<div style="font-size:12px;color:var(--muted);">Категории не заданы</div>';
+
+  const focusDoneCount = focusPts.filter(p => p.had_order).length;
   const focusHtml = focusPts.length > 0
     ? focusPts.map((p, i) => {
         const res = p.had_order
           ? '<span style="color:#2D5A1B;font-weight:700;font-size:15px;flex-shrink:0">✓</span>'
           : '<span style="color:#8B1A1A;font-weight:700;font-size:15px;flex-shrink:0">✕</span>';
-        const border = i < focusPts.length - 1 ? 'border-bottom:1px solid var(--border);' : '';
+        const border = i < focusPts.length - 1 ? 'border-bottom:1px solid #f0d090;' : '';
         const ptLabel = p.client
-          ? `<div style="font-size:12px;font-weight:700;line-height:1.3">${p.client}</div><div style="font-size:10px;color:var(--muted);margin-top:1px">${p.name || ''}</div>`
+          ? `<div style="font-size:12px;font-weight:700;line-height:1.3">${p.client}</div><div style="font-size:10px;color:#8B6914;margin-top:1px">${p.name || ''}</div>`
           : `<div style="font-size:12px;font-weight:600;line-height:1.3">${p.name || ''}</div>`;
         return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:8px 0;${border}gap:8px">
           <div>${ptLabel}</div>${res}</div>`;
       }).join('')
-    : '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет точек контроля от СВ</div>';
+    : '<div style="font-size:13px;color:#8B6914;padding:8px 0">Нет точек контроля от СВ</div>';
+
+  function _fmtPct1(v) {
+    return v.toFixed(1).replace('.', ',');
+  }
+
+  function dayCell(val, isTotal) {
+    const lv = levelOf80(val);
+    if (isTotal) {
+      return `<div style="flex:1;background:${colorOf(lv)};border-radius:6px;padding:5px 2px;text-align:center;margin:0 2px;border:2px solid ${colorOf(lv)};">
+        <span style="font-size:13px;font-weight:800;color:#fff;">${_fmtPct1(val)}%</span>
+      </div>`;
+    }
+    return `<div style="flex:1;background:${bgOf(lv)};border-radius:6px;padding:5px 2px;text-align:center;margin:0 2px;">
+      <span style="font-size:12px;font-weight:500;color:${colorOf(lv)};">${val}%</span>
+    </div>`;
+  }
+
+  // 01.08.2026: подписи колонок (Сист/Чист/категории/Итог) выводятся ОДИН
+  // РАЗ сверху, не под каждым числом у каждого агента — при 5-7 торговых
+  // подряд повторение убивает читаемость. Строка визитов/заказов/вне
+  // рядом с именем убрана полностью по просьбе.
+  const teamCatNames = team.length ? Object.keys(team[0].cat_shares || {}) : [];
+  const teamHeaderHtml = team.length ? `<div style="display:flex;gap:5px;padding:0 2px 6px;">
+      <div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">Сист</div>
+      <div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">Чист</div>
+      ${teamCatNames.map(n => `<div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">${n}</div>`).join('')}
+      <div style="flex:1;text-align:center;font-size:10px;font-weight:800;color:#3730A3;text-transform:uppercase;">Итог</div>
+    </div>` : '';
 
   const teamHtml = team.map((a, i) => {
     const short = a.name.split(' ').slice(0,2).join(' ');
-    const col = colorOf(levelOf(a.clean_stt));
-    const dotCol = a.level === 'green' ? '#2D5A1B' : a.level === 'yellow' ? '#8B6914' : '#8B1A1A';
-    const border = i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : '';
-    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;${border}gap:6px;font-size:12px">
-      <span style="width:7px;height:7px;border-radius:50%;background:${dotCol};flex-shrink:0;display:inline-block"></span>
-      <span style="flex:1;font-weight:500;color:#1e1b4b">${short}</span>
-      <span style="color:#6366F1;font-size:11px;flex-shrink:0">${a.planned} вз · ${a.orders} зак · −${a.off} вне</span>
-      <span style="font-weight:700;font-size:13px;color:${col};min-width:36px;text-align:right">${a.clean_stt}%</span>
+    const catCells = teamCatNames.map(n => dayCell((a.cat_shares || {})[n]?.pct ?? 0)).join('');
+    const meStyle = a.is_me
+      ? 'background:#fff;border:2px solid #6366F1;border-radius:10px;padding:7px 6px;margin:2px 0;'
+      : `padding:7px 0;${i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : ''}`;
+    return `<div style="${meStyle}">
+      <div style="font-size:12.5px;font-weight:700;color:#1e1b4b;margin-bottom:5px;">
+        <span style="color:#6366F1;margin-right:4px;">${i+1}.</span>${short}${a.is_me ? ' <span style="color:#6366F1;">(вы)</span>' : ''}
+      </div>
+      <div style="display:flex;">
+        ${dayCell(a.sys_stt)}${dayCell(a.clean_stt)}${catCells}${dayCell(a.average, true)}
+      </div>
     </div>`;
   }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет данных по команде</div>';
 
   const cardStyle = 'background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);';
-  const labelStyle = 'font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;';
 
   document.getElementById('screen-day').innerHTML = `
     <div class="header">
       <div class="header-top">
-        <div class="header-name">Итог дня</div>
+        <div class="header-name">Итоги дня</div>
         <div class="header-date">${formatDate()}</div>
       </div>
     </div>
-    <div style="padding:12px 16px 80px">
-      <div style="${cardStyle}">
-        <span style="${labelStyle}">Мой итог</span>
+    <div style="padding:12px 16px 0">
+      ${_dayChipsHtml()}
+    </div>
+    <div style="padding:0 16px 80px">
+      <div style="${cardStyle}border-left:3px solid var(--green)">
+        <span style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Мой итог</span>
         ${myHtml}
       </div>
-      <div style="${cardStyle}">
-        <span style="${labelStyle}">⚠️ Точки фокуса СВ — выполнено?</span>
-        ${focusHtml}
+
+      <div style="${cardStyle}border-left:3px solid #7c4fbf">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+          <span>🏷️</span>
+          <span style="font-size:11px;font-weight:700;color:#7c4fbf;text-transform:uppercase;letter-spacing:.06em;">Категории</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px;">доля заказов с категорией от всех заказов сегодня (${myTotalOrdersToday})</div>
+        ${catsHtml}
       </div>
+
+      <div style="background:#fff3cd;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #f59e0b;">
+        <details>
+          <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+            <span style="font-size:13px;font-weight:700;color:#7c4f00">⚠️ Точки фокуса СВ · ${focusDoneCount}/${focusPts.length}</span>
+            <span style="font-size:10px;color:#7c4f00">▶</span>
+          </summary>
+          <div style="padding-top:8px">${focusHtml}</div>
+        </details>
+      </div>
+
       <div style="background:#EEF2FF;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #C7D2FE;">
         <details>
           <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
             <span style="font-size:13px;font-weight:700;color:#3730A3">👥 Команда сегодня</span>
             <span style="font-size:10px;color:#6366F1">▶</span>
           </summary>
-          <div style="padding-top:8px">${teamHtml}</div>
+          <div style="padding-top:8px">${teamHeaderHtml}${teamHtml}</div>
         </details>
       </div>
     </div>`;
@@ -682,6 +747,58 @@ function activateScreen(name) {
 }
 
 let _dayFocusPoints = [];
+let _dayDate = new Date();   // текущая просматриваемая дата на "Итоги дня" (агент)
+
+function _localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function _fmtDayLabel(d) {
+  const days = ['вс','пн','вт','ср','чт','пт','сб'];
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')} · ${days[d.getDay()]}`;
+}
+
+// 01.08.2026: тот же чип-переключатель на 7 дней, что уже сделан у СВ.
+async function jumpToDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const next = new Date(y, m - 1, d);
+  if (next > new Date()) return;
+  _dayDate = next;
+  const el = document.getElementById('screen-day');
+  el.innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>';
+  try {
+    const r = await fetch(`${API}/api/agent/${_telegramId}/day?d=${dateStr}`);
+    if (!r.ok) throw new Error('bad response');
+    buildDayScreen(await r.json());
+  } catch (e) {
+    el.innerHTML = '<div class="empty">⚠️ Ошибка загрузки итога дня</div>';
+  }
+}
+let _telegramId = null;
+let _sttMonthOffset = 0;
+let _sttOpenCat = null;
+let _lastSttData = null;
+
+function fetchAndBuildStt(offset) {
+  _sttMonthOffset = offset;
+  if (!_telegramId) {
+    buildSttScreen(DEMO.stt);
+    return;
+  }
+  const now = new Date();
+  const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+  fetch(`${API}/api/agent/${_telegramId}/stt?month=${d.getMonth()+1}&year=${d.getFullYear()}`)
+    .then(r => r.ok ? r.json() : Promise.reject())
+    .then(buildSttScreen)
+    .catch(() => apiErr('screen-stt', 'Ошибка загрузки Итогов месяца'));
+}
+
+function apiErr(sid, msg) {
+  document.getElementById(sid).innerHTML = `<div class="loader"><div style="font-size:28px">⚠️</div><div>${msg}</div></div>`;
+}
 
 async function main() {
   const id = getTelegramId();
@@ -690,21 +807,17 @@ async function main() {
 
   document.getElementById('app').innerHTML = `
     <div id="screen-route" class="screen ${startScreen==='route'?'active':''}"></div>
-    <div id="screen-stt"   class="screen ${startScreen==='stt'?'active':''}"></div>
-    <div id="screen-history" class="screen ${startScreen==='history'?'active':''}"></div>
     <div id="screen-day" class="screen ${startScreen==='day'?'active':''}"></div>
+    <div id="screen-stt"   class="screen ${startScreen==='stt'?'active':''}"></div>
     <nav class="nav">
       <button class="nav-btn ${startScreen==='route'?'active':''}" data-screen="route" onclick="activateScreen('route')">
         <span class="nav-icon">📍</span>Маршрут
       </button>
-      <button class="nav-btn ${startScreen==='stt'?'active':''}" data-screen="stt" onclick="activateScreen('stt')">
-        <span class="nav-icon">📊</span>Мой СТТ
-      </button>
-      <button class="nav-btn ${startScreen==='history'?'active':''}" data-screen="history" onclick="activateScreen('history')">
-        <span class="nav-icon">🕐</span>История
-      </button>
       <button class="nav-btn ${startScreen==='day'?'active':''}" data-screen="day" onclick="activateScreen('day')">
-        <span class="nav-icon">📋</span>Итог дня
+        <span class="nav-icon">📋</span>Итоги дня
+      </button>
+      <button class="nav-btn ${startScreen==='stt'?'active':''}" data-screen="stt" onclick="activateScreen('stt')">
+        <span class="nav-icon">📊</span>Итоги месяца
       </button>
     </nav>`;
 
@@ -790,6 +903,9 @@ async function main() {
       clean_orders: 32,
       clean_stt: 32,
       green: 5, yellow: 8, red: 11,
+      points_stt: [{name:'вул. Соборна, 22', client:'Мельник Оксана Іванівна'},{name:'вул. Шевченка, 5', client:'Ковальчук Ірина Петрівна'}],
+      points_akb: [{name:'вул. Світанкова, 11', client:'Прокопенко Любов Миколаївна'}],
+      points_ne_akb: [{name:'вул. Лісова, 8', client:'Гриценко Марія Іванівна'}],
       total_all_orders: 100,
       cat_shares: {
         'Варенные': {pct:50, count:50},
@@ -797,26 +913,11 @@ async function main() {
         'С/К': {pct:62, count:62}
       }
     },
-    history: {
-      trend: {
-        avg_per_month: 4,
-        months_to_goal: 9,
-        current_stt: 41,
-        direction: 'up'
-      },
-      months: [
-        {month_num:6, stt:41, clean_stt:32, green_n:5,  yellow_n:8,  red_n:11, not_in_route:7, not_worked:3, is_current:true},
-        {month_num:5, stt:58, clean_stt:48, green_n:9,  yellow_n:7,  red_n:8,  not_in_route:3, not_worked:0},
-        {month_num:4, stt:23, clean_stt:-4, green_n:3,  yellow_n:5,  red_n:16, not_in_route:9, not_worked:6},
-        {month_num:3, stt:31, clean_stt:19, green_n:4,  yellow_n:6,  red_n:14, not_in_route:5, not_worked:2}
-      ]
-    }
   };
 
   if (!id) {
     buildRouteScreen(DEMO.today);
     buildSttScreen(DEMO.stt);
-    buildHistoryScreen(DEMO.history);
     const bar = document.createElement('div');
     bar.className = 'demo-bar';
     bar.textContent = '⚡ ДЕМО-РЕЖИМ — реальные данные загружаются через Telegram';
@@ -825,9 +926,8 @@ async function main() {
     return;
   }
 
-  const err = (sid, msg) => {
-    document.getElementById(sid).innerHTML = `<div class="loader"><div style="font-size:28px">⚠️</div><div>${msg}</div></div>`;
-  };
+  const err = (sid, msg) => apiErr(sid, msg);
+  _telegramId = id;
 
   // Load /day first to get cross-month focus points, then build route
   fetch(`${API}/api/agent/${id}/day`)
@@ -840,15 +940,7 @@ async function main() {
     .then(buildRouteScreen)
     .catch(() => err('screen-route', 'Ошибка загрузки маршрута'));
 
-  fetch(`${API}/api/agent/${id}/stt`)
-    .then(r => r.ok ? r.json() : Promise.reject())
-    .then(buildSttScreen)
-    .catch(() => err('screen-stt', 'Ошибка загрузки СТТ'));
-
-  fetch(`${API}/api/agent/${id}/history`)
-    .then(r => r.ok ? r.json() : Promise.reject())
-    .then(buildHistoryScreen)
-    .catch(() => err('screen-history', 'Ошибка загрузки истории'));
+  fetchAndBuildStt(0);
 
   fetch(`${API}/api/agent/${id}/day`)
     .then(r => r.ok ? r.json() : Promise.reject())

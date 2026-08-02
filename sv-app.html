@@ -20,6 +20,8 @@
     --red-dark: #A93B30;
     --amber: #D98A3D;
     --amber-bg: #F8EBDB;
+    --blue: #3B7DDB;
+    --blue-bg: #E7EFFB;
   }
   * { box-sizing: border-box; }
   body {
@@ -219,17 +221,25 @@
   #screen-history .extra-line { font-size: 11px; color: var(--ink-soft); margin-top: 3px; }
 
   /* ============ SCREEN: ИИ-КОУЧ ============ */
-  #screen-training .coach-summary-row { display: flex; gap: 8px; margin-bottom: 18px; }
-  #screen-training .coach-stat { flex: 1; border-radius: 14px; padding: 12px 10px; text-align: center; }
+  #screen-training .coach-intro { font-size: 11.5px; color: var(--ink-soft); line-height: 1.5; margin: 0 0 14px; }
+  #screen-training .coach-week-toggle { display: flex; gap: 6px; background: var(--card); padding: 4px; border-radius: 12px; margin-bottom: 16px; }
+  #screen-training .coach-week-btn { flex: 1; text-align: center; padding: 8px 4px; border-radius: 9px; font-size: 12px; font-weight: 700; cursor: pointer; color: var(--ink-soft); }
+  #screen-training .coach-week-btn.active { background: var(--ink); color: #fff; }
+  #screen-training .coach-summary-cap { font-size: 11px; color: var(--ink-soft); line-height: 1.4; margin: 0 0 8px; }
+  #screen-training .coach-summary-row { display: flex; gap: 8px; margin-bottom: 6px; }
+  #screen-training .coach-stat { flex: 1; border-radius: 14px; padding: 12px 8px; text-align: center; }
   #screen-training .coach-stat.green { background: var(--green-bg); }
   #screen-training .coach-stat.yellow { background: var(--yellow-bg); }
   #screen-training .coach-stat.red { background: var(--red-bg); }
-  #screen-training .coach-stat-num { font-size: 24px; font-weight: 800; line-height: 1; }
+  #screen-training .coach-stat.gray { background: var(--line); }
+  #screen-training .coach-stat-num { font-size: 22px; font-weight: 800; line-height: 1; }
   #screen-training .coach-stat.green .coach-stat-num { color: var(--green); }
   #screen-training .coach-stat.yellow .coach-stat-num { color: var(--yellow); }
   #screen-training .coach-stat.red .coach-stat-num { color: var(--red); }
-  #screen-training .coach-stat-cap { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
-  #screen-training .coach-section-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin: 0 0 10px; }
+  #screen-training .coach-stat.gray .coach-stat-num { color: var(--ink-soft); }
+  #screen-training .coach-stat-cap { font-size: 10px; font-weight: 700; color: var(--ink-soft); margin-top: 3px; line-height: 1.3; }
+  #screen-training .coach-section-label { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); margin: 18px 0 4px; }
+  #screen-training .coach-section-cap { font-size: 11px; color: var(--ink-soft); line-height: 1.4; margin: 0 0 10px; }
   #screen-training details.coach-agent-card {
     background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden;
     border-left: 4px solid var(--line);
@@ -237,30 +247,61 @@
   #screen-training details.coach-agent-card.level-red { border-left-color: var(--red); }
   #screen-training details.coach-agent-card.level-yellow { border-left-color: var(--yellow); }
   #screen-training details.coach-agent-card.level-green { border-left-color: var(--green); }
+  #screen-training details.coach-agent-card.level-gray { border-left-color: var(--line); }
   #screen-training details.coach-agent-card summary {
-    list-style: none; display: flex; align-items: center; justify-content: space-between;
+    list-style: none; display: flex; align-items: center; gap: 8px; justify-content: space-between;
     padding: 13px 16px; cursor: pointer;
   }
   #screen-training details.coach-agent-card summary::-webkit-details-marker { display: none; }
-  #screen-training .ca-name { font-size: 14px; font-weight: 700; }
+  #screen-training .ca-name { font-size: 14px; font-weight: 700; flex: 1; }
+  #screen-training .ca-days { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); }
+  #screen-training .ca-trend { font-size: 14px; font-weight: 800; }
+  #screen-training .ca-trend.up { color: var(--green); }
+  #screen-training .ca-trend.flat { color: var(--yellow); }
+  #screen-training .ca-trend.down { color: var(--red); }
   #screen-training .ca-status { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 100px; }
   #screen-training .ca-status.red { background: var(--red-bg); color: var(--red); }
   #screen-training .ca-status.yellow { background: var(--yellow-bg); color: var(--yellow); }
   #screen-training .ca-status.green { background: var(--green-bg); color: var(--green); }
-  #screen-training .ca-body { padding: 10px 16px 14px; border-top: 1px solid var(--line); }
-  #screen-training .ca-dots { display: flex; gap: 6px; margin-bottom: 8px; }
-  #screen-training .ca-dot { width: 12px; height: 12px; border-radius: 50%; }
-  #screen-training .ca-dot.d1 { background: var(--red); }
-  #screen-training .ca-dot.d2 { background: var(--yellow); }
-  #screen-training .ca-dot.d3 { background: var(--green); }
-  #screen-training .ca-dot.dn { background: var(--line); }
-  #screen-training .ca-pattern { font-size: 12px; color: var(--ink-soft); line-height: 1.4; }
+  #screen-training .ca-status.gray { background: var(--line); color: var(--ink-soft); }
+  #screen-training .ca-new-signal {
+    font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 100px;
+    background: var(--blue-bg); color: var(--blue); white-space: nowrap;
+  }
+  #screen-training .coach-signals-card {
+    background: var(--blue-bg); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px;
+  }
+  #screen-training .coach-signals-label {
+    font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--blue); margin-bottom: 8px;
+  }
+  #screen-training .coach-signal-row { font-size: 12.5px; line-height: 1.5; color: var(--ink); margin-bottom: 6px; }
+  #screen-training .coach-signal-row:last-child { margin-bottom: 0; }
+  #screen-training .coach-signal-agent { font-weight: 700; }
+  #screen-training .coach-signals-empty { font-size: 12px; color: var(--ink-soft); }
+  #screen-training .ca-body { padding: 4px 16px 14px; border-top: 1px solid var(--line); }
+  #screen-training .ca-body-cap { font-size: 10.5px; color: var(--ink-soft); line-height: 1.4; margin: 10px 0 10px; }
+  #screen-training .ca-response { background: var(--bg); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
+  #screen-training .ca-response:last-child { margin-bottom: 0; }
+  #screen-training .ca-response-date { font-size: 10.5px; font-weight: 800; color: var(--ink-soft); margin-bottom: 8px; letter-spacing: 0.02em; }
+  #screen-training .ca-row { display: flex; gap: 8px; margin-bottom: 7px; }
+  #screen-training .ca-row:last-child { margin-bottom: 0; }
+  #screen-training .ca-row-label { flex-shrink: 0; width: 60px; font-size: 9.5px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.02em; padding-top: 1px; }
+  #screen-training .ca-row-text { font-size: 12.5px; line-height: 1.4; flex: 1; color: var(--ink); }
+  #screen-training .ca-row.conclusion { border-top: 1px solid var(--line); padding-top: 7px; margin-top: 2px; }
+  #screen-training .ca-row.conclusion .ca-row-text { font-weight: 600; }
+  #screen-training .ca-score-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
+  #screen-training .ca-score-dot.d1 { background: var(--red); }
+  #screen-training .ca-score-dot.d2 { background: var(--yellow); }
+  #screen-training .ca-score-dot.d3 { background: var(--green); }
+  #screen-training .ca-no-responses { font-size: 12px; color: var(--ink-soft); text-align: center; padding: 12px 0; }
   #screen-training .coach-sv-card {
     background: #FAE7E4; border: 1px solid #F1C9C2; border-radius: 16px;
-    padding: 14px 16px; margin-bottom: 16px; margin-top: 16px;
+    padding: 14px 16px; margin-bottom: 16px; margin-top: 4px;
   }
   #screen-training .coach-sv-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--red); margin-bottom: 5px; }
   #screen-training .coach-sv-text { font-size: 14px; font-weight: 700; color: var(--ink); line-height: 1.4; margin-bottom: 4px; }
+  #screen-training .coach-sv-cap { font-size: 10.5px; color: #99694F; line-height: 1.4; margin-bottom: 4px; }
   #screen-training .coach-feedback-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
   #screen-training .coach-fb-btn { background: rgba(255,255,255,0.6); border: 1px solid #F1C9C2; border-radius: 8px; padding: 5px 10px; font-size: 14px; cursor: pointer; }
 </style>
@@ -277,10 +318,9 @@
     </div>
     <div class="tabbar" id="tabbar" style="display:none">
       <button class="tab active" data-screen="route" onclick="switchTab('route')"><span class="icon">🗺️</span>Маршрут</button>
-      <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>СТТ</button>
-      <button class="tab" data-screen="history" onclick="switchTab('history')"><span class="icon">📈</span>История</button>
+      <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итоги дня</button>
+      <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>Итоги месяца</button>
       <button class="tab" data-screen="training" onclick="switchTab('training')"><span class="icon">🧠</span>ИИ-коуч</button>
-      <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итог дня</button>
     </div>
   </div>
 </div>
@@ -292,14 +332,14 @@ const API = new URLSearchParams(window.location.search).get('dev') === '1'
 
 const screenMeta = {
   route:    { title: 'Улучшить систему', pill: () => formatDate() },
-  stt:      { title: 'СТТ команды',               pill: () => _sttMonth || '' },
-  history:  { title: 'История команды',           pill: () => '' },
+  stt:      { title: 'Итоги месяца',               pill: () => _sttMonth || '' },
   training: { title: 'ИИ-коуч',                   pill: () => _coachPeriod || '7 дней' },
-  day:      { title: 'Итог дня',                     pill: () => formatDate() },
+  day:      { title: 'Итоги дня',                     pill: () => formatDate() },
 };
 
 let _telegramId = null;
 let _sttMonth = '';
+let _sttMonthOffset = 0;   // 0 = текущий месяц, 1 = прошлый — переключатель на "Итоги месяца"
 let _coachPeriod = '';
 let _coachPatterns = [];
 let _dayDate = new Date();   // текущая просматриваемая дата на вкладке "Итог дня"
@@ -361,6 +401,32 @@ async function navDay(delta) {
   await loadDay();
 }
 
+// 01.08.2026: переключатель "Текущий месяц/Прошлый месяц" на "Итоги
+// месяца" — /api/sv/{id}/stt уже принимал month/year, тут только
+// вызываем его правильно и сбрасываем кеш "Рейтинг СВ", чтобы он тоже
+// пересчитался за нужный период при следующем открытии той вкладки.
+async function switchSttMonth(offset) {
+  _sttMonthOffset = offset;
+  _svRatingLoaded = false;
+  const el = document.getElementById('screen-stt');
+  el.innerHTML = `<div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>`;
+  try {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
+    const r = await fetch(`${API}/api/sv/${_telegramId}/stt?month=${d.getMonth() + 1}&year=${d.getFullYear()}`);
+    if (!r.ok) throw new Error('bad response');
+    const data = await r.json();
+    el.innerHTML = renderStt(data);
+    // Если сейчас открыт "Рейтинг СВ" — перезагрузить сразу, не дожидаясь
+    // повторного переключения вкладки.
+    if (document.getElementById('view-trend')?.classList.contains('active')) {
+      loadSvRating();
+    }
+  } catch (e) {
+    el.innerHTML = `<div class="empty">⚠️ Ошибка загрузки Итогов месяца</div>`;
+  }
+}
+
 async function loadDay() {
   const el = document.getElementById('screen-day');
   if (!el) return;
@@ -374,6 +440,16 @@ async function loadDay() {
   } catch (e) {
     el.innerHTML = `<div class="empty">⚠️ Ошибка загрузки итога дня</div>`;
   }
+}
+
+// 01.08.2026: прыжок на конкретный день по клику на чип (тот же путь,
+// что navDay(), просто на абсолютную дату, а не на +1/-1 от текущей).
+async function jumpToDay(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const next = new Date(y, m - 1, d);
+  if (next > new Date()) return;
+  _dayDate = next;
+  await loadDay();
 }
 
 function switchTab(name) {
@@ -663,6 +739,11 @@ function renderStt(data) {
   const deltaHtml = '';
 
   return `
+    <div class="segment">
+      <button class="${_sttMonthOffset === 0 ? 'active' : ''}" onclick="switchSttMonth(0)">Текущий месяц</button>
+      <button class="${_sttMonthOffset === 1 ? 'active' : ''}" onclick="switchSttMonth(1)">Прошлый месяц</button>
+    </div>
+
     <div class="summary-card">
       <div class="summary-top-row">
         <p class="summary-label">Итог по команде</p>
@@ -724,7 +805,9 @@ let _svRatingLoaded = false;
 async function loadSvRating() {
   const area = document.getElementById('sv-rating-area');
   try {
-    const res = await fetch(`${API}/api/sv/${_telegramId}/rating-sv`);
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - _sttMonthOffset, 1);
+    const res = await fetch(`${API}/api/sv/${_telegramId}/rating-sv?month=${d.getMonth() + 1}&year=${d.getFullYear()}`);
     const data = await res.json();
     _svRatingLoaded = true;
 
@@ -876,31 +959,90 @@ function renderHistory(data) {
 // ============================================================
 // РЕНДЕР: ИИ-КОУЧ
 // ============================================================
+let _coachWeek = 'current';
+
+function _coachTrendArrow(dots) {
+  if (!dots || dots.length < 2) return '';
+  const half = Math.floor(dots.length / 2) || 1;
+  const firstAvg = dots.slice(0, half).reduce((a, b) => a + b, 0) / half;
+  const lastAvg = dots.slice(-half).reduce((a, b) => a + b, 0) / half;
+  if (lastAvg > firstAvg) return '<span class="ca-trend up">↑</span>';
+  if (lastAvg < firstAvg) return '<span class="ca-trend down">↓</span>';
+  return '<span class="ca-trend flat">→</span>';
+}
+
 function renderCoach(data) {
   _coachPeriod = data.period || '7 дней';
   _coachPatterns = data.patterns_for_topic || [];
+  _coachWeek = data.week || 'current';
   const ts = data.team_summary || {};
 
+  const newSignals = data.new_signals || [];
+  const newSignalsHtml = newSignals.length === 0
+    ? `<div class="coach-signals-empty">Новых сигналов на этой неделе нет.</div>`
+    : newSignals.map(s => `
+        <div class="coach-signal-row">
+          <span class="coach-signal-agent">${s.agent}:</span> ${s.reason}
+        </div>`).join('');
+
   const agentsHtml = (data.agents || []).map(a => {
-    const dotsHtml = (a.trend_dots || []).map(d => {
-      const cls = d === null ? 'dn' : d === 1 ? 'd1' : d === 2 ? 'd2' : 'd3';
-      return `<span class="ca-dot ${cls}"></span>`;
-    }).join('');
+    const responses = a.last_responses || [];
+    const bodyHtml = responses.length === 0
+      ? `<div class="ca-no-responses">Ещё не отвечал(а) на этой неделе.</div>`
+      : responses.map(r => {
+          const scoreCls = r.ai_score >= 3 ? 'd3' : r.ai_score === 2 ? 'd2' : 'd1';
+          return `
+            <div class="ca-response">
+              <div class="ca-response-date">${r.date || ''}</div>
+              <div class="ca-row">
+                <div class="ca-row-label">Причина</div>
+                <div class="ca-row-text">${r.reason || '—'}</div>
+              </div>
+              <div class="ca-row">
+                <div class="ca-row-label">Действие</div>
+                <div class="ca-row-text">${r.action || '—'}</div>
+              </div>
+              <div class="ca-row">
+                <div class="ca-row-label">Помощь</div>
+                <div class="ca-row-text">${r.seed || '—'}</div>
+              </div>
+              ${r.ai_reasoning ? `
+              <div class="ca-row conclusion">
+                <div class="ca-row-label">Вывод ИИ</div>
+                <div class="ca-row-text"><span class="ca-score-dot ${scoreCls}"></span>${r.ai_reasoning}</div>
+              </div>` : ''}
+            </div>`;
+        }).join('');
 
     return `
       <details class="coach-agent-card level-${a.status_color}">
         <summary>
           <span class="ca-name">${a.name}</span>
+          <span class="ca-days">${a.days_answered} ${a.days_answered === 1 ? 'день' : 'дн.'}</span>
+          ${_coachTrendArrow(a.trend_dots)}
+          ${a.new_signal ? '<span class="ca-new-signal">новый сигнал</span>' : ''}
           <span class="ca-status ${a.status_color}">${a.status}</span>
         </summary>
         <div class="ca-body">
-          <div class="ca-dots">${dotsHtml}</div>
-          <div class="ca-pattern">${a.pattern}</div>
+          <div class="ca-body-cap">Последние ответы — что написал(а) агент и вывод ИИ по каждому дню:</div>
+          ${bodyHtml}
         </div>
       </details>`;
   }).join('');
 
   return `
+    <p class="coach-intro">
+      Как думает команда, а не только что сделала. Каждый вечер агент
+      отвечает на 3 коротких вопроса — ИИ определяет, в каком состоянии
+      он сейчас: ждёт, разбирается или уже действует.
+    </p>
+
+    <div class="coach-week-toggle">
+      <div class="coach-week-btn ${_coachWeek === 'current' ? 'active' : ''}" onclick="switchCoachWeek('current')">Текущая неделя</div>
+      <div class="coach-week-btn ${_coachWeek === 'previous' ? 'active' : ''}" onclick="switchCoachWeek('previous')">Прошлая неделя</div>
+    </div>
+
+    <p class="coach-summary-cap">Считается по всем накопленным ответам — без правила «минимум 3 из 5». Один ответ есть — уже есть статус.</p>
     <div class="coach-summary-row">
       <div class="coach-stat green">
         <div class="coach-stat-num">${ts.acts || 0}</div>
@@ -914,14 +1056,26 @@ function renderCoach(data) {
         <div class="coach-stat-num">${ts.waits || 0}</div>
         <div class="coach-stat-cap">Ждёт</div>
       </div>
+      <div class="coach-stat gray">
+        <div class="coach-stat-num">${ts.collecting || 0}</div>
+        <div class="coach-stat-cap">Нет ответов</div>
+      </div>
     </div>
 
-    <div class="coach-section-label">По агентам — тренд 5 дней</div>
+    <div class="coach-signals-card">
+      <div class="coach-signals-label">Новые сигналы за неделю</div>
+      ${newSignalsHtml}
+    </div>
+
+    <div class="coach-section-label">По агентам</div>
+    <p class="coach-section-cap">Нажмите на агента — увидите его последние ответы и что решил ИИ.</p>
     ${agentsHtml}
 
+    <div class="coach-section-label">Программа обучения на неделю</div>
+    <p class="coach-section-cap">Собирается из реальных слов команды — не из общей теории.</p>
     <div class="coach-sv-card">
       <div class="coach-sv-label">Тема обучения по результатам недели</div>
-      <div class="coach-sv-text" id="coach-topic">Генерируется по итогам недели...</div>
+      <div class="coach-sv-text" id="coach-topic">Ещё не сформирована</div>
       <div style="border-top:1px solid #F1C9C2;margin:10px 0;"></div>
       <div id="program-area">
         <button onclick="generateProgram()" style="width:100%;background:#A93B30;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">
@@ -931,9 +1085,23 @@ function renderCoach(data) {
       <div class="coach-feedback-row">
         <button class="coach-fb-btn" onclick="sendFeedback('up')">👍</button>
         <button class="coach-fb-btn" onclick="sendFeedback('down')">👎</button>
-        <span style="font-size:11px;color:#993C1D;font-weight:600;margin-left:4px;">Материал обучения практичный?</span>
+        <span style="font-size:11px;color:#993C1D;font-weight:600;margin-left:4px;">Провели встречу по этой теме?</span>
       </div>
     </div>`;
+}
+
+async function switchCoachWeek(week) {
+  if (week === _coachWeek) return;
+  const container = document.getElementById('screen-training');
+  if (!container) return;
+  try {
+    const res = await fetch(`${API}/api/sv/${_telegramId}/coach/week?week=${week}`);
+    if (!res.ok) throw new Error(`request failed: ${res.status}`);
+    const data = await res.json();
+    container.innerHTML = renderCoach(data);
+  } catch (e) {
+    console.error('switchCoachWeek error', e);
+  }
 }
 
 // ============================================================
@@ -941,11 +1109,11 @@ function renderCoach(data) {
 // ============================================================
 async function generateProgram() {
   const area = document.getElementById('program-area');
-  area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Генерирую программу...</div>';
+  area.innerHTML = '<div style="text-align:center;padding:10px;color:var(--ink-soft);font-size:13px;">⏳ Анализирую ответы команды…</div>';
 
   try {
     const res = await fetch(
-      `${API}/api/sv/${_telegramId}/coach/generate-program`,
+      `${API}/api/sv/${_telegramId}/coach/generate-program?week=${_coachWeek}`,
       { method: 'POST' }
     );
     if (!res.ok) throw new Error(`request failed: ${res.status}`);
@@ -1003,15 +1171,24 @@ function renderDay(data) {
   const agents = data.agents || [];
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
 
-  // Панель "‹ дата ›" — стрелка вперёд скрыта, если уже смотрим сегодня
-  const navStyle = 'display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;';
-  const arrowStyle = 'background:var(--card);border:none;border-radius:8px;width:32px;height:32px;font-size:16px;font-weight:700;color:var(--ink);cursor:pointer;';
-  const isToday = _isToday(_dayDate);
-  const navHtml = `<div style="${navStyle}">
-    <button style="${arrowStyle}" onclick="navDay(-1)">‹</button>
-    <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${_fmtDayLabel(_dayDate)}</span>
-    <button style="${arrowStyle}${isToday ? ';opacity:0.3;cursor:default' : ''}" ${isToday ? 'disabled' : ''} onclick="navDay(1)">›</button>
-  </div>`;
+  // 01.08.2026: 3 кнопки периода (Сегодня/Прошлый день/Неделя назад)
+  // вместо строки из 7 чипов — проще и понятнее для СВ.
+  const periods = [
+    { key: 'today',     label: 'Сегодня',      date: new Date() },
+    { key: 'yesterday', label: 'Прошлый день', date: (() => { const d = new Date(); d.setDate(d.getDate()-1); return d; })() },
+    { key: 'weekago',   label: 'Неделя назад', date: (() => { const d = new Date(); d.setDate(d.getDate()-7); return d; })() },
+  ];
+  const activePeriod = periods.find(p =>
+    p.date.getFullYear() === _dayDate.getFullYear() &&
+    p.date.getMonth()    === _dayDate.getMonth()    &&
+    p.date.getDate()     === _dayDate.getDate()
+  );
+  const activePeriodKey = activePeriod ? activePeriod.key : null;
+  const navHtml = `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;">${_fmtDayLabel(_dayDate)}</div>
+    <div style="display:flex;gap:6px;background:var(--card);padding:4px;border-radius:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);">
+      ${periods.map(p => `<div style="flex:1;text-align:center;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;${p.key===activePeriodKey?'background:var(--ink);color:#fff;':'color:var(--ink-soft);'}" onclick="jumpToDay('${_localDateStr(p.date)}')">${p.label}</div>`).join('')}
+    </div>`;
+
 
   const statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.planned || 0}</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">плановых</div></div>
@@ -1037,7 +1214,24 @@ function renderDay(data) {
   }).join('');
   const cardStyle = 'background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;';
   const labelStyle = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin-bottom:10px;';
-  return `${navHtml}<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div><div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
+
+  // 01.08.2026: доля заказов с категорией от всех заказов команды за
+  // день — сразу после блока "Команда за день", до списка по торговым.
+  const catShares = data.cat_shares_today || {};
+  const totalOrdersToday = data.total_orders_today || 0;
+  const catRows = Object.entries(catShares).map(([name, v]) => {
+    const barColor = v.pct >= 75 ? 'var(--green)' : v.pct >= 50 ? 'var(--yellow)' : 'var(--red)';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
+      <span style="width:70px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--ink-soft);">${name}</span>
+      <div style="flex:1;height:7px;background:var(--bg);border-radius:100px;overflow:hidden;"><div style="height:100%;border-radius:100px;width:${v.pct}%;background:${barColor}"></div></div>
+      <span style="width:34px;text-align:right;font-size:12.5px;font-weight:700;">${v.pct}%</span>
+    </div>`;
+  }).join('');
+  const categoriesHtml = Object.keys(catShares).length
+    ? `<div style="${cardStyle}"><div style="${labelStyle}">🏷️ Категории</div><div style="font-size:10.5px;color:var(--ink-soft);margin:-6px 0 8px;">доля заказов с категорией от всех заказов команды сегодня (${totalOrdersToday})</div>${catRows}</div>`
+    : '';
+
+  return `${navHtml}<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div>${categoriesHtml}<div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
 }
 
 // ============================================================
@@ -1056,7 +1250,6 @@ async function main() {
   document.getElementById('mainContent').innerHTML = `
     <div id="screen-route" class="screen-panel active"></div>
     <div id="screen-stt"   class="screen-panel"></div>
-    <div id="screen-history" class="screen-panel"></div>
     <div id="screen-training" class="screen-panel"></div>
     <div id="screen-day" class="screen-panel"></div>`;
   document.getElementById('tabbar').style.display = 'flex';
@@ -1066,12 +1259,11 @@ async function main() {
     if (el) el.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
   };
 
-  // Загружаем все 5 вкладок параллельно
-  const [routeRes, sttRes, historyRes, coachRes, dayRes] = await Promise.allSettled([
+  // Загружаем все 4 вкладки параллельно ("История" убрана 01.08.2026)
+  const [routeRes, sttRes, coachRes, dayRes] = await Promise.allSettled([
     fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/history`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/coach/week`).then(r => r.ok ? r.json() : Promise.reject()),
+    fetch(`${API}/api/sv/${_telegramId}/coach/week?week=current`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
   ]);
 
@@ -1085,12 +1277,6 @@ async function main() {
     document.getElementById('screen-stt').innerHTML = renderStt(sttRes.value);
   } else {
     err('screen-stt', 'Ошибка загрузки СТТ');
-  }
-
-  if (historyRes.status === 'fulfilled') {
-    document.getElementById('screen-history').innerHTML = renderHistory(historyRes.value);
-  } else {
-    err('screen-history', 'Ошибка загрузки истории');
   }
 
   if (coachRes.status === 'fulfilled') {
