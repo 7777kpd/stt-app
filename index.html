@@ -645,11 +645,15 @@ function buildDayScreen(data) {
       }).join('')
     : '<div style="font-size:13px;color:#8B6914;padding:8px 0">Нет точек контроля от СВ</div>';
 
+  function _fmtPct1(v) {
+    return v.toFixed(1).replace('.', ',');
+  }
+
   function dayCell(val, isTotal) {
     const lv = levelOf80(val);
     if (isTotal) {
       return `<div style="flex:1;background:${colorOf(lv)};border-radius:6px;padding:5px 2px;text-align:center;margin:0 2px;border:2px solid ${colorOf(lv)};">
-        <span style="font-size:13px;font-weight:800;color:#fff;">${val}%</span>
+        <span style="font-size:13px;font-weight:800;color:#fff;">${_fmtPct1(val)}%</span>
       </div>`;
     }
     return `<div style="flex:1;background:${bgOf(lv)};border-radius:6px;padding:5px 2px;text-align:center;margin:0 2px;">
@@ -672,9 +676,13 @@ function buildDayScreen(data) {
   const teamHtml = team.map((a, i) => {
     const short = a.name.split(' ').slice(0,2).join(' ');
     const catCells = teamCatNames.map(n => dayCell((a.cat_shares || {})[n]?.pct ?? 0)).join('');
-    const border = i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : '';
-    return `<div style="padding:7px 0;${border}">
-      <div style="font-size:12.5px;font-weight:700;color:#1e1b4b;margin-bottom:5px;">${short}</div>
+    const meStyle = a.is_me
+      ? 'background:#fff;border:2px solid #6366F1;border-radius:10px;padding:7px 6px;margin:2px 0;'
+      : `padding:7px 0;${i < team.length - 1 ? 'border-bottom:1px solid #C7D2FE;' : ''}`;
+    return `<div style="${meStyle}">
+      <div style="font-size:12.5px;font-weight:700;color:#1e1b4b;margin-bottom:5px;">
+        <span style="color:#6366F1;margin-right:4px;">${i+1}.</span>${short}${a.is_me ? ' <span style="color:#6366F1;">(вы)</span>' : ''}
+      </div>
       <div style="display:flex;">
         ${dayCell(a.sys_stt)}${dayCell(a.clean_stt)}${catCells}${dayCell(a.average, true)}
       </div>
