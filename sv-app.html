@@ -1171,29 +1171,24 @@ function renderDay(data) {
   const agents = data.agents || [];
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
 
-  // 01.08.2026: строка чипов на 7 дней назад вместо стрелок ‹ ›.
-  // Тот же лимит "не дальше 7 дней", что уже был в navDay().
-  const dow = ['вс','пн','вт','ср','чт','пт','сб'];
-  const chipDays = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    chipDays.push(d);
-  }
-  const navHtml = `<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:8px;">
-      <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${_fmtDayLabel(_dayDate)}</span>
-    </div>
-    <div style="display:flex;gap:5px;overflow-x:auto;margin-bottom:12px;padding-bottom:2px;">
-      ${chipDays.map(d => {
-        const active = d.getFullYear() === _dayDate.getFullYear() && d.getMonth() === _dayDate.getMonth() && d.getDate() === _dayDate.getDate();
-        const isFuture = d > new Date();
-        const ds = _localDateStr(d);
-        return `<div style="width:38px;flex-shrink:0;text-align:center;padding:7px 0;border-radius:12px;${isFuture ? 'opacity:0.3;pointer-events:none;' : 'cursor:pointer;'}background:${active ? 'var(--ink)' : 'transparent'};" onclick="jumpToDay('${ds}')">
-          <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;color:${active ? '#fff' : 'var(--ink-soft)'}">${dow[d.getDay()]}</div>
-          <div style="font-size:13px;font-weight:700;margin-top:2px;color:${active ? '#fff' : 'var(--ink)'}">${d.getDate()}</div>
-        </div>`;
-      }).join('')}
+  // 01.08.2026: 3 кнопки периода (Сегодня/Прошлый день/Неделя назад)
+  // вместо строки из 7 чипов — проще и понятнее для СВ.
+  const periods = [
+    { key: 'today',     label: 'Сегодня',      date: new Date() },
+    { key: 'yesterday', label: 'Прошлый день', date: (() => { const d = new Date(); d.setDate(d.getDate()-1); return d; })() },
+    { key: 'weekago',   label: 'Неделя назад', date: (() => { const d = new Date(); d.setDate(d.getDate()-7); return d; })() },
+  ];
+  const activePeriod = periods.find(p =>
+    p.date.getFullYear() === _dayDate.getFullYear() &&
+    p.date.getMonth()    === _dayDate.getMonth()    &&
+    p.date.getDate()     === _dayDate.getDate()
+  );
+  const activePeriodKey = activePeriod ? activePeriod.key : null;
+  const navHtml = `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-bottom:8px;">${_fmtDayLabel(_dayDate)}</div>
+    <div style="display:flex;gap:6px;background:var(--card);padding:4px;border-radius:12px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.04);">
+      ${periods.map(p => `<div style="flex:1;text-align:center;padding:8px 4px;border-radius:9px;font-size:12px;font-weight:700;cursor:pointer;${p.key===activePeriodKey?'background:var(--ink);color:#fff;':'color:var(--ink-soft);'}" onclick="jumpToDay('${_localDateStr(p.date)}')">${p.label}</div>`).join('')}
     </div>`;
+
 
   const statsHtml = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
     <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${team.planned || 0}</div><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">плановых</div></div>
