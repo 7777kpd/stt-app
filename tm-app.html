@@ -37,6 +37,11 @@
   .topbar h1 { font-size: 20px; font-weight: 700; margin: 0; }
   .top-pill { font-size: 13px; color: var(--ink-soft); background: var(--card); border-radius: 100px; padding: 6px 12px; font-weight: 600; }
   .content { padding: 4px 16px 24px; overflow-y: auto; flex: 1; }
+  .tabbar { display: flex; background: var(--card); border-top: 1px solid var(--line); padding: 9px 4px 14px; flex-shrink: 0; }
+  .tab { flex: 1; text-align: center; font-size: 10px; font-weight: 700; color: var(--ink-soft); background: none; border: none; font-family: inherit; cursor: pointer; padding: 6px 2px 0; }
+  .tab.active { color: var(--ink); }
+  .tab .icon { width: 26px; height: 26px; margin: 0 auto 4px; border-radius: 8px; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .tab.active .icon { background: #D9CFAE; }
   .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
   .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -104,6 +109,9 @@
     </div>
     <div class="content" id="mainContent">
       <div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>
+    </div>
+    <div class="tabbar" id="tabbar">
+      <button class="tab active" data-screen="route"><span class="icon">🗺️</span>Маршрут</button>
     </div>
   </div>
 </div>
