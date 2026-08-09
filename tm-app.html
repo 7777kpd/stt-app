@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>СТТ — Территориальный менеджер</title>
+<style>
+  :root {
+    --bg: #F0EADC;
+    --card: #FFFFFF;
+    --ink: #2C2A26;
+    --ink-soft: #8B8578;
+    --line: #ECE6D8;
+    --green: #3FAE6A;
+    --green-bg: #E6F4EC;
+    --yellow: #E2A335;
+    --yellow-bg: #FBF1DF;
+    --red: #DC5B4E;
+    --red-bg: #FAE7E4;
+    --red-dark: #A93B30;
+    --amber: #D98A3D;
+    --amber-bg: #F8EBDB;
+    --blue: #3B7DDB;
+    --blue-bg: #E7EFFB;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  .phone {
+    width: 100%; max-width: 480px; background: var(--bg);
+    height: 100dvh; display: flex; flex-direction: column;
+  }
+  .topbar { padding: 22px 20px 14px; display: flex; align-items: baseline; justify-content: space-between; flex-shrink: 0; }
+  .topbar h1 { font-size: 20px; font-weight: 700; margin: 0; }
+  .top-pill { font-size: 13px; color: var(--ink-soft); background: var(--card); border-radius: 100px; padding: 6px 12px; font-weight: 600; }
+  .content { padding: 4px 16px 24px; overflow-y: auto; flex: 1; }
+  .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 40px 16px; color: var(--ink-soft); font-size: 14px; }
+
+  /* ============ ЭКРАН МАРШРУТ (ТМ) — ТОП-5 в фокусе ============ */
+  #screen-route .sub { font-size: 12px; color: var(--ink-soft); font-weight: 600; margin: -4px 0 14px; }
+
+  #screen-route details.route-card {
+    background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  #screen-route details.route-card[open] {
+    margin: 14px 0; box-shadow: 0 6px 18px rgba(60,50,20,.10);
+  }
+  #screen-route details.route-card summary {
+    list-style: none; cursor: pointer; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  #screen-route details.route-card summary::-webkit-details-marker { display: none; }
+  #screen-route .rc-name { font-size: 14px; font-weight: 700; }
+  #screen-route .rc-sub { font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
+  #screen-route .rc-right { display: flex; align-items: center; gap: 10px; }
+  #screen-route .rc-deficit { text-align: right; }
+  #screen-route .rc-deficit .num { font-size: 18px; font-weight: 800; color: var(--red-dark); line-height: 1.1; }
+  #screen-route .rc-deficit .lbl { font-size: 9px; color: var(--red-dark); opacity: .8; }
+  #screen-route .rc-chevron { font-size: 13px; color: var(--ink-soft); transition: transform .15s; }
+  #screen-route details[open] .rc-chevron { transform: rotate(90deg); }
+
+  #screen-route .rc-body { padding: 0 16px 16px; }
+  #screen-route .rc-tiles { display: flex; gap: 5px; margin-bottom: 14px; align-items: stretch; }
+  #screen-route .rc-tile { flex: 1; background: var(--bg); border-radius: 9px; padding: 7px 3px; text-align: center; min-width: 0; }
+  #screen-route .rc-tile .val { font-size: 13px; font-weight: 800; }
+  #screen-route .rc-tile .lbl { font-size: 8px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+  #screen-route .rc-tile .sub { font-size: 7px; color: var(--ink-soft); opacity: .75; margin: 1px 0 0; font-weight: 500; }
+  #screen-route .rc-off { align-self: center; font-size: 10px; font-weight: 800; color: var(--red-dark); white-space: nowrap; }
+
+  #screen-route .pakb-block { margin-bottom: 12px; }
+  #screen-route .pakb-head { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10px; color: var(--ink-soft); font-weight: 600; }
+  #screen-route .pakb-bar { height: 4px; border-radius: 2px; overflow: hidden; display: flex; }
+  #screen-route .pakb-legend { display: flex; justify-content: space-between; font-size: 9px; color: var(--ink-soft); font-weight: 600; margin-top: 4px; }
+
+  #screen-route .formula-toggle { cursor: pointer; background: var(--blue-bg); border-left: 3px solid var(--blue); border-radius: 10px; padding: 10px 12px; }
+  #screen-route .formula-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--blue); }
+  #screen-route .formula-body { margin-top: 8px; display: none; }
+  #screen-route .formula-toggle.open .formula-body { display: block; }
+  #screen-route .frow { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(59,125,219,.12); font-size: 11px; }
+  #screen-route .frow:last-of-type { border-bottom: none; }
+  #screen-route .frow span:first-child { color: var(--blue); opacity: .8; }
+  #screen-route .frow span:last-child { font-weight: 700; color: var(--blue); }
+  #screen-route .frow.total { padding-top: 6px; border-top: 1px solid rgba(59,125,219,.25); margin-top: 4px; font-size: 12px; }
+  #screen-route .frow.total span:last-child { color: var(--red-dark); font-size: 14px; }
+
+  #screen-route .rest-toggle { text-align: center; padding: 12px 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
+  #screen-route .rest-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  #screen-route .rest-row span:last-child { color: var(--ink-soft); font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="phone">
+    <div class="topbar">
+      <h1 id="topTitle">Загрузка...</h1>
+      <div class="top-pill" id="topPill" style="display:none"></div>
+    </div>
+    <div class="content" id="mainContent">
+      <div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
+
+function getTelegramId() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('id')) return p.get('id');
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
+    return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  return null;
+}
+
+function toggleFormula(el, ev) {
+  ev.stopPropagation();
+  el.classList.toggle('open');
+}
+
+function renderRouteCard(a, rank) {
+  const pakb = a.stt_points + a.akb_points + a.ne_akb_points;
+  const sttPct = pakb ? Math.round(a.stt_points / pakb * 100) : 0;
+  const akbPct = pakb ? Math.round(a.akb_points / pakb * 100) : 0;
+  const neakbPct = 100 - sttPct - akbPct;
+
+  return `<details class="route-card">
+    <summary>
+      <div><span class="rc-name">${rank} · ${a.agent}</span><span class="rc-sub">${a.sv || ''}</span></div>
+      <div class="rc-right">
+        <div class="rc-deficit"><div class="num">${a.deficit_orders}</div><div class="lbl">дефицит заказов</div></div>
+        <span class="rc-chevron">▶</span>
+      </div>
+    </summary>
+    <div class="rc-body">
+      <div class="rc-tiles">
+        <div class="rc-tile"><div class="val" style="color:${a.deficit_visits > 0 ? 'var(--red-dark)' : 'var(--ink-soft)'}">${a.deficit_visits}</div><div class="lbl">деф. визитов</div></div>
+        <div class="rc-tile"><div class="val">${a.system_pct}%</div><div class="lbl">системная</div><div class="sub">${a.orders}з·${a.base}в(база)</div></div>
+        <div class="rc-off">−${a.off_route}</div>
+        <div class="rc-tile"><div class="val">${a.clean_pct}%</div><div class="lbl">чистая</div></div>
+        <div class="rc-tile"><div class="val">${a.avg_category != null ? a.avg_category + '%' : '—'}</div><div class="lbl">ср. категория</div></div>
+      </div>
+      <div class="pakb-block">
+        <div class="pakb-head"><span>Клиентская база (ПАКБ)</span><span>${pakb}</span></div>
+        <div class="pakb-bar">
+          <div style="width:${sttPct}%;background:var(--green)"></div>
+          <div style="width:${akbPct}%;background:var(--yellow)"></div>
+          <div style="width:${neakbPct}%;background:var(--red)"></div>
+        </div>
+        <div class="pakb-legend"><span>СТТ ${a.stt_points}</span><span>АКБ ${a.akb_points}</span><span>Не АКБ ${a.ne_akb_points}</span></div>
+      </div>
+      <div class="formula-toggle" onclick="toggleFormula(this, event)">
+        <div class="formula-head"><span>Как посчитали ${a.deficit_orders}?</span><span>▾</span></div>
+        <div class="formula-body">
+          <div class="frow"><span>План визитов (мес)</span><span>${a.plan}</span></div>
+          <div class="frow"><span>Средний по команде</span><span>${a.team_average_plan}</span></div>
+          <div class="frow"><span>Требуемый план заказов = ${a.base}×75%</span><span>${a.need_orders}</span></div>
+          <div class="frow"><span>Заказов по факту</span><span>${a.orders}</span></div>
+          <div class="frow total"><span>Дефицит заказов</span><span>${a.deficit_orders}</span></div>
+        </div>
+      </div>
+    </div>
+  </details>`;
+}
+
+function renderRoute(data) {
+  if (!data.archive_ready) {
+    return `<div class="sub">ТОП-5 в фокусе · ${data.month}</div>
+      <div class="empty">Итоги ${data.month} ещё не закрыты — ТОП-5 появится после закрытия месяца.</div>`;
+  }
+
+  const top5Html = data.top5.map((a, i) => renderRouteCard(a, i + 1)).join('');
+  const restHtml = data.rest.length
+    ? `<div class="rest-toggle" onclick="document.getElementById('restList').style.display = document.getElementById('restList').style.display === 'none' ? 'block' : 'none'">Остальные маршруты (${data.rest.length}) ▾</div>
+       <div id="restList" style="display:none">
+         ${data.rest.map(a => `<div class="rest-row"><span>${a.agent}</span><span>дефицит ${a.deficit_orders}</span></div>`).join('')}
+       </div>`
+    : '';
+
+  return `<div class="sub">ТОП-5 в фокусе · ${data.month}</div>${top5Html}${restHtml}`;
+}
+
+async function main() {
+  const telegramId = getTelegramId();
+  if (!telegramId) {
+    document.getElementById('topTitle').textContent = 'Нет доступа';
+    document.getElementById('mainContent').innerHTML = '<div class="empty">Откройте через Telegram</div>';
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/api/tm/${telegramId}/route`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    document.getElementById('mainContent').innerHTML = renderRoute(data);
+    document.getElementById('topTitle').textContent = 'Маршрут';
+  } catch (e) {
+    document.getElementById('topTitle').textContent = 'Ошибка';
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршрут</div>';
+  }
+}
+
+main();
+</script>
+</body>
+</html>
