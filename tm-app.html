@@ -1,506 +1,1127 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>СТТ — Территориальный менеджер</title>
-<style>
-  :root {
-    --bg: #F0EADC;
-    --card: #FFFFFF;
-    --ink: #2C2A26;
-    --ink-soft: #8B8578;
-    --line: #ECE6D8;
-    --green: #3FAE6A;
-    --green-bg: #E6F4EC;
-    --yellow: #E2A335;
-    --yellow-bg: #FBF1DF;
-    --red: #DC5B4E;
-    --red-bg: #FAE7E4;
-    --red-dark: #A93B30;
-    --amber: #D98A3D;
-    --amber-bg: #F8EBDB;
-    --blue: #3B7DDB;
-    --blue-bg: #E7EFFB;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    color: var(--ink);
-  }
-  .phone {
-    width: 100%; max-width: 480px; background: var(--bg);
-    height: 100dvh; display: flex; flex-direction: column;
-  }
-  .topbar { padding: 22px 20px 14px; display: flex; align-items: baseline; justify-content: space-between; flex-shrink: 0; }
-  .topbar h1 { font-size: 20px; font-weight: 700; margin: 0; }
-  .top-pill { font-size: 13px; color: var(--ink-soft); background: var(--card); border-radius: 100px; padding: 6px 12px; font-weight: 600; }
-  .content { padding: 4px 16px 24px; overflow-y: auto; flex: 1; }
-  .tabbar { display: flex; background: var(--card); border-top: 1px solid var(--line); padding: 9px 4px 14px; flex-shrink: 0; }
-  .tab { flex: 1; text-align: center; font-size: 10px; font-weight: 700; color: var(--ink-soft); background: none; border: none; font-family: inherit; cursor: pointer; padding: 6px 2px 0; }
-  .tab.active { color: var(--ink); }
-  .tab .icon { width: 26px; height: 26px; margin: 0 auto 4px; border-radius: 8px; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; }
-  .tab.active .icon { background: #D9CFAE; }
-  .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
-  .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .empty { text-align: center; padding: 40px 16px; color: var(--ink-soft); font-size: 14px; }
+import math
+import json
+from datetime import date, datetime, timedelta
+from collections import defaultdict
 
-  /* ============ ЭКРАН МАРШРУТ (ТМ) — ТОП-5 в фокусе ============ */
-  .sub { font-size: 12px; color: var(--ink-soft); font-weight: 600; margin: -4px 0 14px; }
+RU_DAYS = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
 
-  details.route-card {
-    background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden;
-    border: 1px solid var(--line);
-  }
-  details.route-card[open] {
-    margin: 14px 0; box-shadow: 0 6px 18px rgba(60,50,20,.10);
-  }
-  details.route-card summary {
-    list-style: none; cursor: pointer; padding: 14px 16px;
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  details.route-card summary::-webkit-details-marker { display: none; }
-  .rc-name { font-size: 14px; font-weight: 700; }
-  .rc-sub { font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
-  .rc-right { display: flex; align-items: center; gap: 10px; }
-  .rc-deficit { text-align: right; }
-  .rc-deficit .num { font-size: 18px; font-weight: 800; color: var(--red-dark); line-height: 1.1; }
-  .rc-deficit .lbl { font-size: 9px; color: var(--red-dark); opacity: .8; }
-  .rc-chevron { font-size: 13px; color: var(--ink-soft); transition: transform .15s; }
-  details[open] .rc-chevron { transform: rotate(90deg); }
 
-  .rc-body { padding: 0 16px 16px; }
-  .rc-tiles { display: flex; gap: 5px; margin-bottom: 14px; align-items: stretch; }
-  .rc-tile { flex: 1; background: var(--bg); border-radius: 9px; padding: 7px 3px; text-align: center; min-width: 0; }
-  .rc-tile .val { font-size: 13px; font-weight: 800; }
-  .rc-tile .lbl { font-size: 8px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
-  .rc-tile .sub { font-size: 7px; color: var(--ink-soft); opacity: .75; margin: 1px 0 0; font-weight: 500; }
-  .rc-off { align-self: center; font-size: 10px; font-weight: 800; color: var(--red-dark); white-space: nowrap; }
+def get_calendar(month, year):
+    cal = {}
+    for d in range(1, 32):
+        try:
+            cal[d] = RU_DAYS[date(year, month, d).weekday()]
+        except ValueError:
+            pass
+    return cal
 
-  .pakb-block { margin-bottom: 12px; }
-  .pakb-head { display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 10px; color: var(--ink-soft); font-weight: 600; }
-  .pakb-bar { height: 4px; border-radius: 2px; overflow: hidden; display: flex; }
-  .pakb-legend { display: flex; justify-content: space-between; font-size: 9px; color: var(--ink-soft); font-weight: 600; margin-top: 4px; }
 
-  .formula-toggle { cursor: pointer; background: var(--blue-bg); border-left: 3px solid var(--blue); border-radius: 10px; padding: 10px 12px; }
-  .formula-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--blue); }
-  .formula-body { margin-top: 8px; display: none; }
-  .formula-toggle.open .formula-body { display: block; }
-  .frow { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(59,125,219,.12); font-size: 11px; }
-  .frow:last-of-type { border-bottom: none; }
-  .frow span:first-child { color: var(--blue); opacity: .8; }
-  .frow span:last-child { font-weight: 700; color: var(--blue); }
-  .frow.total { padding-top: 6px; border-top: 1px solid rgba(59,125,219,.25); margin-top: 4px; font-size: 12px; }
-  .frow.total span:last-child { color: var(--red-dark); font-size: 14px; }
+def short_address(tt):
+    parts = [p.strip() for p in tt.split(',')]
+    filtered = [p for p in parts if 'район' not in p.lower()]
+    if len(filtered) >= 3:
+        return ', '.join(filtered[-3:])
+    elif len(filtered) >= 2:
+        return ', '.join(filtered[-2:])
+    return tt
 
-  .rest-toggle { text-align: center; padding: 12px 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
-  .rest-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
-  .rest-row span:last-child { color: var(--ink-soft); font-weight: 600; }
 
-  .history-toggle { cursor: pointer; background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
-  .history-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
-  .history-body { margin-top: 10px; display: none; }
-  .history-toggle.open .history-body { display: block; }
-  .history-days { display: flex; gap: 6px; justify-content: space-between; }
-  .history-day { text-align: center; }
-  .history-day .dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; margin: 0 auto 4px; }
-  .history-day .dot.done { background: var(--green-bg); color: var(--green); }
-  .history-day .dot.miss { background: var(--red-bg); color: var(--red-dark); }
-  .history-day .lbl { font-size: 9px; color: var(--ink-soft); font-weight: 600; }
-  .history-summary { text-align: center; font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-top: 10px; }
+def calc_point_stt(company, agent, tt, today, plan_data, fact_data, structure_cache=None):
+    month = today.month
+    year = today.year
+    yesterday = today.day - 1
 
-  /* ============ ЭКРАН ИТОГИ ДНЯ (ТМ) ============ */
-  .period-switch { display: flex; gap: 6px; margin-bottom: 14px; }
-  .period-btn { flex: 1; font-size: 11px; font-weight: 700; padding: 8px 4px; border-radius: 9px; border: none; background: var(--card); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
-  .period-btn.active { background: var(--ink); color: #fff; }
+    cal = get_calendar(month, year)
+    plan = plan_data.get('plan', {})
+    orders = fact_data.get('orders', {})
+    clients = fact_data.get('clients', {})
 
-  .day-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
-  .day-card h3 { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .02em; }
-  .day-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .day-tile { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
-  .day-tile .val { font-size: 18px; font-weight: 800; }
-  .day-tile .lbl { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+    # ВАЖНО (24.07.2026): параметр `tt` теперь — это ключ плана (код ТТ,
+    # или "__addr__..." запасной вариант для строк без кода) — то же
+    # самое значение, что дают все вызывающие функции при переборе
+    # plan.items(). Реальный адрес для показа человеку — отдельно,
+    # из info['address'], а не из этого параметра.
+    info = plan.get((agent, tt), {})
+    days = info.get('days', set())
+    route_id = info.get('route', '')
+    tt_code = info.get('tt_code', '') or tt
+    address = info.get('address', '') or tt
 
-  .team-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
-  .team-row:last-child { border-bottom: none; }
-  .cat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; color: var(--ink-soft); }
-  .cat-row b { color: var(--ink); }
+    if not days:
+        return None
 
-  details.agent-day-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; overflow: hidden; }
-  details.agent-day-card summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; }
-  details.agent-day-card summary::-webkit-details-marker { display: none; }
-  .adc-name { font-size: 13px; font-weight: 700; }
-  .adc-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
-  .adc-body { padding: 0 14px 14px; }
-  .adc-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-  .adc-metric { flex: 1 1 30%; background: var(--bg); border-radius: 9px; padding: 8px 4px; text-align: center; min-width: 0; }
-  .adc-metric .val { font-size: 14px; font-weight: 800; }
-  .adc-metric .delta { font-size: 9px; font-weight: 700; margin-top: 1px; }
-  .adc-metric .lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; line-height: 1.2; }
-  .level-bar { height: 6px; border-radius: 3px; overflow: hidden; display: flex; margin-bottom: 4px; }
-  .level-bar-labels { display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; margin-bottom: 10px; }
-  .point-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; border-bottom: 1px solid var(--line); }
-  .point-row:last-child { border-bottom: none; }
-  .point-info { flex: 1; min-width: 0; }
-  .point-client { color: var(--ink); font-weight: 600; }
-  .point-addr { color: var(--ink-soft); font-size: 10px; margin-top: 1px; }
-  .point-pct-wrap { flex-shrink: 0; text-align: right; }
-  .point-pct { font-size: 13px; font-weight: 800; display: block; }
-  .point-pct-lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; }
-  .visit-dots { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
-  .visit-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-  .visit-dot.yes { background: var(--green); }
-  .visit-dot.no { background: var(--line); border: 1px solid var(--ink-soft); }
-  .cat-chip { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 6px; }
-  .cat-chip.good { background: var(--green-bg); color: var(--green); }
-  .cat-chip.bad { background: var(--yellow-bg); color: var(--amber); }
-  .cat-chip.none { background: var(--line); color: var(--ink-soft); }
-  .lvl-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
-  .lvl-tab { flex: 1; font-size: 10px; font-weight: 700; padding: 7px 4px; border-radius: 8px; border: none; background: var(--bg); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
-  .lvl-tab.active.lvl-tab-green { background: var(--green-bg); color: var(--green); }
-  .lvl-tab.active.lvl-tab-yellow { background: var(--yellow-bg); color: var(--amber); }
-  .lvl-tab.active.lvl-tab-red { background: var(--red-bg); color: var(--red-dark); }
-  details.focus-sv-block { background: var(--red-bg); border-radius: 10px; padding: 0; margin-bottom: 10px; overflow: hidden; }
-  details.focus-sv-block[open] { padding: 8px 10px; }
-  .focus-sv-head { list-style: none; cursor: pointer; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--red-dark); }
-  details.focus-sv-block[open] .focus-sv-head { padding: 0 0 6px; }
-  .focus-sv-head::-webkit-details-marker { display: none; }
-  details.focus-sv-block[open] .rc-chevron { transform: rotate(90deg); }
-  .focus-sv-block .point-row { border-bottom: 1px solid rgba(169,59,48,.12); }
-  .check-yes { color: var(--green); font-weight: 800; }
-  .check-no { color: var(--red-dark); font-weight: 800; }
-</style>
-</head>
-<body>
-<div id="app">
-  <div class="phone">
-    <div class="topbar">
-      <h1 id="topTitle">Загрузка...</h1>
-      <div class="top-pill" id="topPill" style="display:none"></div>
-    </div>
-    <div class="content" id="mainContent">
-      <div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>
-    </div>
-    <div class="tabbar" id="tabbar">
-      <button class="tab active" data-screen="route" onclick="switchScreen('route')"><span class="icon">🗺️</span>Маршрут</button>
-      <button class="tab" data-screen="day" onclick="switchScreen('day')"><span class="icon">📋</span>Итоги дня</button>
-    </div>
-  </div>
-</div>
+    planned_month = {d for d, dn in cal.items() if dn in days}
+    planned_passed = {d for d in planned_month if d <= yesterday}
+    remaining = planned_month - planned_passed
 
-<script>
-const API = new URLSearchParams(window.location.search).get('dev') === '1'
-  ? 'https://develop-production-0a2d.up.railway.app'
-  : 'https://worker-production-1dfb.up.railway.app';
+    total_planned = len(planned_month)
+    passed_planned = len(planned_passed)
+    remaining_count = len(remaining)
 
-function getTelegramId() {
-  const p = new URLSearchParams(window.location.search);
-  if (p.get('id')) return p.get('id');
-  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
-    return String(window.Telegram.WebApp.initDataUnsafe.user.id);
-  return null;
-}
+    if total_planned == 0:
+        return None
 
-function toggleFormula(el, ev) {
-  ev.stopPropagation();
-  el.classList.toggle('open');
-}
+    tt_orders = orders.get((agent, tt_code), {})
+    # Клиент берётся из плана (всегда есть) или из факта (если есть заказы)
+    client_name = info.get('client', '') or clients.get((agent, tt_code), '')
+    systemic_dates = planned_passed & set(tt_orders.keys())
+    orders_count = len(systemic_dates)
+    missed = passed_planned - orders_count
 
-let currentTelegramId = null;
-const historyCache = {};
+    all_order_dates = set(tt_orders.keys())
+    off_schedule_dates = all_order_dates - planned_passed
+    off_schedule_count = len(off_schedule_dates)
 
-async function toggleHistory(cardId, agentName, ev) {
-  ev.stopPropagation();
-  const toggle = document.getElementById(`hist-${cardId}`);
-  const body = document.getElementById(`hist-body-${cardId}`);
-  const wasOpen = toggle.classList.contains('open');
-  toggle.classList.toggle('open');
-  if (wasOpen) return;
+    # 01.08.2026: было orders_count/total_planned (весь месяц, включая
+    # ещё не наступившие дни) — рано в месяце это занижало % несправедливо.
+    # Теперь считаем от passed_planned (прошедшие плановые визиты), как
+    # уже делают "Мой СТТ"/"Итог дня".
+    stt = int(round(orders_count / passed_planned * 100, 0)) if passed_planned else 0
 
-  if (historyCache[agentName]) {
-    body.innerHTML = renderHistoryDots(historyCache[agentName]);
-    return;
-  }
+    need_75 = max(0, math.ceil(total_planned * 0.75) - orders_count)
+    need_75_possible = need_75 <= remaining_count
 
-  try {
-    const res = await fetch(`${API}/api/tm/${currentTelegramId}/route-history?agent=${encodeURIComponent(agentName)}`);
-    if (!res.ok) throw new Error('bad response');
-    const data = await res.json();
-    historyCache[agentName] = data.history;
-    body.innerHTML = renderHistoryDots(data.history);
-  } catch (e) {
-    body.innerHTML = '<div class="empty" style="padding:10px 0">Не удалось загрузить историю</div>';
-  }
-}
+    # 01.08.2026: ПАКБ/АКБ/СТТ/Не АКБ вместо система/потенциал/провал.
+    # "Не АКБ" — точка вообще не сработала (ни на маршруте, ни вне него),
+    # а не просто низкий %. Заказ вне маршрута уже делает точку АКБ.
+    total_worked = orders_count + off_schedule_count
+    if total_worked == 0:
+        level = '🔴'
+        level_name = 'Не АКБ'
+    elif stt >= 75:
+        level = '🟢'
+        level_name = 'СТТ'
+    else:
+        level = '🟡'
+        level_name = 'АКБ'
 
-function renderHistoryDots(history) {
-  const doneCount = history.filter(d => d.completed).length;
-  const days = history.map(d => `
-    <div class="history-day">
-      <div class="dot ${d.completed ? 'done' : 'miss'}">${d.completed ? '✓' : '✗'}</div>
-      <div class="lbl">${d.weekday.slice(0, 2)}</div>
-    </div>`).join('');
-  return `<div class="history-days">${days}</div>
-    <div class="history-summary">${doneCount} из ${history.length} дней — задача выполнена</div>`;
-}
+    # 04.08.2026: calc_point_stt вызывается на каждую точку каждого агента —
+    # сотни раз за один заход на дашборд/бот. Структура компании одна и та
+    # же для всего запроса, поэтому вызывающая функция должна загрузить её
+    # ОДИН раз и передать через structure_cache — здесь грузим сами только
+    # если её не передали (одиночный вызов вне цикла).
+    structure = structure_cache if structure_cache is not None else company.load_structure()
+    cats = structure.get('agent_cats', {}).get(agent, [])
 
-function renderRouteCard(a, rank) {
-  const cardId = rank;
-  const pakb = a.stt_points + a.akb_points + a.ne_akb_points;
-  const sttPct = pakb ? Math.round(a.stt_points / pakb * 100) : 0;
-  const akbPct = pakb ? Math.round(a.akb_points / pakb * 100) : 0;
-  const neakbPct = 100 - sttPct - akbPct;
+    if not cats:
+        import logging
+        logging.getLogger(__name__).warning(
+            f"calc_point_stt: для агента='{agent}' не найдены категории в 'Структуре'"
+        )
 
-  return `<details class="route-card">
-    <summary>
-      <div><span class="rc-name">${rank} · ${a.agent}</span><span class="rc-sub">${a.sv || ''}</span></div>
-      <div class="rc-right">
-        <div class="rc-deficit"><div class="num">${a.deficit_orders}</div><div class="lbl">дефицит заказов</div></div>
-        <span class="rc-chevron">▶</span>
-      </div>
-    </summary>
-    <div class="rc-body">
-      <div class="rc-tiles">
-        <div class="rc-tile"><div class="val" style="color:${a.deficit_visits > 0 ? 'var(--red-dark)' : 'var(--ink-soft)'}">${a.deficit_visits}</div><div class="lbl">деф. визитов</div></div>
-        <div class="rc-tile"><div class="val">${a.system_pct}%</div><div class="lbl">системная</div><div class="sub">${a.orders}з·${a.base}в(база)</div></div>
-        <div class="rc-off">−${a.off_route}</div>
-        <div class="rc-tile"><div class="val">${a.clean_pct}%</div><div class="lbl">чистая</div></div>
-        <div class="rc-tile"><div class="val">${a.avg_category != null ? a.avg_category + '%' : '—'}</div><div class="lbl">ср. категория</div></div>
-      </div>
-      <div class="pakb-block">
-        <div class="pakb-head"><span>Клиентская база (ПАКБ)</span><span>${pakb}</span></div>
-        <div class="pakb-bar">
-          <div style="width:${sttPct}%;background:var(--green)"></div>
-          <div style="width:${akbPct}%;background:var(--yellow)"></div>
-          <div style="width:${neakbPct}%;background:var(--red)"></div>
-        </div>
-        <div class="pakb-legend"><span>СТТ ${a.stt_points}</span><span>АКБ ${a.akb_points}</span><span>Не АКБ ${a.ne_akb_points}</span></div>
-      </div>
-      <div class="formula-toggle" onclick="toggleFormula(this, event)">
-        <div class="formula-head"><span>Как посчитали ${a.deficit_orders}?</span><span>▾</span></div>
-        <div class="formula-body">
-          <div class="frow"><span>План визитов (мес)</span><span>${a.plan}</span></div>
-          <div class="frow"><span>Средний по команде</span><span>${a.team_average_plan}</span></div>
-          <div class="frow"><span>Требуемый план заказов = ${a.base}×75%</span><span>${a.need_orders}</span></div>
-          <div class="frow"><span>Заказов по факту</span><span>${a.orders}</span></div>
-          <div class="frow total"><span>Дефицит заказов</span><span>${a.deficit_orders}</span></div>
-        </div>
-      </div>
-    </div>
-  </details>`;
-}
+    cat_stts = {}
+    cat_missed = {}
+    for cat in cats:
+        # 01.08.2026: знаменатель — ВСЕ заказы точки (система + вне
+        # маршрута), не только системные. Качество заказа (набор категорий)
+        # и статус точки (АКБ/СТТ/Не АКБ) — разные вещи: может быть заказ
+        # вне маршрута с полным набором категорий у точки без единого
+        # системного заказа, и наоборот. Если заказов вообще не было
+        # (total_worked=0), категориям взяться неоткуда — отдаём None,
+        # фронтенд показывает "—", а не "0%" (это разные состояния).
+        cat_orders = sum(
+            1 for d in all_order_dates
+            if cat in tt_orders.get(d, set())
+        )
+        cat_stts[cat] = int(round(cat_orders / total_worked * 100, 0)) if total_worked else None
+        cat_missed[cat] = (total_worked - cat_orders) if total_worked else None
 
-function renderRoute(data) {
-  if (!data.archive_ready) {
-    return `<div class="sub">ТОП-5 в фокусе · ${data.month}</div>
-      <div class="empty">Итоги ${data.month} ещё не закрыты — ТОП-5 появится после закрытия месяца.</div>`;
-  }
+    sequence = []
+    for d in sorted(planned_passed):
+        had = d in systemic_dates
+        sequence.append((d, had))
 
-  const top5Html = data.top5.map((a, i) => renderRouteCard(a, i + 1)).join('');
-  const restHtml = data.rest.length
-    ? `<div class="rest-toggle" onclick="document.getElementById('restList').style.display = document.getElementById('restList').style.display === 'none' ? 'block' : 'none'">Остальные маршруты (${data.rest.length}) ▾</div>
-       <div id="restList" style="display:none">
-         ${data.rest.map(a => `<div class="rest-row"><span>${a.agent}</span><span>дефицит ${a.deficit_orders}</span></div>`).join('')}
-       </div>`
-    : '';
+    seq_icons = ''.join('✓' if had else '✕' for _, had in sequence)
+    future_dots = '·' * remaining_count
+    seq_display = f"{seq_icons} | {future_dots}" if seq_icons else f"| {future_dots}"
 
-  return `<div class="sub">ТОП-5 в фокусе · ${data.month}</div>${top5Html}${restHtml}`;
-}
+    return {
+        'agent': agent,
+        'tt': address,
+        'tt_short': short_address(address),
+        'tt_code': tt_code,
+        'client': client_name,
+        'route_id': route_id,
+        'total_planned': total_planned,
+        'passed_planned': passed_planned,
+        'remaining': remaining_count,
+        'orders': orders_count,
+        'off_schedule_orders': off_schedule_count,
+        'missed': missed,
+        'stt': stt,
+        'need_75': need_75,
+        'need_75_possible': need_75_possible,
+        'level': level,
+        'level_name': level_name,
+        'sequence': sequence,
+        'seq_display': seq_display,
+        'cat_stts': cat_stts,
+        'cat_missed': cat_missed,
+    }
 
-let currentScreen = 'route';
-let currentPeriod = 'today';
-const dayCache = {};
 
-function switchScreen(screen) {
-  currentScreen = screen;
-  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === screen));
-  if (screen === 'route') {
-    document.getElementById('topTitle').textContent = 'Маршрут';
-    loadRoute();
-  } else {
-    document.getElementById('topTitle').textContent = 'Итоги дня';
-    loadDay(currentPeriod);
-  }
-}
+async def get_agent_today_points(company, agent_name, today):
+    today_name = RU_DAYS[today.weekday()]
+    month = today.month
+    year = today.year
+    yesterday = today.day - 1
 
-function switchLevelTab(btn) {
-  const aid = btn.dataset.aid;
-  const lvl = btn.dataset.lvl;
-  document.querySelectorAll(`.lvl-tab[data-aid="${aid}"]`).forEach(b => b.classList.toggle('active', b === btn));
-  document.querySelectorAll(`.lvl-panel[data-aid="${aid}"]`).forEach(p => {
-    p.style.display = p.dataset.lvl === lvl ? 'block' : 'none';
-  });
-}
+    plan_data = company.load_plan(month, year)
+    fact_data = await company.load_fact(month, year, yesterday)
+    plan = plan_data.get('plan', {})
+    structure_cache = company.load_structure()  # 04.08.2026: один раз на весь цикл
 
-function levelClass(level) {
-  if (level === '🟢') return 'green';
-  if (level === '🟡') return 'yellow';
-  return 'red';
-}
+    results = []
+    for (agent, tt), info in plan.items():
+        if agent != agent_name:
+            continue
+        if today_name not in info.get('days', set()):
+            continue
+        r = calc_point_stt(company, agent, tt, today, plan_data, fact_data, structure_cache)
+        if r:
+            results.append(r)
 
-function renderDay(data) {
-  const periodSwitch = `<div class="period-switch">
-    <button class="period-btn ${currentPeriod === 'today' ? 'active' : ''}" onclick="loadDay('today')">Сегодня</button>
-    <button class="period-btn ${currentPeriod === 'prev' ? 'active' : ''}" onclick="loadDay('prev')">Прошлый день</button>
-    <button class="period-btn ${currentPeriod === 'week' ? 'active' : ''}" onclick="loadDay('week')">Неделя назад</button>
-  </div>`;
+    level_order = {'🔴': 0, '🟡': 1, '🟢': 2}
+    results.sort(key=lambda r: (level_order.get(r['level'], 9), r['tt_short']))
+    return results
 
-  const teamsHtml = (data.teams || []).map(t => `<div class="team-row"><span>${t.team}</span><span>${t.orders}/${t.plan} · ${t.system_pct}%</span></div>`).join('');
-  const catsHtml = (data.categories || []).map(c => `<div class="cat-row"><span>${c.name}</span><b>${c.pct}%</b></div>`).join('');
 
-  const top5Html = data.top5_focus_ready
-    ? (data.top5_today || []).map((a, agentIdx) => {
-        const levelOrder = ['Не АКБ', 'АКБ', 'СТТ'];
-        const levelClassMap = {'СТТ': 'green', 'АКБ': 'yellow', 'Не АКБ': 'red'};
-        const aid = `a${agentIdx}`;
+async def get_sv_today_summary(company, sv_name, today):
+    today_name = RU_DAYS[today.weekday()]
+    month = today.month
+    year = today.year
+    yesterday = today.day - 1
 
-        const tabsHtml = levelOrder.map((lvl, i) => {
-          const count = (a.points_by_level && a.points_by_level[lvl] || []).length;
-          return `<button class="lvl-tab lvl-tab-${levelClassMap[lvl]} ${i === 0 ? 'active' : ''}" data-aid="${aid}" data-lvl="${lvl}" onclick="switchLevelTab(this)">${lvl} · ${count}</button>`;
-        }).join('');
+    structure = company.load_structure()
 
-        const groupsHtml = levelOrder.map((lvl, i) => {
-          const pts = (a.points_by_level && a.points_by_level[lvl]) || [];
-          const rows = pts.map(p => {
-            const dots = p.sequence.map(had => `<span class="visit-dot ${had ? 'yes' : 'no'}"></span>`).join('');
-            const catsHtml = Object.entries(p.cat_stts || {}).map(([cat, val]) => {
-              if (val === null || val === undefined) return `<span class="cat-chip none">${cat.slice(0,4)} —</span>`;
-              const cls = val >= 75 ? 'good' : 'bad';
-              return `<span class="cat-chip ${cls}">${cat.slice(0,4)} ${val}%</span>`;
-            }).join('');
-            return `<div class="point-row">
-              <div class="point-info">
-                <div class="point-client">${p.name}${p.in_focus_sv ? ' <span style="color:var(--red-dark)">⚠</span>' : ''}</div>
-                <div class="point-addr">${p.address}</div>
-                <div class="visit-dots">${dots}${catsHtml}</div>
-              </div>
-              <div class="point-pct-wrap"><span class="point-pct">${p.pct}%</span><span class="point-pct-lbl">система</span></div>
-            </div>`;
-          }).join('') || '<div class="empty" style="padding:8px 0;font-size:11px">Нет точек</div>';
-          return `<div class="lvl-panel" data-aid="${aid}" data-lvl="${lvl}" style="display:${i === 0 ? 'block' : 'none'}">${rows}</div>`;
-        }).join('');
+    # Список агентов команды СВ (из Структуры)
+    team_agents = {
+        u['name'] for u in structure.get('users', {}).values()
+        if u.get('role') == 'agent' and u.get('sv') == sv_name
+    }
 
-        const focusSvHtml = (a.focus_sv && a.focus_sv.length)
-          ? `<details class="focus-sv-block">
-              <summary class="focus-sv-head"><span>👁 Фокус СВ · ${a.focus_sv.length}</span><span class="rc-chevron">▶</span></summary>
-              ${a.focus_sv.map(fp => `
-                <div class="point-row">
-                  <span class="${fp.had_order ? 'check-yes' : 'check-no'}">${fp.had_order ? '✓' : '✗'}</span>
-                  <div class="point-info">
-                    <div class="point-client">${fp.name}</div>
-                    <div class="point-addr">${fp.address} · ${fp.missed_streak} пропусков подряд</div>
-                  </div>
-                </div>`).join('')}
-            </details>`
-          : '';
+    plan_data = company.load_plan(month, year)
+    fact_data = await company.load_fact(month, year, yesterday)
+    plan = plan_data.get('plan', {})
+    # structure уже загружена выше (для team_agents) — переиспользуем,
+    # не грузим второй раз ни здесь, ни внутри calc_point_stt (04.08.2026)
 
-        function factorTile(actual, target, label) {
-          const ok = actual >= target;
-          const color = ok ? 'var(--green)' : 'var(--red-dark)';
-          return `<div class="adc-metric">
-            <div class="val" style="color:${color}">${actual}/${target}</div>
-            <div class="lbl">${label} · есть/нужно</div>
-          </div>`;
+    results = []
+    for (agent, tt), info in plan.items():
+        if agent not in team_agents:
+            continue
+        if today_name not in info.get('days', set()):
+            continue
+        r = calc_point_stt(company, agent, tt, today, plan_data, fact_data, structure)
+        if r:
+            results.append(r)
+
+    from collections import Counter
+    cnt = Counter(r['level'] for r in results)
+    total_orders = sum(r['orders'] for r in results)
+    total_planned = sum(r['total_planned'] for r in results)
+    total_missed = sum(r['missed'] for r in results)
+    stt = int(round(total_orders / total_planned * 100, 0)) if total_planned else 0
+
+    agents_data = defaultdict(lambda: {
+        'points': [], 'green': 0, 'yellow': 0, 'red': 0, 'missed': 0
+    })
+    for r in results:
+        a = r['agent']
+        agents_data[a]['points'].append(r)
+        if r['level'] == '🟢':
+            agents_data[a]['green'] += 1
+        elif r['level'] == '🟡':
+            agents_data[a]['yellow'] += 1
+        else:
+            agents_data[a]['red'] += 1
+        agents_data[a]['missed'] += r['missed']
+
+    return {
+        'sv_name': sv_name,
+        'total': len(results),
+        'green': cnt.get('🟢', 0),
+        'yellow': cnt.get('🟡', 0),
+        'red': cnt.get('🔴', 0),
+        'stt': stt,
+        'total_missed': total_missed,
+        'agents': dict(agents_data),
+        'points': results,
+    }
+
+
+def _calc_missed_streak(sequence: list) -> int:
+    """Пропуски подряд в конце sequence."""
+    streak = 0
+    for _, had in reversed(sequence):
+        if not had:
+            streak += 1
+        else:
+            break
+    return streak
+
+
+async def _load_prev_month_data(company, today):
+    """
+    Грузит план и факт прошлого месяца ОДИН РАЗ — вызывающая функция должна
+    вызвать это до цикла по точкам и передать результат в _calc_cross_month_streak
+    через prev_data, а не полагаться на загрузку внутри неё на каждую точку
+    (было N+1 — тот же баг, что чинили в api.py 04.08.2026).
+    """
+    try:
+        from datetime import timedelta
+        prev_m = today.month - 1 if today.month > 1 else 12
+        prev_y = today.year if today.month > 1 else today.year - 1
+        prev_last_day = (date(prev_y if prev_m < 12 else prev_y + 1,
+                              prev_m + 1 if prev_m < 12 else 1, 1) - timedelta(days=1)).day
+        prev_plan = company.load_plan(prev_m, prev_y)
+        prev_fact = await company.load_fact(prev_m, prev_y, prev_last_day)
+        return prev_plan, prev_fact, prev_m, prev_y, prev_last_day
+    except Exception:
+        return None, None, None, None, None
+
+
+async def _calc_cross_month_streak(company, agent, tt, today, plan_data, fact_data,
+                                    structure_cache=None, prev_data=None):
+    """
+    Сквозной streak через границу месяцев.
+    Берёт sequence текущего месяца + конец прошлого месяца и считает пропуски подряд.
+    Используется только для точек фокуса (маршрут/итог дня/бот) — не для СТТ.
+
+    prev_data — необязательный кортеж от _load_prev_month_data(), посчитанный
+    ОДИН РАЗ до цикла по точкам вызывающей функцией. Если не передан — функция
+    загрузит данные сама (поведение для одиночного вызова вне цикла), но во
+    всех циклах по нескольким точкам prev_data нужно готовить заранее.
+    """
+    r = calc_point_stt(company, agent, tt, today, plan_data, fact_data, structure_cache)
+    if not r:
+        return 0, r
+
+    current_seq = r.get('sequence', [])
+    current_streak = _calc_missed_streak(current_seq)
+
+    if current_seq and current_streak < len(current_seq):
+        return current_streak, r
+
+    try:
+        if prev_data is not None:
+            prev_plan, prev_fact, prev_m, prev_y, prev_last_day = prev_data
+        else:
+            prev_plan, prev_fact, prev_m, prev_y, prev_last_day = await _load_prev_month_data(company, today)
+
+        if prev_plan is None:
+            return current_streak, r
+
+        class _PrevDate:
+            def __init__(self, y, m, d):
+                self.year = y; self.month = m; self.day = d
+
+        pd = _PrevDate(prev_y, prev_m, prev_last_day + 1)
+        prev_r = calc_point_stt(company, agent, tt, pd, prev_plan, prev_fact, structure_cache)
+
+        if not prev_r:
+            return current_streak, r
+
+        prev_seq = prev_r.get('sequence', [])
+        if not prev_seq:
+            return current_streak, r
+
+        combined_seq = prev_seq + current_seq
+        combined_streak = _calc_missed_streak(combined_seq)
+        return combined_streak, r
+
+    except Exception:
+        return current_streak, r
+
+
+async def get_agent_focus_points(company, agent_name, today, prev_data=None):
+    """
+    Точки фокуса СВ для агента: 2+ пропуска подряд ИЛИ есть заказы вне маршрута.
+    Единый источник — используется дашбордом агента (Маршрут/Итог дня) и
+    вечерним опросником бота, чтобы не было расхождений между ними.
+
+    prev_data — необязательный кортеж от _load_prev_month_data(), посчитанный
+    ОДИН РАЗ до цикла по нескольким агентам (10.08.2026: раньше get_tm_day_focus
+    вызывал эту функцию на каждого из 5 агентов ТОП-5 без передачи prev_data —
+    прошлый месяц грузился заново 5 раз подряд, хотя данные одни и те же для
+    всех агентов одной компании за один и тот же "today". Если не передан —
+    поведение как раньше, функция загрузит сама (для одиночного вызова вне
+    цикла, например из бота).
+
+    Возвращает список:
+    {
+        'name':          короткий адрес точки,
+        'client':        имя клиента,
+        'tt_code':       код ТТ (join-ключ),
+        'had_order':     был ли заказ сегодня (bool),
+        'missed_streak': пропусков подряд,
+        'off_route':     заказов вне маршрута,
+    }
+    """
+    today_name = RU_DAYS[today.weekday()]
+    month = today.month
+    year = today.year
+
+    plan_data = company.load_plan(month, year)
+    fact_prev = await company.load_fact(month, year, today.day - 1 if today.day > 1 else 1)
+    fact_today = await company.load_fact(month, year, today.day)
+
+    plan = plan_data.get('plan', {})
+    orders_all = fact_today.get('orders', {})
+
+    # 04.08.2026: структура и прошлый месяц — один раз до цикла, а не на
+    # каждую точку (эта функция дёргается ботом на каждый вечерний опрос)
+    structure_cache = company.load_structure()
+    if prev_data is None:
+        prev_data = await _load_prev_month_data(company, today)
+
+    focus_points = []
+    for (agent, tt), info in plan.items():
+        if agent != agent_name:
+            continue
+        days = info.get('days', set())
+        if today_name not in days:
+            continue
+
+        missed_streak, r = await _calc_cross_month_streak(
+            company, agent_name, tt, today, plan_data, fact_prev,
+            structure_cache=structure_cache, prev_data=prev_data
+        )
+        if not r:
+            continue
+
+        off_route = r.get('off_schedule_orders', 0)
+        if missed_streak >= 2 or off_route > 0:
+            tt_code = info.get('tt_code', '')
+            had_order = today.day in orders_all.get((agent_name, tt_code), {})
+            focus_points.append({
+                'name': r['tt_short'],
+                'client': r.get('client', ''),
+                'tt_code': tt_code,
+                'had_order': had_order,
+                'missed_streak': missed_streak,
+                'off_route': off_route,
+            })
+
+    return focus_points
+
+
+def calc_agent_distribution(company, agent_name, today, plan_data, fact_data):
+    yesterday = today.day - 1
+
+    orders = fact_data.get('orders', {})
+
+    all_unique_orders = set()
+    for (a, tt_code), day_cats in orders.items():
+        if a != agent_name:
+            continue
+        for day, cats in day_cats.items():
+            if day > yesterday:
+                continue
+            all_unique_orders.add((tt_code, day))
+
+    structure = company.load_structure()
+    cats_list = structure.get('agent_cats', {}).get(agent_name, [])
+    cat_order_count = {cat: 0 for cat in cats_list}
+
+    for (a, tt_code), day_cats in orders.items():
+        if a != agent_name:
+            continue
+        for day, cats in day_cats.items():
+            if day > yesterday:
+                continue
+            for cat in cats:
+                if cat in cat_order_count:
+                    cat_order_count[cat] += 1
+
+    total_all_orders = len(all_unique_orders)
+    cat_shares = {}
+    for cat, count in cat_order_count.items():
+        cat_shares[cat] = {
+            'pct': int(round(count / total_all_orders * 100, 0)) if total_all_orders else 0,
+            'count': count
         }
 
-        const lp = a.level_pcts || {};
-        const topBar = `<div class="level-bar">
-          <div style="width:${lp['СТТ']||0}%;background:var(--green)"></div>
-          <div style="width:${lp['АКБ']||0}%;background:var(--yellow)"></div>
-          <div style="width:${lp['Не АКБ']||0}%;background:var(--red)"></div>
-        </div>
-        <div class="level-bar-labels">
-          <span style="color:var(--green)">СТТ ${lp['СТТ']||0}%</span>
-          <span style="color:var(--amber)">АКБ ${lp['АКБ']||0}%</span>
-          <span style="color:var(--red-dark)">Не АКБ ${lp['Не АКБ']||0}%</span>
-        </div>`;
+    return {
+        'total_all_orders': total_all_orders,
+        'cat_shares': cat_shares,
+    }
 
-        return `<details class="agent-day-card">
-          <summary>
-            <div><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
-            <span class="rc-chevron">▶</span>
-          </summary>
-          <div class="adc-body">
-            ${topBar}
-            <div class="adc-metrics">
-              ${factorTile(a.visits_today, a.visits_target, 'визиты')}
-              ${factorTile(a.orders_week_ago, a.orders_target, 'заказы нед.назад')}
-            </div>
-            <div class="adc-metrics">
-              <div class="adc-metric"><div class="val">${a.today_system_pct}%</div><div class="lbl">системная</div></div>
-              <div class="adc-metric"><div class="val">${a.today_clean_pct}%</div><div class="lbl">чистая</div></div>
-              <div class="adc-metric"><div class="val">${a.avg_category_today != null ? a.avg_category_today + '%' : '—'}</div><div class="lbl">ср. категория</div></div>
-            </div>
-            ${focusSvHtml}
-            <div class="lvl-tabs">${tabsHtml}</div>
-            ${groupsHtml}
-          </div>
-        </details>`;
-      }).join('')
-    : '<div class="empty" style="padding:12px 0">Итоги прошлого месяца ещё не закрыты — ТОП-5 недоступен</div>';
 
-  return `${periodSwitch}
-    <div class="day-card">
-      <h3>Итог по территории</h3>
-      <div class="day-grid">
-        <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.system_orders} <span style="color:var(--red-dark);font-size:11px">−${data.off_route_orders}</span></div><div class="lbl">заказов</div></div>
-        <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
-        <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
-      </div>
-    </div>
-    <div class="day-card"><h3>По командам</h3>${teamsHtml || '<div class="empty">Нет данных</div>'}</div>
-    <div class="day-card"><h3>Категории</h3>${catsHtml || '<div class="empty">Нет данных</div>'}</div>
-    <div class="sub" style="margin:14px 0 10px">ТОП-5 сегодня</div>
-    ${top5Html}`;
+# ============================================================
+# ТЕРРИТОРИАЛЬНЫЙ МЕНЕДЖЕР (ТМ) — ТОП-5 маршрутов в фокусе
+# ============================================================
+
+def _agents_for_tm(structure, tm_name):
+    """Множество имён агентов, у которых structure.users[...]['tm'] == tm_name."""
+    return {
+        u['name'] for u in structure.get('users', {}).values()
+        if u.get('role') == 'agent' and u.get('tm') == tm_name
+    }
+
+
+class _FullMonthDate:
+    """
+    Синтетический объект даты "первый день следующего месяца" — тот же
+    приём, что уже используется в _load_prev_month_data (см. выше).
+    Передаётся в calc_point_stt/calc_agent_distribution как `today`,
+    чтобы passed_planned == total_planned (месяц полностью закрыт,
+    "прошло" = "план", без известного бага "прошло < план").
+    """
+    def __init__(self, y, m, d):
+        self.year = y
+        self.month = m
+        self.day = d
+
+
+async def calc_all_agents_month_summary(company, month, year):
+    """
+    Считает "Итоги месяца" для ВСЕХ агентов компании за один месяц —
+    используется ТОЛЬКО для записи в архив (см. sheets.py::save_month_summary),
+    не для живого показа на дашборде.
+
+    Вызывающий код (cron / ручной пересчёт на тесте) отвечает за то,
+    чтобы month/year был уже ЗАКРЫТЫМ месяцем — здесь это не проверяется.
+
+    Использует ту же синтетическую "конец месяца" дату, что и остальной
+    архивный/агрегатный код (get_tm_route_focus, _load_prev_month_data) —
+    чтобы passed_planned == total_planned, без известного (уже
+    исправленного в api.py::_resolve_stt_period) бага "прошло < план".
+
+    ПРОИЗВОДИТЕЛЬНОСТЬ: Структура/План/Факт грузятся ОДИН раз на всех
+    агентов сразу, не по одному агенту за раз — цикл идёт по точкам плана
+    один проход, агенты собираются "по пути".
+
+    Возвращает список словарей — готовый для передачи в
+    company.save_month_summary(month, year, rows).
+    """
+    last_day = (date(year if month < 12 else year + 1,
+                      month + 1 if month < 12 else 1, 1) - timedelta(days=1)).day
+    today_obj = _FullMonthDate(year, month, last_day + 1)
+
+    structure = company.load_structure()
+    plan_data = company.load_plan(month, year)
+    fact_data = await company.load_fact(month, year, last_day)
+    plan = plan_data.get('plan', {})
+
+    all_agent_names = {
+        u['name'] for u in structure.get('users', {}).values()
+        if u.get('role') == 'agent'
+    }
+
+    # Один проход по всем точкам всех агентов — каждая точка считается
+    # ровно один раз через calc_point_stt, результаты копятся по агенту.
+    agent_points = defaultdict(list)
+    for (agent, tt), info in plan.items():
+        if agent not in all_agent_names:
+            continue
+        r = calc_point_stt(company, agent, tt, today_obj, plan_data, fact_data, structure)
+        if r:
+            agent_points[agent].append(r)
+
+    rows = []
+    for agent, points in agent_points.items():
+        plan_visits = sum(p['total_planned'] for p in points)
+        orders = sum(p['orders'] for p in points)
+        off_route = sum(p.get('off_schedule_orders', 0) for p in points)
+        system_pct = int(round(orders / plan_visits * 100, 0)) if plan_visits else 0
+        clean_orders = max(0, orders - off_route)
+        clean_pct = int(round(clean_orders / plan_visits * 100, 0)) if plan_visits else 0
+
+        stt_points = sum(1 for p in points if p['level'] == '🟢')
+        akb_points = sum(1 for p in points if p['level'] == '🟡')
+        ne_akb_points = sum(1 for p in points if p['level'] == '🔴')
+
+        dist = calc_agent_distribution(company, agent, today_obj, plan_data, fact_data)
+        cat_shares = dist.get('cat_shares', {})
+
+        rows.append({
+            'agent': agent,
+            'plan': plan_visits,
+            'orders': orders,
+            'system_pct': system_pct,
+            'off_route': off_route,
+            'clean_orders': clean_orders,
+            'clean_pct': clean_pct,
+            'stt_points': stt_points,
+            'akb_points': akb_points,
+            'ne_akb_points': ne_akb_points,
+            'cat_shares_json': json.dumps(cat_shares, ensure_ascii=False),
+        })
+
+    return rows
+
+
+async def get_tm_day_focus(company, tm_name, today):
+    """
+    "ТОП-5 сегодня" для "Итоги дня" ТМ — по каждому агенту из ТОП-5:
+    дневная цель (get_agent_daily_focus) + точки на сегодня, сгруппированные
+    так же, как везде в продукте — СТТ (≥75%) / АКБ (<75%) / Не АКБ (0) —
+    переиспользует calc_point_stt.level, ничего нового не изобретает.
+    Плюс отдельно "Фокус СВ" (2+ пропуска подряд ИЛИ заказ вне маршрута) —
+    переиспользует уже существующую get_agent_focus_points (та же функция,
+    что использует бот для вечернего опроса), включая had_order — был ли
+    заказ СЕГОДНЯ по этой точке (не месячный итог).
+
+    ЭФФЕКТИВНОСТЬ (10.08.2026): это самый тяжёлый вызов на весь ТМ-дашборд
+    — на каждого из 5 агентов фокуса считается calc_point_stt по всем его
+    точкам ТРИЖДЫ (внутри get_agent_today_points, get_agent_focus_points,
+    и косвенно в get_agent_daily_focus). Углублённая оптимизация (слить эти
+    3 прохода в один) требует аккуратной ревизии _calc_missed_streak/
+    _calc_cross_month_streak, чтобы не сломать точность "Фокус СВ" — она же
+    используется вечерним опросом бота, трогать её вслепую рискованно.
+    Вместо этого — кеш ГОТОВОГО результата на 3 минуты (не 10, как общий
+    кеш компании — "сегодня" меняется быстрее месячных данных): первое
+    открытие экрана всё ещё тяжёлое, но повторные открытия в течение
+    3 минут (типичный паттерн — переключился на "Маршрут" и обратно)
+    отдаются мгновенно, без единого пересчёта.
+    """
+    cache_key = f'tm_day_focus_{tm_name}_{today.isoformat()}'
+    cached = company._cache.get(cache_key)
+    if cached and (datetime.now() - cached['time']).seconds < 180:
+        return cached['data']
+
+    today_actual = today
+    focus_month = today_actual.month - 1 if today_actual.month > 1 else 12
+    focus_year = today_actual.year if today_actual.month > 1 else today_actual.year - 1
+
+    focus = await get_tm_route_focus(company, tm_name, focus_month, focus_year)
+    if not focus['archive_ready']:
+        return {'archive_ready': False, 'agents': []}
+
+    # 10.08.2026 (оптимизация скорости "Итоги дня"): прошлый месяц для
+    # "Фокус СВ" — одни и те же данные для всех 5 агентов ТОП-5 (один
+    # today, одна компания). Раньше грузился заново внутри
+    # get_agent_focus_points на КАЖДОГО из 5 агентов — реальный лишний
+    # запрос к Sheets 4 раза из 5. Грузим один раз здесь и передаём во
+    # все вызовы.
+    prev_data = await _load_prev_month_data(company, today_actual)
+
+    agents_out = []
+    for entry in focus['top5']:
+        daily = await get_agent_daily_focus(
+            company, entry['agent'], entry['base'], entry['need_orders'], today_actual
+        )
+        points = await get_agent_today_points(company, entry['agent'], today_actual)
+        focus_points = await get_agent_focus_points(company, entry['agent'], today_actual, prev_data=prev_data)
+        focus_codes = {p['tt_code'] for p in focus_points}
+
+        by_level = {'СТТ': [], 'АКБ': [], 'Не АКБ': []}
+        for p in points:
+            pct = int(round(p['orders'] / p['passed_planned'] * 100, 0)) if p['passed_planned'] else 0
+            by_level.setdefault(p['level_name'], []).append({
+                'name': p['client'] or p['tt_short'],
+                'address': p['tt_short'],
+                'orders': p['orders'],
+                'passed_planned': p['passed_planned'],
+                'pct': pct,
+                'sequence': [had for _, had in p['sequence']],
+                'in_focus_sv': p['tt_code'] in focus_codes,
+                # 10.08.2026: категории по этой точке — уже посчитаны
+                # calc_point_stt (cat_stts), просто прокидываем дальше.
+                # None у категории = не было ни одного заказа вообще
+                # (у "Не АКБ" точек это ожидаемо для всех категорий).
+                'cat_stts': p.get('cat_stts', {}),
+            })
+
+        today_orders_sum = sum(p['orders'] for p in points)
+        today_passed_sum = sum(p['passed_planned'] for p in points)
+        today_off_sum = sum(p.get('off_schedule_orders', 0) for p in points)
+        today_clean_sum = max(0, today_orders_sum - today_off_sum)
+        today_system_pct = int(round(today_orders_sum / today_passed_sum * 100, 0)) if today_passed_sum else 0
+        today_clean_pct = int(round(today_clean_sum / today_passed_sum * 100, 0)) if today_passed_sum else 0
+
+        # 10.08.2026: средняя категорийная — только по точкам СТТ+АКБ (не
+        # "Не АКБ" — там cat_stts всегда None, у них ещё не было заказов,
+        # усреднять с ними значило бы искусственно занижать показатель
+        # точками, где категориям взяться неоткуда).
+        cat_values = []
+        for p in points:
+            if p['level_name'] == 'Не АКБ':
+                continue
+            for v in p.get('cat_stts', {}).values():
+                if v is not None:
+                    cat_values.append(v)
+        avg_category_today = round(sum(cat_values) / len(cat_values)) if cat_values else None
+
+        total_points = len(points)
+        level_pcts = {
+            lvl: round(len(by_level.get(lvl, [])) / total_points * 100) if total_points else 0
+            for lvl in ('СТТ', 'АКБ', 'Не АКБ')
+        }
+
+        # 10.08.2026: Фокус СВ — сортировка по убыванию пропусков подряд,
+        # чтобы самые запущенные точки были видны первыми, не в порядке
+        # обхода Sheets.
+        focus_points_sorted = sorted(focus_points, key=lambda fp: -fp['missed_streak'])
+
+        agents_out.append({
+            'agent': entry['agent'],
+            'sv': entry.get('sv', ''),
+            **daily,
+            'today_system_pct': today_system_pct,
+            'today_clean_pct': today_clean_pct,
+            'avg_category_today': avg_category_today,
+            'level_pcts': level_pcts,
+            'points_by_level': by_level,
+            'focus_sv': [
+                {
+                    'name': fp['client'] or fp['name'],
+                    'address': fp['name'],
+                    'had_order': fp['had_order'],
+                    'missed_streak': fp['missed_streak'],
+                    'off_route': fp['off_route'],
+                }
+                for fp in focus_points_sorted
+            ],
+        })
+
+    result = {'archive_ready': True, 'agents': agents_out}
+    company._cache[cache_key] = {'data': result, 'time': datetime.now()}
+    return result
+
+
+async def get_tm_day_summary(company, tm_name, today):
+    """
+    "Итоги дня" территориального менеджера — живой снимок на сегодня (или
+    любую дату, переданную в `today`) по всем агентам этого ТМ, с
+    разбивкой "по командам". "Команда" здесь = поле 'category'
+    (Номенклатурная группа) агента — реальное поле в Структуре, тот же
+    признак, что уже используется для группировки СВ в rating-sv; отдельного
+    понятия "команда СМК/Сопутка" в данных нет, category — его ближайший
+    реальный эквивалент.
+
+    ЭФФЕКТИВНОСТЬ: живой расчёт — сегодняшний день ещё не закрыт, архива
+    для него нет и быть не может, поэтому в отличие от get_tm_route_focus
+    здесь неизбежен цикл calc_point_stt по точкам агентов ТМ на сегодняшний
+    день (это один день, не весь месяц — заметно дешевле, чем месячный
+    calc_all_agents_month_summary). Структура/План/Факт грузятся один раз
+    на весь вызов, как и в get_sv_today_summary. Кеш готового результата
+    на 3 минуты (10.08.2026) — та же логика, что в get_tm_day_focus.
+    """
+    cache_key = f'tm_day_summary_{tm_name}_{today.isoformat()}'
+    cached = company._cache.get(cache_key)
+    if cached and (datetime.now() - cached['time']).seconds < 180:
+        return cached['data']
+
+    RU_DAYS_LOCAL = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота', 'воскресенье']
+    today_name = RU_DAYS_LOCAL[today.weekday()]
+    month, year = today.month, today.year
+    yesterday = today.day - 1
+
+    structure = company.load_structure()
+    tm_agents_info = {
+        u['name']: u for u in structure.get('users', {}).values()
+        if u.get('role') == 'agent' and u.get('tm') == tm_name
+    }
+    if not tm_agents_info:
+        return None
+
+    plan_data = company.load_plan(month, year)
+    fact_data = await company.load_fact(month, year, yesterday)
+    plan = plan_data.get('plan', {})
+
+    results = []
+    for (agent, tt), info in plan.items():
+        if agent not in tm_agents_info:
+            continue
+        if today_name not in info.get('days', set()):
+            continue
+        r = calc_point_stt(company, agent, tt, today, plan_data, fact_data, structure)
+        if r:
+            results.append(r)
+
+    total_orders = sum(r['orders'] for r in results)
+    total_planned = sum(r['total_planned'] for r in results)
+    off_route = sum(r.get('off_schedule_orders', 0) for r in results)
+    system_pct = int(round(total_orders / total_planned * 100, 0)) if total_planned else 0
+    clean_orders = max(0, total_orders - off_route)
+    clean_pct = int(round(clean_orders / total_planned * 100, 0)) if total_planned else 0
+
+    # 10.08.2026: было "по командам" через category (натяжка, реального
+    # понятия "команда" в данных нет) — заменено на честную группировку
+    # ПО СУПЕРВАЙЗЕРАМ (реальное поле 'sv' из Структуры), с полным набором
+    # показателей на каждого: план визитов, факт заказов, % системы,
+    # заказов вне системы (off_route) — тот же принцип "на шаг вниз",
+    # что и весь остальной проект (ТМ видит своих СВ, не агентов напрямую).
+    by_sv = defaultdict(lambda: {'plan': 0, 'orders': 0, 'off_route': 0})
+    for r in results:
+        sv_name = tm_agents_info.get(r['agent'], {}).get('sv', 'Без СВ')
+        by_sv[sv_name]['plan'] += r['total_planned']
+        by_sv[sv_name]['orders'] += r['orders']
+        by_sv[sv_name]['off_route'] += r.get('off_schedule_orders', 0)
+    svs = [
+        {
+            'sv': sv_name, 'plan': d['plan'], 'orders': d['orders'], 'off_route': d['off_route'],
+            'system_pct': int(round(d['orders'] / d['plan'] * 100, 0)) if d['plan'] else 0,
+        }
+        for sv_name, d in by_sv.items()
+    ]
+    svs.sort(key=lambda x: -x['system_pct'])
+
+    # Категории — прямой подсчёт по факту сегодняшнего дня (проще и точнее,
+    # чем реконструировать из calc_point_stt, который считает за весь месяц)
+    cat_order_count = defaultdict(int)
+    total_all_orders = 0
+    for (agent, tt_code), day_cats in fact_data.get('orders', {}).items():
+        if agent not in tm_agents_info:
+            continue
+        cats_today = day_cats.get(today.day, set())
+        if not cats_today:
+            continue
+        total_all_orders += 1
+        for cat in cats_today:
+            cat_order_count[cat] += 1
+    categories = [
+        {'name': cat, 'orders': cnt, 'pct': int(round(cnt / total_all_orders * 100)) if total_all_orders else 0}
+        for cat, cnt in cat_order_count.items()
+    ]
+
+    result = {
+        'planned_visits': total_planned,
+        'system_orders': total_orders,
+        'system_stt': system_pct,
+        'off_route_orders': off_route,
+        'clean_orders': clean_orders,
+        'clean_stt': clean_pct,
+        'svs': svs,
+        'categories': categories,
+    }
+    company._cache[cache_key] = {'data': result, 'time': datetime.now()}
+    return result
+
+
+async def get_tm_month_summary(company, tm_name, month, year, is_current_month):
+    """
+    "Итоги месяца" территориального менеджера — Клиентская база / Система /
+    Категории, суммарно по всем агентам ТМ.
+
+    Для ПРОШЛОГО месяца — читает архив (company.load_month_summary), не
+    пересчитывает точки: дёшево, тот же принцип, что и get_tm_route_focus.
+    Для ТЕКУЩЕГО месяца — архива по определению ещё нет (месяц не закрыт),
+    поэтому живой расчёт по точкам агентов ТМ — единственный вариант.
+
+    ЭФФЕКТИВНОСТЬ: живая ветка (текущий месяц) — самая тяжёлая операция
+    из всех эндпоинтов ТМ, сопоставима по стоимости с
+    calc_all_agents_month_summary, только на ~20 агентов ТМ, а не на всю
+    компанию. Оправдано только потому, что "текущий месяц" — это именно
+    то, что должно быть живым (данные меняются каждый день); прошлый
+    месяц — та же цена, что и /route (одно чтение архива).
+    """
+    structure = company.load_structure()
+    tm_agents_info = {
+        u['name']: u for u in structure.get('users', {}).values()
+        if u.get('role') == 'agent' and u.get('tm') == tm_name
+    }
+    if not tm_agents_info:
+        return None
+
+    if not is_current_month:
+        archived = company.load_month_summary(month, year)
+        team_archived = {a: d for a, d in archived.items() if a in tm_agents_info}
+        if not team_archived:
+            return {'archive_ready': False}
+
+        total_plan = sum(d['plan'] for d in team_archived.values())
+        total_orders = sum(d['orders'] for d in team_archived.values())
+        total_off = sum(d['off_route'] for d in team_archived.values())
+        total_clean = sum(d['clean_orders'] for d in team_archived.values())
+        stt_pts = sum(d['stt_points'] for d in team_archived.values())
+        akb_pts = sum(d['akb_points'] for d in team_archived.values())
+        neakb_pts = sum(d['ne_akb_points'] for d in team_archived.values())
+
+        cat_order_count = defaultdict(int)
+        cat_total = 0
+        for d in team_archived.values():
+            for cat, v in d.get('cat_shares', {}).items():
+                cat_order_count[cat] += v.get('count', 0)
+                cat_total += v.get('count', 0)
+        categories = [
+            {'name': cat, 'orders': cnt, 'pct': int(round(cnt / cat_total * 100)) if cat_total else 0}
+            for cat, cnt in cat_order_count.items()
+        ]
+        avg_category = round(sum(c['pct'] for c in categories) / len(categories)) if categories else None
+
+        return {
+            'archive_ready': True,
+            'pakb': stt_pts + akb_pts + neakb_pts,
+            'stt_points': stt_pts, 'akb_points': akb_pts, 'ne_akb_points': neakb_pts,
+            'planned_visits': total_plan,
+            'system_orders': total_orders,
+            'system_stt': int(round(total_orders / total_plan * 100, 0)) if total_plan else 0,
+            'off_route_orders': total_off,
+            'clean_orders': total_clean,
+            'clean_stt': int(round(total_clean / total_plan * 100, 0)) if total_plan else 0,
+            'categories': categories,
+            'avg_category': avg_category,
+        }
+
+    # Текущий месяц — живой расчёт (тот же паттерн, что calc_all_agents_month_summary,
+    # но отфильтрован на агентов конкретного ТМ, и период — "по вчера", не весь месяц)
+    today_actual = date.today()
+    plan_data = company.load_plan(month, year)
+    fact_data = await company.load_fact(month, year, today_actual.day - 1)
+    plan = plan_data.get('plan', {})
+
+    results = []
+    for (agent, tt), info in plan.items():
+        if agent not in tm_agents_info:
+            continue
+        r = calc_point_stt(company, agent, tt, today_actual, plan_data, fact_data, structure)
+        if r:
+            results.append(r)
+
+    total_plan = sum(r['total_planned'] for r in results)
+    total_orders = sum(r['orders'] for r in results)
+    total_off = sum(r.get('off_schedule_orders', 0) for r in results)
+    total_passed = sum(r['passed_planned'] for r in results)
+    clean_orders = max(0, total_orders - total_off)
+    stt_pts = sum(1 for r in results if r['level'] == '🟢')
+    akb_pts = sum(1 for r in results if r['level'] == '🟡')
+    neakb_pts = sum(1 for r in results if r['level'] == '🔴')
+
+    cat_order_count = defaultdict(int)
+    cat_total = 0
+    for agent in tm_agents_info:
+        dist = calc_agent_distribution(company, agent, today_actual, plan_data, fact_data)
+        for cat, v in dist.get('cat_shares', {}).items():
+            cat_order_count[cat] += v.get('count', 0)
+        cat_total += dist.get('total_all_orders', 0)
+    categories = [
+        {'name': cat, 'orders': cnt, 'pct': int(round(cnt / cat_total * 100)) if cat_total else 0}
+        for cat, cnt in cat_order_count.items()
+    ]
+    avg_category = round(sum(c['pct'] for c in categories) / len(categories)) if categories else None
+
+    return {
+        'archive_ready': True,  # текущий месяц не архив, но данные есть — фронтенд не должен различать
+        'pakb': stt_pts + akb_pts + neakb_pts,
+        'stt_points': stt_pts, 'akb_points': akb_pts, 'ne_akb_points': neakb_pts,
+        'planned_visits': total_plan,
+        'system_orders': total_orders,
+        'system_stt': int(round(total_orders / total_passed * 100, 0)) if total_passed else 0,
+        'off_route_orders': total_off,
+        'clean_orders': clean_orders,
+        'clean_stt': int(round(clean_orders / total_passed * 100, 0)) if total_passed else 0,
+        'categories': categories,
+        'avg_category': avg_category,
+    }
+
+
+_CRON_TO_RU_DAY = {
+    'mon': 'понедельник', 'tue': 'вторник', 'wed': 'среда', 'thu': 'четверг',
+    'fri': 'пятница', 'sat': 'суббота', 'sun': 'воскресенье',
 }
 
-async function loadDay(period) {
-  currentPeriod = period;
-  document.querySelectorAll('.period-btn').forEach(b => {});
-  if (dayCache[period]) {
-    document.getElementById('mainContent').innerHTML = renderDay(dayCache[period]);
-    return;
-  }
-  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
-  try {
-    const res = await fetch(`${API}/api/tm/${currentTelegramId}/day?period=${period}`);
-    if (!res.ok) throw new Error('bad response');
-    const data = await res.json();
-    dayCache[period] = data;
-    document.getElementById('mainContent').innerHTML = renderDay(data);
-  } catch (e) {
-    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить итоги дня</div>';
-  }
-}
 
-async function loadRoute() {
-  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
-  try {
-    const res = await fetch(`${API}/api/tm/${currentTelegramId}/route`);
-    if (!res.ok) throw new Error('bad response');
-    const data = await res.json();
-    document.getElementById('mainContent').innerHTML = renderRoute(data);
-  } catch (e) {
-    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршрут</div>';
-  }
-}
+def count_working_days(company, month, year):
+    """
+    Рабочие дни месяца по company.working_days (companies.py::_load_registry,
+    колонка "выходные_дни" в реестре компаний). Формат: 'mon-sun' (все 7
+    дней, выходных не настроено) или список через запятую
+    ('mon,tue,wed,thu,fri,sat' — конкретные рабочие дни, выходные уже
+    вычтены при парсинге в companies.py).
 
-async function main() {
-  const telegramId = getTelegramId();
-  currentTelegramId = telegramId;
-  if (!telegramId) {
-    document.getElementById('topTitle').textContent = 'Нет доступа';
-    document.getElementById('mainContent').innerHTML = '<div class="empty">Откройте через Telegram</div>';
-    return;
-  }
-  document.getElementById('topTitle').textContent = 'Маршрут';
-  await loadRoute();
-}
+    ЭФФЕКТИВНОСТЬ: чистая арифметика над уже загруженным атрибутом
+    компании — не обращается к Sheets вообще.
+    """
+    working_days_raw = getattr(company, 'working_days', 'mon-sun')
+    cal = get_calendar(month, year)
+    if working_days_raw == 'mon-sun':
+        return len(cal)
+    working_codes = {d.strip() for d in working_days_raw.split(',')}
+    working_ru_names = {_CRON_TO_RU_DAY[c] for c in working_codes if c in _CRON_TO_RU_DAY}
+    return sum(1 for day_name in cal.values() if day_name in working_ru_names)
 
-main();
-</script>
-</body>
-</html>
+
+async def get_agent_daily_focus(company, agent_name, base, need_orders, today):
+    """
+    Дневная цель "Фокус ТМ" для одного агента из ТОП-5 фокуса текущего
+    месяца. `base`/`need_orders` — уже готовые числа из get_tm_route_focus
+    за ПРОШЛЫЙ месяц (тот же принцип "фокус текущего месяца по итогам
+    прошлого", что и у самого ТОП-5) — эта функция их НЕ пересчитывает,
+    только делит на рабочие дни текущего месяца.
+
+    "Заказы неделю назад" — справочное значение (не "сегодня", т.к. день
+    ещё не закончился и заказы за него не финальны — решение уже
+    принималось раньше в макете экрана).
+
+    ЭФФЕКТИВНОСТЬ: единственная живая часть — план/факт ОДНОГО агента на
+    ОДИН день (и ещё раз на день неделю назад для справки) — не тянет
+    ни всю команду, ни весь месяц. Дёшево, можно дёргать хоть на каждое
+    открытие экрана агента без риска для Railway/Sheets-квоты.
+    """
+    working_days = count_working_days(company, today.month, today.year)
+    visits_target = math.ceil(base / working_days) if working_days else 0
+    orders_target = math.ceil(need_orders / working_days) if working_days else 0
+
+    plan_data = company.load_plan(today.month, today.year)
+    fact_data = await company.load_fact(today.month, today.year, today.day)
+    today_name = RU_DAYS[today.weekday()]
+
+    visits_today = sum(
+        1 for (agent, tt), info in plan_data.get('plan', {}).items()
+        if agent == agent_name and today_name in info.get('days', set())
+    )
+
+    week_ago = today - timedelta(days=7)
+    week_ago_month, week_ago_year = week_ago.month, week_ago.year
+    if (week_ago_month, week_ago_year) == (today.month, today.year):
+        week_fact = fact_data
+    else:
+        week_fact = await company.load_fact(week_ago_month, week_ago_year, week_ago.day)
+    orders_week_ago = sum(
+        1 for (agent, tt), days in week_fact.get('orders', {}).items()
+        if agent == agent_name and days.get(week_ago.day)
+    )
+
+    return {
+        'visits_today': visits_today,
+        'visits_target': visits_target,
+        'orders_week_ago': orders_week_ago,
+        'orders_target': orders_target,
+    }
+
+
+async def get_agent_week_history(company, agent_name, base, need_orders, today, days_back=7):
+    """
+    История выполнения дневной цели за последние `days_back` ЗАКРЫТЫХ
+    дней (не считая сегодня — день ещё не завершён, рано судить
+    "выполнил/не выполнил"). Для ТМ: те самые 7 точек ✓/✗ на детальном
+    экране маршрута.
+
+    День считается выполненным, если И визиты, И заказы за этот день
+    достигли дневной нормы (та же норма, что в get_agent_daily_focus —
+    base/need_orders месяца ÷ рабочие дни месяца ЭТОГО дня — если день
+    попал в другой месяц из-за границы месяца, норма пересчитывается на
+    его собственный месяц).
+
+    ЭФФЕКТИВНОСТЬ: цикл на days_back дней, но всегда для ОДНОГО агента —
+    не команды, не территории. Верхняя граница нагрузки на Sheets — те же
+    дни, что и так читаются load_fact/load_plan по кешу компании (10 минут
+    TTL) — при просмотре нескольких маршрутов подряд повторные дни не
+    перечитываются заново.
+    """
+    history = []
+    for i in range(1, days_back + 1):
+        day = today - timedelta(days=i)
+        working_days = count_working_days(company, day.month, day.year)
+        visits_target = math.ceil(base / working_days) if working_days else 0
+        orders_target = math.ceil(need_orders / working_days) if working_days else 0
+
+        plan_data = company.load_plan(day.month, day.year)
+        fact_data = await company.load_fact(day.month, day.year, day.day)
+        day_name = RU_DAYS[day.weekday()]
+
+        visits_actual = sum(
+            1 for (agent, tt), info in plan_data.get('plan', {}).items()
+            if agent == agent_name and day_name in info.get('days', set())
+        )
+        orders_actual = sum(
+            1 for (agent, tt), days in fact_data.get('orders', {}).items()
+            if agent == agent_name and days.get(day.day)
+        )
+
+        history.append({
+            'date': day.strftime('%d.%m'),
+            'weekday': day_name,
+            'visits_actual': visits_actual,
+            'visits_target': visits_target,
+            'orders_actual': orders_actual,
+            'orders_target': orders_target,
+            'completed': visits_actual >= visits_target and orders_actual >= orders_target,
+        })
+
+    history.reverse()  # от старого к новому — так рисуется слева направо
+    return history
+
+
+async def get_tm_route_focus(company, tm_name, month, year):
+    """
+    ТОП-5 маршрутов в фокусе для территориального менеджера — читает уже
+    ГОТОВЫЙ архив "Итоги месяца" (company.load_month_summary), не считает
+    точки заново. Раз в месяц архив пишет scheduled_month_close_for_company
+    (bot.py) через calc_all_agents_month_summary — эта функция просто
+    фильтрует и агрегирует уже посчитанное для агентов конкретного ТМ.
+
+    ЭФФЕКТИВНОСТЬ (09.08.2026, переделано): было — цикл calc_point_stt по
+    всем точкам всех ~20 агентов ТМ при каждом вызове (тяжело). Стало —
+    одно чтение архива месяца (уже кешируется в Company._cache) плюс
+    дешёвая агрегация в Python по ~20 готовым строкам. На Railway это
+    на порядки меньше CPU, на Sheets — вместо десятков calc_point_stt
+    (каждый из которых сам по себе не делает новых сетевых вызовов, но
+    держит процесс) — просто фильтр по уже загруженным данным.
+
+    Если архив для month/year ещё не существует (месяц ещё не закрыт,
+    либо cron/тест ещё не отработали) — возвращает пустой результат;
+    вызывающий код (эндпоинт) сам решает, что показать пользователю
+    (например, "данные появятся после закрытия месяца").
+
+    Формула на агента (не изменилась):
+        база = max(план агента, средний план по всем агентам ТМ)
+        нужно_заказов = ceil(база × 0.75)
+        дефицит_заказов = max(0, нужно_заказов − факт заказов)
+        дефицит_визитов = max(0, средний по ТМ − план агента)
+    Сортировка — по убыванию дефицит_заказов, единственный критерий.
+    """
+    structure = company.load_structure()
+    tm_agents = _agents_for_tm(structure, tm_name)
+    if not tm_agents:
+        return {'top5': [], 'rest': [], 'team_average_plan': 0, 'archive_ready': False}
+
+    archived = company.load_month_summary(month, year)
+    team_archived = {a: d for a, d in archived.items() if a in tm_agents}
+    if not team_archived:
+        return {'top5': [], 'rest': [], 'team_average_plan': 0, 'archive_ready': False}
+
+    team_average_plan = sum(d['plan'] for d in team_archived.values()) / len(team_archived)
+
+    results = []
+    for agent, d in team_archived.items():
+        plan_visits = d['plan']
+        orders = d['orders']
+
+        base = max(plan_visits, team_average_plan)
+        deficit_visits = max(0, round(team_average_plan - plan_visits))
+        need_orders = math.ceil(base * 0.75)
+        deficit_orders = max(0, need_orders - orders)
+
+        cat_pcts = [v.get('pct') for v in d.get('cat_shares', {}).values() if v.get('pct') is not None]
+        avg_category = round(sum(cat_pcts) / len(cat_pcts)) if cat_pcts else None
+
+        agent_info = next(
+            (u for u in structure.get('users', {}).values()
+             if u.get('role') == 'agent' and u.get('name') == agent),
+            {}
+        )
+
+        results.append({
+            'agent': agent,
+            'sv': agent_info.get('sv', ''),
+            'plan': plan_visits,
+            'orders': orders,
+            'team_average_plan': round(team_average_plan),
+            'base': round(base),
+            'deficit_visits': deficit_visits,
+            'need_orders': need_orders,
+            'deficit_orders': deficit_orders,
+            'avg_category': avg_category,
+            # 09.08.2026: уже есть в архиве (та же строка d) — просто не
+            # передавались дальше, а нужны фронтенду для плиток
+            # Системная/Чистая и полосы ПАКБ на карточке маршрута.
+            'system_pct': d['system_pct'],
+            'off_route': d['off_route'],
+            'clean_pct': d['clean_pct'],
+            'stt_points': d['stt_points'],
+            'akb_points': d['akb_points'],
+            'ne_akb_points': d['ne_akb_points'],
+        })
+
+    results.sort(key=lambda x: x['deficit_orders'], reverse=True)
+
+    return {
+        'top5': results[:5],
+        'rest': results[5:],
+        'team_average_plan': round(team_average_plan),
+        'archive_ready': True,
+    }
