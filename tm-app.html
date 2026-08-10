@@ -268,26 +268,25 @@ function renderRouteCard(a, rank) {
   const cardId = rank;
 
   const weekEntries = Object.entries(a.weekly_load || {});
-  const counts = weekEntries.map(([,v]) => v.count);
-  const maxLoad = Math.max(...counts, 1);
-  const avgLoad = counts.length ? counts.reduce((s,v)=>s+v,0) / counts.length : 0;
-  const avgLinePct = Math.round(avgLoad / maxLoad * 100);
+  const counts = weekEntries.map(([,v]) => v.avg_count);
+  const maxLoad = Math.max(...counts, a.daily_avg || 0, 1);
+  const avgLine = a.daily_avg || 0;
+  const avgLinePct = Math.round(avgLine / maxLoad * 100);
   const weekShortMap = {'понедельник':'Пн','вторник':'Вт','среда':'Ср','четверг':'Чт','пятница':'Пт','суббота':'Сб','воскресенье':'Вс'};
   const weeklyLoadHtml = `<div class="week-load-block">
     <div class="week-load-label">План посещений по дням недели</div>
     <div class="week-load-bars" style="position:relative">
-      <div class="week-load-avg-line" style="bottom:${avgLinePct}%"><span class="week-load-avg-num">${Math.round(avgLoad)}</span></div>
-      ${weekEntries.map(([d, v], j) => {
-        const h = Math.round(v.count/maxLoad*100);
-        const off = v.count > avgLoad*1.3 || v.count < avgLoad*0.7;
-        const pctTxt = v.system_pct != null ? v.system_pct + '%' : '—';
+      <div class="week-load-avg-line" style="bottom:${avgLinePct}%"><span class="week-load-avg-num">${avgLine}</span></div>
+      ${weekEntries.map(([d, v]) => {
+        const h = Math.round(v.avg_count/maxLoad*100);
+        const off = v.avg_count > avgLine*1.3 || v.avg_count < avgLine*0.7;
         return `<div class="week-load-col">
           <div class="week-load-bar-wrap"><div class="week-load-bar ${off?'off':''}" style="height:${h}%"></div></div>
         </div>`;
       }).join('')}
     </div>
     <div class="week-load-zone week-load-zone-visits">
-      ${weekEntries.map(([d, v], j) => `<div class="week-load-col-lbl">${j===0?'<span class=\"week-load-zone-tag\">визитов</span>':''}<span class="week-load-num">${v.count}</span></div>`).join('')}
+      ${weekEntries.map(([d, v], j) => `<div class="week-load-col-lbl">${j===0?'<span class=\"week-load-zone-tag\">визитов (ср)</span>':''}<span class="week-load-num">${v.avg_count}</span></div>`).join('')}
     </div>
     <div class="week-load-zone week-load-zone-system">
       ${weekEntries.map(([d, v], j) => {
@@ -298,7 +297,7 @@ function renderRouteCard(a, rank) {
     <div class="week-load-zone week-load-zone-days">
       ${weekEntries.map(([d]) => `<div class="week-load-col-lbl"><span class="week-load-day">${weekShortMap[d] || d.slice(0,2)}</span></div>`).join('')}
     </div>
-    <div class="week-load-legend">пунктир — среднее по неделе (план, который должен быть)</div>
+    <div class="week-load-legend">пунктир (${avgLine}) — средний план визитов в день (план÷рабочие дни)</div>
   </div>`;
 
   return `<details class="route-card">
