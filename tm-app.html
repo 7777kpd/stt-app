@@ -110,6 +110,40 @@
   .history-day .dot.miss { background: var(--red-bg); color: var(--red-dark); }
   .history-day .lbl { font-size: 9px; color: var(--ink-soft); font-weight: 600; }
   .history-summary { text-align: center; font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-top: 10px; }
+
+  /* ============ ЭКРАН ИТОГИ ДНЯ (ТМ) ============ */
+  .period-switch { display: flex; gap: 6px; margin-bottom: 14px; }
+  .period-btn { flex: 1; font-size: 11px; font-weight: 700; padding: 8px 4px; border-radius: 9px; border: none; background: var(--card); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
+  .period-btn.active { background: var(--ink); color: #fff; }
+
+  .day-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .day-card h3 { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .02em; }
+  .day-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .day-tile { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
+  .day-tile .val { font-size: 18px; font-weight: 800; }
+  .day-tile .lbl { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+
+  .team-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .team-row:last-child { border-bottom: none; }
+  .cat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; color: var(--ink-soft); }
+  .cat-row b { color: var(--ink); }
+
+  details.agent-day-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; overflow: hidden; }
+  details.agent-day-card summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; }
+  details.agent-day-card summary::-webkit-details-marker { display: none; }
+  .adc-name { font-size: 13px; font-weight: 700; }
+  .adc-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
+  .adc-body { padding: 0 14px 14px; }
+  .adc-metrics { display: flex; gap: 8px; margin-bottom: 10px; }
+  .adc-metric { flex: 1; background: var(--bg); border-radius: 9px; padding: 8px; text-align: center; }
+  .adc-metric .val { font-size: 15px; font-weight: 800; }
+  .adc-metric .lbl { font-size: 8px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; }
+  .point-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+  .point-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .point-dot.green { background: var(--green); }
+  .point-dot.yellow { background: var(--yellow); }
+  .point-dot.red { background: var(--red); }
+  .point-name { flex: 1; color: var(--ink-soft); }
 </style>
 </head>
 <body>
@@ -123,7 +157,8 @@
       <div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>
     </div>
     <div class="tabbar" id="tabbar">
-      <button class="tab active" data-screen="route"><span class="icon">🗺️</span>Маршрут</button>
+      <button class="tab active" data-screen="route" onclick="switchScreen('route')"><span class="icon">🗺️</span>Маршрут</button>
+      <button class="tab" data-screen="day" onclick="switchScreen('day')"><span class="icon">📋</span>Итоги дня</button>
     </div>
   </div>
 </div>
@@ -226,10 +261,6 @@ function renderRouteCard(a, rank) {
           <div class="frow total"><span>Дефицит заказов</span><span>${a.deficit_orders}</span></div>
         </div>
       </div>
-      <div class="history-toggle" id="hist-${cardId}" onclick="toggleHistory('${cardId}', '${a.agent.replace(/'/g, "\\'")}', event)">
-        <div class="history-head"><span>Выполнение по дням (7 дней)</span><span>▾</span></div>
-        <div class="history-body" id="hist-body-${cardId}"><div class="empty" style="padding:10px 0">Загрузка...</div></div>
-      </div>
     </div>
   </details>`;
 }
@@ -251,6 +282,109 @@ function renderRoute(data) {
   return `<div class="sub">ТОП-5 в фокусе · ${data.month}</div>${top5Html}${restHtml}`;
 }
 
+let currentScreen = 'route';
+let currentPeriod = 'today';
+const dayCache = {};
+
+function switchScreen(screen) {
+  currentScreen = screen;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === screen));
+  if (screen === 'route') {
+    document.getElementById('topTitle').textContent = 'Маршрут';
+    loadRoute();
+  } else {
+    document.getElementById('topTitle').textContent = 'Итоги дня';
+    loadDay(currentPeriod);
+  }
+}
+
+function levelClass(level) {
+  if (level === '🟢') return 'green';
+  if (level === '🟡') return 'yellow';
+  return 'red';
+}
+
+function renderDay(data) {
+  const periodSwitch = `<div class="period-switch">
+    <button class="period-btn ${currentPeriod === 'today' ? 'active' : ''}" onclick="loadDay('today')">Сегодня</button>
+    <button class="period-btn ${currentPeriod === 'prev' ? 'active' : ''}" onclick="loadDay('prev')">Прошлый день</button>
+    <button class="period-btn ${currentPeriod === 'week' ? 'active' : ''}" onclick="loadDay('week')">Неделя назад</button>
+  </div>`;
+
+  const teamsHtml = (data.teams || []).map(t => `<div class="team-row"><span>${t.team}</span><span>${t.orders}/${t.plan} · ${t.system_pct}%</span></div>`).join('');
+  const catsHtml = (data.categories || []).map(c => `<div class="cat-row"><span>${c.name}</span><b>${c.pct}%</b></div>`).join('');
+
+  const top5Html = data.top5_focus_ready
+    ? (data.top5_today || []).map(a => {
+        const pointsHtml = a.points.map(p => `
+          <div class="point-row">
+            <span class="point-dot ${levelClass(p.level)}"></span>
+            <span class="point-name">${p.name}</span>
+            <span>${p.orders}/${p.total_planned}</span>
+          </div>`).join('') || '<div class="empty" style="padding:6px 0;font-size:11px">Нет точек на сегодня</div>';
+        return `<details class="agent-day-card">
+          <summary>
+            <div><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
+            <span class="rc-chevron">▶</span>
+          </summary>
+          <div class="adc-body">
+            <div class="adc-metrics">
+              <div class="adc-metric"><div class="val">${a.visits_today}/${a.visits_target}</div><div class="lbl">визитов сегодня/норма</div></div>
+              <div class="adc-metric"><div class="val">${a.orders_week_ago}/${a.orders_target}</div><div class="lbl">заказы неделю назад/норма</div></div>
+            </div>
+            ${pointsHtml}
+          </div>
+        </details>`;
+      }).join('')
+    : '<div class="empty" style="padding:12px 0">Итоги прошлого месяца ещё не закрыты — ТОП-5 недоступен</div>';
+
+  return `${periodSwitch}
+    <div class="day-card">
+      <h3>Итог по территории</h3>
+      <div class="day-grid">
+        <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
+        <div class="day-tile"><div class="val">${data.system_orders} <span style="color:var(--red-dark);font-size:11px">−${data.off_route_orders}</span></div><div class="lbl">заказов</div></div>
+        <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
+        <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
+      </div>
+    </div>
+    <div class="day-card"><h3>По командам</h3>${teamsHtml || '<div class="empty">Нет данных</div>'}</div>
+    <div class="day-card"><h3>Категории</h3>${catsHtml || '<div class="empty">Нет данных</div>'}</div>
+    <div class="sub" style="margin:14px 0 10px">ТОП-5 сегодня</div>
+    ${top5Html}`;
+}
+
+async function loadDay(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(b => {});
+  if (dayCache[period]) {
+    document.getElementById('mainContent').innerHTML = renderDay(dayCache[period]);
+    return;
+  }
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const res = await fetch(`${API}/api/tm/${currentTelegramId}/day?period=${period}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    dayCache[period] = data;
+    document.getElementById('mainContent').innerHTML = renderDay(data);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить итоги дня</div>';
+  }
+}
+
+async function loadRoute() {
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const res = await fetch(`${API}/api/tm/${currentTelegramId}/route`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    document.getElementById('mainContent').innerHTML = renderRoute(data);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршрут</div>';
+  }
+}
+
 async function main() {
   const telegramId = getTelegramId();
   currentTelegramId = telegramId;
@@ -259,17 +393,8 @@ async function main() {
     document.getElementById('mainContent').innerHTML = '<div class="empty">Откройте через Telegram</div>';
     return;
   }
-
-  try {
-    const res = await fetch(`${API}/api/tm/${telegramId}/route`);
-    if (!res.ok) throw new Error('bad response');
-    const data = await res.json();
-    document.getElementById('mainContent').innerHTML = renderRoute(data);
-    document.getElementById('topTitle').textContent = 'Маршрут';
-  } catch (e) {
-    document.getElementById('topTitle').textContent = 'Ошибка';
-    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршрут</div>';
-  }
+  document.getElementById('topTitle').textContent = 'Маршрут';
+  await loadRoute();
 }
 
 main();
