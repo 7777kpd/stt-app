@@ -134,10 +134,12 @@
   .adc-name { font-size: 13px; font-weight: 700; }
   .adc-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
   .adc-body { padding: 0 14px 14px; }
-  .adc-metrics { display: flex; gap: 6px; margin-bottom: 10px; }
-  .adc-metric { flex: 1; background: var(--bg); border-radius: 9px; padding: 8px 4px; text-align: center; min-width: 0; }
+  .adc-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .adc-metric { flex: 1 1 30%; background: var(--bg); border-radius: 9px; padding: 8px 4px; text-align: center; min-width: 0; }
   .adc-metric .val { font-size: 14px; font-weight: 800; }
+  .adc-metric .delta { font-size: 9px; font-weight: 700; margin-top: 1px; }
   .adc-metric .lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; line-height: 1.2; }
+  .level-bar { height: 6px; border-radius: 3px; overflow: hidden; display: flex; margin-bottom: 10px; }
   .point-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; border-bottom: 1px solid var(--line); }
   .point-row:last-child { border-bottom: none; }
   .point-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -148,11 +150,17 @@
   .point-client { color: var(--ink); font-weight: 600; }
   .point-addr { color: var(--ink-soft); font-size: 10px; margin-top: 1px; }
   .point-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; }
-  .visit-dots { display: flex; gap: 3px; margin-top: 4px; }
+  .visit-dots { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
   .visit-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .visit-dot.yes { background: var(--green); }
   .visit-dot.no { background: var(--line); border: 1px solid var(--ink-soft); }
-  .point-group-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 12px 0 6px; padding-left: 8px; border-left: 3px solid transparent; }
+  .cat-chip { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 6px; }
+  .cat-chip.good { background: var(--green-bg); color: var(--green); }
+  .cat-chip.bad { background: var(--yellow-bg); color: var(--amber); }
+  .cat-chip.none { background: var(--line); color: var(--ink-soft); }
+  .section-divider { height: 2px; background: var(--line); margin: 14px 0 0; }
+  .section-divider.first { display: none; }
+  .point-group-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 8px 0 6px; padding-left: 8px; border-left: 3px solid transparent; }
   .point-group-label:first-child { margin-top: 0; }
   .point-group-label.lvl-green { border-left-color: var(--green); color: var(--green); }
   .point-group-label.lvl-yellow { border-left-color: var(--yellow); color: var(--amber); }
@@ -335,21 +343,27 @@ function renderDay(data) {
     ? (data.top5_today || []).map(a => {
         const levelOrder = ['СТТ', 'АКБ', 'Не АКБ'];
         const levelClassMap = {'СТТ': 'green', 'АКБ': 'yellow', 'Не АКБ': 'red'};
-        const groupsHtml = levelOrder.map(lvl => {
+        const groupsHtml = levelOrder.map((lvl, idx) => {
           const pts = (a.points_by_level && a.points_by_level[lvl]) || [];
           if (!pts.length) return '';
           const rows = pts.map(p => {
             const dots = p.sequence.map(had => `<span class="visit-dot ${had ? 'yes' : 'no'}"></span>`).join('');
+            const catsHtml = Object.entries(p.cat_stts || {}).map(([cat, val]) => {
+              if (val === null || val === undefined) return `<span class="cat-chip none">${cat.slice(0,4)} —</span>`;
+              const cls = val >= 75 ? 'good' : 'bad';
+              return `<span class="cat-chip ${cls}">${cat.slice(0,4)} ${val}%</span>`;
+            }).join('');
             return `<div class="point-row">
               <div class="point-info">
                 <div class="point-client">${p.name}${p.in_focus_sv ? ' <span style="color:var(--red-dark)">⚠</span>' : ''}</div>
                 <div class="point-addr">${p.address}</div>
-                <div class="visit-dots">${dots}</div>
+                <div class="visit-dots">${dots}${catsHtml}</div>
               </div>
               <span class="point-pct">${p.pct}%</span>
             </div>`;
           }).join('');
-          return `<div class="point-group-label lvl-${levelClassMap[lvl]}">${lvl} · ${pts.length}</div>${rows}`;
+          return `<div class="section-divider ${idx > 0 ? '' : 'first'}"></div>
+            <div class="point-group-label lvl-${levelClassMap[lvl]}">${lvl} · ${pts.length}</div>${rows}`;
         }).join('') || '<div class="empty" style="padding:6px 0;font-size:11px">Нет точек на сегодня</div>';
 
         const focusSvHtml = (a.focus_sv && a.focus_sv.length)
@@ -366,8 +380,23 @@ function renderDay(data) {
             </div>`
           : '';
 
-        const visitsDiff = a.visits_today - a.visits_target;
-        const visitsColor = visitsDiff >= 0 ? 'var(--green)' : 'var(--red-dark)';
+        function deltaTile(actual, target, label) {
+          const diff = actual - target;
+          const sign = diff >= 0 ? '+' : '';
+          const color = diff >= 0 ? 'var(--green)' : 'var(--red-dark)';
+          return `<div class="adc-metric">
+            <div class="val">${actual}</div>
+            <div class="delta" style="color:${color}">${sign}${diff}</div>
+            <div class="lbl">${label}</div>
+          </div>`;
+        }
+
+        const lp = a.level_pcts || {};
+        const topBar = `<div class="level-bar">
+          <div style="width:${lp['СТТ']||0}%;background:var(--green)"></div>
+          <div style="width:${lp['АКБ']||0}%;background:var(--yellow)"></div>
+          <div style="width:${lp['Не АКБ']||0}%;background:var(--red)"></div>
+        </div>`;
 
         return `<details class="agent-day-card">
           <summary>
@@ -375,10 +404,13 @@ function renderDay(data) {
             <span class="rc-chevron">▶</span>
           </summary>
           <div class="adc-body">
+            ${topBar}
             <div class="adc-metrics">
-              <div class="adc-metric" style="background:rgba(0,0,0,.03)"><div class="val" style="color:${visitsColor}">${a.visits_today}/${a.visits_target}</div><div class="lbl">визитов сегодня/норма</div></div>
-              <div class="adc-metric"><div class="val">${a.orders_week_ago}/${a.orders_target}</div><div class="lbl">заказы неделю назад/норма</div></div>
+              ${deltaTile(a.visits_today, a.visits_target, 'визиты/норма')}
+              ${deltaTile(a.orders_week_ago, a.orders_target, 'заказы нед.назад/норма')}
               <div class="adc-metric"><div class="val">${a.today_system_pct}%</div><div class="lbl">системная</div></div>
+              <div class="adc-metric"><div class="val">${a.today_clean_pct}%</div><div class="lbl">чистая</div></div>
+              <div class="adc-metric"><div class="val">${a.avg_category_today != null ? a.avg_category_today + '%' : '—'}</div><div class="lbl">ср. категория</div></div>
             </div>
             ${focusSvHtml}
             ${groupsHtml}
