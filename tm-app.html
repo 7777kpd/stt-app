@@ -139,17 +139,16 @@
   .adc-metric .val { font-size: 14px; font-weight: 800; }
   .adc-metric .delta { font-size: 9px; font-weight: 700; margin-top: 1px; }
   .adc-metric .lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; line-height: 1.2; }
-  .level-bar { height: 6px; border-radius: 3px; overflow: hidden; display: flex; margin-bottom: 10px; }
+  .level-bar { height: 6px; border-radius: 3px; overflow: hidden; display: flex; margin-bottom: 4px; }
+  .level-bar-labels { display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; margin-bottom: 10px; }
   .point-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; border-bottom: 1px solid var(--line); }
   .point-row:last-child { border-bottom: none; }
-  .point-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .point-dot.green { background: var(--green); }
-  .point-dot.yellow { background: var(--yellow); }
-  .point-dot.red { background: var(--red); }
   .point-info { flex: 1; min-width: 0; }
   .point-client { color: var(--ink); font-weight: 600; }
   .point-addr { color: var(--ink-soft); font-size: 10px; margin-top: 1px; }
-  .point-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; }
+  .point-pct-wrap { flex-shrink: 0; text-align: right; }
+  .point-pct { font-size: 13px; font-weight: 800; display: block; }
+  .point-pct-lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; }
   .visit-dots { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
   .visit-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .visit-dot.yes { background: var(--green); }
@@ -158,14 +157,17 @@
   .cat-chip.good { background: var(--green-bg); color: var(--green); }
   .cat-chip.bad { background: var(--yellow-bg); color: var(--amber); }
   .cat-chip.none { background: var(--line); color: var(--ink-soft); }
-  .section-divider { height: 2px; background: var(--line); margin: 14px 0 0; }
-  .section-divider.first { display: none; }
-  .point-group-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 8px 0 6px; padding-left: 8px; border-left: 3px solid transparent; }
-  .point-group-label:first-child { margin-top: 0; }
-  .point-group-label.lvl-green { border-left-color: var(--green); color: var(--green); }
-  .point-group-label.lvl-yellow { border-left-color: var(--yellow); color: var(--amber); }
-  .point-group-label.lvl-red { border-left-color: var(--red); color: var(--red-dark); }
-  .focus-sv-block { background: var(--red-bg); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+  .lvl-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+  .lvl-tab { flex: 1; font-size: 10px; font-weight: 700; padding: 7px 4px; border-radius: 8px; border: none; background: var(--bg); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
+  .lvl-tab.active.lvl-tab-green { background: var(--green-bg); color: var(--green); }
+  .lvl-tab.active.lvl-tab-yellow { background: var(--yellow-bg); color: var(--amber); }
+  .lvl-tab.active.lvl-tab-red { background: var(--red-bg); color: var(--red-dark); }
+  details.focus-sv-block { background: var(--red-bg); border-radius: 10px; padding: 0; margin-bottom: 10px; overflow: hidden; }
+  details.focus-sv-block[open] { padding: 8px 10px; }
+  .focus-sv-head { list-style: none; cursor: pointer; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--red-dark); }
+  details.focus-sv-block[open] .focus-sv-head { padding: 0 0 6px; }
+  .focus-sv-head::-webkit-details-marker { display: none; }
+  details.focus-sv-block[open] .rc-chevron { transform: rotate(90deg); }
   .focus-sv-block .point-row { border-bottom: 1px solid rgba(169,59,48,.12); }
   .check-yes { color: var(--green); font-weight: 800; }
   .check-no { color: var(--red-dark); font-weight: 800; }
@@ -323,6 +325,15 @@ function switchScreen(screen) {
   }
 }
 
+function switchLevelTab(btn) {
+  const aid = btn.dataset.aid;
+  const lvl = btn.dataset.lvl;
+  document.querySelectorAll(`.lvl-tab[data-aid="${aid}"]`).forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll(`.lvl-panel[data-aid="${aid}"]`).forEach(p => {
+    p.style.display = p.dataset.lvl === lvl ? 'block' : 'none';
+  });
+}
+
 function levelClass(level) {
   if (level === '🟢') return 'green';
   if (level === '🟡') return 'yellow';
@@ -340,12 +351,18 @@ function renderDay(data) {
   const catsHtml = (data.categories || []).map(c => `<div class="cat-row"><span>${c.name}</span><b>${c.pct}%</b></div>`).join('');
 
   const top5Html = data.top5_focus_ready
-    ? (data.top5_today || []).map(a => {
-        const levelOrder = ['СТТ', 'АКБ', 'Не АКБ'];
+    ? (data.top5_today || []).map((a, agentIdx) => {
+        const levelOrder = ['Не АКБ', 'АКБ', 'СТТ'];
         const levelClassMap = {'СТТ': 'green', 'АКБ': 'yellow', 'Не АКБ': 'red'};
-        const groupsHtml = levelOrder.map((lvl, idx) => {
+        const aid = `a${agentIdx}`;
+
+        const tabsHtml = levelOrder.map((lvl, i) => {
+          const count = (a.points_by_level && a.points_by_level[lvl] || []).length;
+          return `<button class="lvl-tab lvl-tab-${levelClassMap[lvl]} ${i === 0 ? 'active' : ''}" data-aid="${aid}" data-lvl="${lvl}" onclick="switchLevelTab(this)">${lvl} · ${count}</button>`;
+        }).join('');
+
+        const groupsHtml = levelOrder.map((lvl, i) => {
           const pts = (a.points_by_level && a.points_by_level[lvl]) || [];
-          if (!pts.length) return '';
           const rows = pts.map(p => {
             const dots = p.sequence.map(had => `<span class="visit-dot ${had ? 'yes' : 'no'}"></span>`).join('');
             const catsHtml = Object.entries(p.cat_stts || {}).map(([cat, val]) => {
@@ -359,16 +376,15 @@ function renderDay(data) {
                 <div class="point-addr">${p.address}</div>
                 <div class="visit-dots">${dots}${catsHtml}</div>
               </div>
-              <span class="point-pct">${p.pct}%</span>
+              <div class="point-pct-wrap"><span class="point-pct">${p.pct}%</span><span class="point-pct-lbl">система</span></div>
             </div>`;
-          }).join('');
-          return `<div class="section-divider ${idx > 0 ? '' : 'first'}"></div>
-            <div class="point-group-label lvl-${levelClassMap[lvl]}">${lvl} · ${pts.length}</div>${rows}`;
-        }).join('') || '<div class="empty" style="padding:6px 0;font-size:11px">Нет точек на сегодня</div>';
+          }).join('') || '<div class="empty" style="padding:8px 0;font-size:11px">Нет точек</div>';
+          return `<div class="lvl-panel" data-aid="${aid}" data-lvl="${lvl}" style="display:${i === 0 ? 'block' : 'none'}">${rows}</div>`;
+        }).join('');
 
         const focusSvHtml = (a.focus_sv && a.focus_sv.length)
-          ? `<div class="focus-sv-block">
-              <div class="point-group-label" style="color:var(--red-dark);margin:0 0 4px">⚠ Фокус СВ · ${a.focus_sv.length}</div>
+          ? `<details class="focus-sv-block">
+              <summary class="focus-sv-head"><span>👁 Фокус СВ · ${a.focus_sv.length}</span><span class="rc-chevron">▶</span></summary>
               ${a.focus_sv.map(fp => `
                 <div class="point-row">
                   <span class="${fp.had_order ? 'check-yes' : 'check-no'}">${fp.had_order ? '✓' : '✗'}</span>
@@ -377,17 +393,15 @@ function renderDay(data) {
                     <div class="point-addr">${fp.address} · ${fp.missed_streak} пропусков подряд</div>
                   </div>
                 </div>`).join('')}
-            </div>`
+            </details>`
           : '';
 
-        function deltaTile(actual, target, label) {
-          const diff = actual - target;
-          const sign = diff >= 0 ? '+' : '';
-          const color = diff >= 0 ? 'var(--green)' : 'var(--red-dark)';
+        function factorTile(actual, target, label) {
+          const ok = actual >= target;
+          const color = ok ? 'var(--green)' : 'var(--red-dark)';
           return `<div class="adc-metric">
-            <div class="val">${actual}</div>
-            <div class="delta" style="color:${color}">${sign}${diff}</div>
-            <div class="lbl">${label}</div>
+            <div class="val" style="color:${color}">${actual}/${target}</div>
+            <div class="lbl">${label} · есть/нужно</div>
           </div>`;
         }
 
@@ -396,6 +410,11 @@ function renderDay(data) {
           <div style="width:${lp['СТТ']||0}%;background:var(--green)"></div>
           <div style="width:${lp['АКБ']||0}%;background:var(--yellow)"></div>
           <div style="width:${lp['Не АКБ']||0}%;background:var(--red)"></div>
+        </div>
+        <div class="level-bar-labels">
+          <span style="color:var(--green)">СТТ ${lp['СТТ']||0}%</span>
+          <span style="color:var(--amber)">АКБ ${lp['АКБ']||0}%</span>
+          <span style="color:var(--red-dark)">Не АКБ ${lp['Не АКБ']||0}%</span>
         </div>`;
 
         return `<details class="agent-day-card">
@@ -406,13 +425,16 @@ function renderDay(data) {
           <div class="adc-body">
             ${topBar}
             <div class="adc-metrics">
-              ${deltaTile(a.visits_today, a.visits_target, 'визиты/норма')}
-              ${deltaTile(a.orders_week_ago, a.orders_target, 'заказы нед.назад/норма')}
+              ${factorTile(a.visits_today, a.visits_target, 'визиты')}
+              ${factorTile(a.orders_week_ago, a.orders_target, 'заказы нед.назад')}
+            </div>
+            <div class="adc-metrics">
               <div class="adc-metric"><div class="val">${a.today_system_pct}%</div><div class="lbl">системная</div></div>
               <div class="adc-metric"><div class="val">${a.today_clean_pct}%</div><div class="lbl">чистая</div></div>
               <div class="adc-metric"><div class="val">${a.avg_category_today != null ? a.avg_category_today + '%' : '—'}</div><div class="lbl">ср. категория</div></div>
             </div>
             ${focusSvHtml}
+            <div class="lvl-tabs">${tabsHtml}</div>
             ${groupsHtml}
           </div>
         </details>`;
