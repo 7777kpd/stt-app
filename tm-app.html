@@ -134,10 +134,10 @@
   .adc-name { font-size: 13px; font-weight: 700; }
   .adc-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
   .adc-body { padding: 0 14px 14px; }
-  .adc-metrics { display: flex; gap: 8px; margin-bottom: 10px; }
-  .adc-metric { flex: 1; background: var(--bg); border-radius: 9px; padding: 8px; text-align: center; }
-  .adc-metric .val { font-size: 15px; font-weight: 800; }
-  .adc-metric .lbl { font-size: 8px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; }
+  .adc-metrics { display: flex; gap: 6px; margin-bottom: 10px; }
+  .adc-metric { flex: 1; background: var(--bg); border-radius: 9px; padding: 8px 4px; text-align: center; min-width: 0; }
+  .adc-metric .val { font-size: 14px; font-weight: 800; }
+  .adc-metric .lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; line-height: 1.2; }
   .point-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; border-bottom: 1px solid var(--line); }
   .point-row:last-child { border-bottom: none; }
   .point-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -147,8 +147,16 @@
   .point-info { flex: 1; min-width: 0; }
   .point-client { color: var(--ink); font-weight: 600; }
   .point-addr { color: var(--ink-soft); font-size: 10px; margin-top: 1px; }
-  .point-group-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 10px 0 4px; }
+  .point-pct { font-size: 13px; font-weight: 800; flex-shrink: 0; }
+  .visit-dots { display: flex; gap: 3px; margin-top: 4px; }
+  .visit-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .visit-dot.yes { background: var(--green); }
+  .visit-dot.no { background: var(--line); border: 1px solid var(--ink-soft); }
+  .point-group-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 12px 0 6px; padding-left: 8px; border-left: 3px solid transparent; }
   .point-group-label:first-child { margin-top: 0; }
+  .point-group-label.lvl-green { border-left-color: var(--green); color: var(--green); }
+  .point-group-label.lvl-yellow { border-left-color: var(--yellow); color: var(--amber); }
+  .point-group-label.lvl-red { border-left-color: var(--red); color: var(--red-dark); }
   .focus-sv-block { background: var(--red-bg); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
   .focus-sv-block .point-row { border-bottom: 1px solid rgba(169,59,48,.12); }
   .check-yes { color: var(--green); font-weight: 800; }
@@ -330,21 +338,23 @@ function renderDay(data) {
         const groupsHtml = levelOrder.map(lvl => {
           const pts = (a.points_by_level && a.points_by_level[lvl]) || [];
           if (!pts.length) return '';
-          const rows = pts.map(p => `
-            <div class="point-row">
-              <span class="point-dot ${levelClassMap[lvl]}"></span>
+          const rows = pts.map(p => {
+            const dots = p.sequence.map(had => `<span class="visit-dot ${had ? 'yes' : 'no'}"></span>`).join('');
+            return `<div class="point-row">
               <div class="point-info">
                 <div class="point-client">${p.name}${p.in_focus_sv ? ' <span style="color:var(--red-dark)">⚠</span>' : ''}</div>
                 <div class="point-addr">${p.address}</div>
+                <div class="visit-dots">${dots}</div>
               </div>
-              <span>${p.orders}/${p.total_planned}</span>
-            </div>`).join('');
-          return `<div class="point-group-label">${lvl} · ${pts.length}</div>${rows}`;
+              <span class="point-pct">${p.pct}%</span>
+            </div>`;
+          }).join('');
+          return `<div class="point-group-label lvl-${levelClassMap[lvl]}">${lvl} · ${pts.length}</div>${rows}`;
         }).join('') || '<div class="empty" style="padding:6px 0;font-size:11px">Нет точек на сегодня</div>';
 
         const focusSvHtml = (a.focus_sv && a.focus_sv.length)
           ? `<div class="focus-sv-block">
-              <div class="point-group-label" style="color:var(--red-dark)">⚠ Фокус СВ · ${a.focus_sv.length}</div>
+              <div class="point-group-label" style="color:var(--red-dark);margin:0 0 4px">⚠ Фокус СВ · ${a.focus_sv.length}</div>
               ${a.focus_sv.map(fp => `
                 <div class="point-row">
                   <span class="${fp.had_order ? 'check-yes' : 'check-no'}">${fp.had_order ? '✓' : '✗'}</span>
@@ -356,6 +366,9 @@ function renderDay(data) {
             </div>`
           : '';
 
+        const visitsDiff = a.visits_today - a.visits_target;
+        const visitsColor = visitsDiff >= 0 ? 'var(--green)' : 'var(--red-dark)';
+
         return `<details class="agent-day-card">
           <summary>
             <div><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
@@ -363,8 +376,9 @@ function renderDay(data) {
           </summary>
           <div class="adc-body">
             <div class="adc-metrics">
-              <div class="adc-metric"><div class="val">${a.visits_today}/${a.visits_target}</div><div class="lbl">визитов сегодня/норма</div></div>
+              <div class="adc-metric" style="background:rgba(0,0,0,.03)"><div class="val" style="color:${visitsColor}">${a.visits_today}/${a.visits_target}</div><div class="lbl">визитов сегодня/норма</div></div>
               <div class="adc-metric"><div class="val">${a.orders_week_ago}/${a.orders_target}</div><div class="lbl">заказы неделю назад/норма</div></div>
+              <div class="adc-metric"><div class="val">${a.today_system_pct}%</div><div class="lbl">системная</div></div>
             </div>
             ${focusSvHtml}
             ${groupsHtml}
