@@ -138,12 +138,21 @@
   .adc-metric { flex: 1; background: var(--bg); border-radius: 9px; padding: 8px; text-align: center; }
   .adc-metric .val { font-size: 15px; font-weight: 800; }
   .adc-metric .lbl { font-size: 8px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; }
-  .point-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
+  .point-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; border-bottom: 1px solid var(--line); }
+  .point-row:last-child { border-bottom: none; }
   .point-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .point-dot.green { background: var(--green); }
   .point-dot.yellow { background: var(--yellow); }
   .point-dot.red { background: var(--red); }
-  .point-name { flex: 1; color: var(--ink-soft); }
+  .point-info { flex: 1; min-width: 0; }
+  .point-client { color: var(--ink); font-weight: 600; }
+  .point-addr { color: var(--ink-soft); font-size: 10px; margin-top: 1px; }
+  .point-group-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 10px 0 4px; }
+  .point-group-label:first-child { margin-top: 0; }
+  .focus-sv-block { background: var(--red-bg); border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+  .focus-sv-block .point-row { border-bottom: 1px solid rgba(169,59,48,.12); }
+  .check-yes { color: var(--green); font-weight: 800; }
+  .check-no { color: var(--red-dark); font-weight: 800; }
 </style>
 </head>
 <body>
@@ -316,12 +325,37 @@ function renderDay(data) {
 
   const top5Html = data.top5_focus_ready
     ? (data.top5_today || []).map(a => {
-        const pointsHtml = a.points.map(p => `
-          <div class="point-row">
-            <span class="point-dot ${levelClass(p.level)}"></span>
-            <span class="point-name">${p.name}</span>
-            <span>${p.orders}/${p.total_planned}</span>
-          </div>`).join('') || '<div class="empty" style="padding:6px 0;font-size:11px">Нет точек на сегодня</div>';
+        const levelOrder = ['СТТ', 'АКБ', 'Не АКБ'];
+        const levelClassMap = {'СТТ': 'green', 'АКБ': 'yellow', 'Не АКБ': 'red'};
+        const groupsHtml = levelOrder.map(lvl => {
+          const pts = (a.points_by_level && a.points_by_level[lvl]) || [];
+          if (!pts.length) return '';
+          const rows = pts.map(p => `
+            <div class="point-row">
+              <span class="point-dot ${levelClassMap[lvl]}"></span>
+              <div class="point-info">
+                <div class="point-client">${p.name}${p.in_focus_sv ? ' <span style="color:var(--red-dark)">⚠</span>' : ''}</div>
+                <div class="point-addr">${p.address}</div>
+              </div>
+              <span>${p.orders}/${p.total_planned}</span>
+            </div>`).join('');
+          return `<div class="point-group-label">${lvl} · ${pts.length}</div>${rows}`;
+        }).join('') || '<div class="empty" style="padding:6px 0;font-size:11px">Нет точек на сегодня</div>';
+
+        const focusSvHtml = (a.focus_sv && a.focus_sv.length)
+          ? `<div class="focus-sv-block">
+              <div class="point-group-label" style="color:var(--red-dark)">⚠ Фокус СВ · ${a.focus_sv.length}</div>
+              ${a.focus_sv.map(fp => `
+                <div class="point-row">
+                  <span class="${fp.had_order ? 'check-yes' : 'check-no'}">${fp.had_order ? '✓' : '✗'}</span>
+                  <div class="point-info">
+                    <div class="point-client">${fp.name}</div>
+                    <div class="point-addr">${fp.address} · ${fp.missed_streak} пропусков подряд</div>
+                  </div>
+                </div>`).join('')}
+            </div>`
+          : '';
+
         return `<details class="agent-day-card">
           <summary>
             <div><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
@@ -332,7 +366,8 @@ function renderDay(data) {
               <div class="adc-metric"><div class="val">${a.visits_today}/${a.visits_target}</div><div class="lbl">визитов сегодня/норма</div></div>
               <div class="adc-metric"><div class="val">${a.orders_week_ago}/${a.orders_target}</div><div class="lbl">заказы неделю назад/норма</div></div>
             </div>
-            ${pointsHtml}
+            ${focusSvHtml}
+            ${groupsHtml}
           </div>
         </details>`;
       }).join('')
