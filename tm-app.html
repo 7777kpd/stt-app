@@ -317,6 +317,8 @@ function renderRouteCard(a, rank) {
           <div class="frow"><span>Требуемый план заказов = ${a.base}×75%</span><span>${a.need_orders}</span></div>
           <div class="frow"><span>Заказов по факту</span><span>${a.orders}</span></div>
           <div class="frow total"><span>Дефицит заказов</span><span>${a.deficit_orders}</span></div>
+          <div class="frow" style="border-top:1px dashed rgba(59,111,160,.3);margin-top:4px;padding-top:8px"><span>Плановых визитов в день = ${a.base}÷раб.дни</span><span>${a.daily_avg}</span></div>
+          <div class="frow"><span>Плановых заказов в день = ${a.need_orders}÷раб.дни</span><span>${a.daily_orders_avg}</span></div>
         </div>
       </div>
       ${weeklyLoadHtml}
