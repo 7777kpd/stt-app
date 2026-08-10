@@ -99,6 +99,16 @@
   .rest-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
   .rest-row span:last-child { color: var(--ink-soft); font-weight: 600; }
 
+  .week-load-block { margin-bottom: 12px; }
+  .week-load-label { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-bottom: 8px; }
+  .week-load-bars { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px; height: 60px; }
+  .week-load-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+  .week-load-bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
+  .week-load-bar { width: 100%; background: var(--ink-soft); opacity: .35; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .week-load-bar.off { background: var(--red); opacity: .7; }
+  .week-load-val { font-size: 9px; font-weight: 700; margin-top: 3px; }
+  .week-load-day { font-size: 8px; color: var(--ink-soft); }
+
   .history-toggle { cursor: pointer; background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
   .history-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
   .history-body { margin-top: 10px; display: none; }
@@ -258,6 +268,28 @@ function renderRouteCard(a, rank) {
   const akbPct = pakb ? Math.round(a.akb_points / pakb * 100) : 0;
   const neakbPct = 100 - sttPct - akbPct;
 
+  const weekOrder = ['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'];
+  const weekShort = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+  const load = a.weekly_load || {};
+  const loadVals = weekOrder.map(d => load[d] || 0);
+  const maxLoad = Math.max(...loadVals, 1);
+  const avgLoad = loadVals.reduce((s,v)=>s+v,0) / 7;
+  const weeklyLoadHtml = `<div class="week-load-block">
+    <div class="week-load-label">Нагрузка по дням недели</div>
+    <div class="week-load-bars">
+      ${weekOrder.map((d,i) => {
+        const v = loadVals[i];
+        const h = Math.round(v/maxLoad*100);
+        const off = v > avgLoad*1.3 || v < avgLoad*0.7;
+        return `<div class="week-load-col">
+          <div class="week-load-bar-wrap"><div class="week-load-bar ${off?'off':''}" style="height:${h}%"></div></div>
+          <div class="week-load-val">${v}</div>
+          <div class="week-load-day">${weekShort[i]}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
+
   return `<details class="route-card">
     <summary>
       <div><span class="rc-name">${rank} · ${a.agent}</span><span class="rc-sub">${a.sv || ''}</span></div>
@@ -283,6 +315,7 @@ function renderRouteCard(a, rank) {
         </div>
         <div class="pakb-legend"><span>СТТ ${a.stt_points}</span><span>АКБ ${a.akb_points}</span><span>Не АКБ ${a.ne_akb_points}</span></div>
       </div>
+      ${weeklyLoadHtml}
       <div class="formula-toggle" onclick="toggleFormula(this, event)">
         <div class="formula-head"><span>Как посчитали ${a.deficit_orders}?</span><span>▾</span></div>
         <div class="formula-body">
