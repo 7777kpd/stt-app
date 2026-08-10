@@ -98,6 +98,18 @@
   .rest-toggle { text-align: center; padding: 12px 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
   .rest-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
   .rest-row span:last-child { color: var(--ink-soft); font-weight: 600; }
+
+  .history-toggle { cursor: pointer; background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+  .history-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .history-body { margin-top: 10px; display: none; }
+  .history-toggle.open .history-body { display: block; }
+  .history-days { display: flex; gap: 6px; justify-content: space-between; }
+  .history-day { text-align: center; }
+  .history-day .dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; margin: 0 auto 4px; }
+  .history-day .dot.done { background: var(--green-bg); color: var(--green); }
+  .history-day .dot.miss { background: var(--red-bg); color: var(--red-dark); }
+  .history-day .lbl { font-size: 9px; color: var(--ink-soft); font-weight: 600; }
+  .history-summary { text-align: center; font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -134,7 +146,46 @@ function toggleFormula(el, ev) {
   el.classList.toggle('open');
 }
 
+let currentTelegramId = null;
+const historyCache = {};
+
+async function toggleHistory(cardId, agentName, ev) {
+  ev.stopPropagation();
+  const toggle = document.getElementById(`hist-${cardId}`);
+  const body = document.getElementById(`hist-body-${cardId}`);
+  const wasOpen = toggle.classList.contains('open');
+  toggle.classList.toggle('open');
+  if (wasOpen) return;
+
+  if (historyCache[agentName]) {
+    body.innerHTML = renderHistoryDots(historyCache[agentName]);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/api/tm/${currentTelegramId}/route-history?agent=${encodeURIComponent(agentName)}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    historyCache[agentName] = data.history;
+    body.innerHTML = renderHistoryDots(data.history);
+  } catch (e) {
+    body.innerHTML = '<div class="empty" style="padding:10px 0">Не удалось загрузить историю</div>';
+  }
+}
+
+function renderHistoryDots(history) {
+  const doneCount = history.filter(d => d.completed).length;
+  const days = history.map(d => `
+    <div class="history-day">
+      <div class="dot ${d.completed ? 'done' : 'miss'}">${d.completed ? '✓' : '✗'}</div>
+      <div class="lbl">${d.weekday.slice(0, 2)}</div>
+    </div>`).join('');
+  return `<div class="history-days">${days}</div>
+    <div class="history-summary">${doneCount} из ${history.length} дней — задача выполнена</div>`;
+}
+
 function renderRouteCard(a, rank) {
+  const cardId = rank;
   const pakb = a.stt_points + a.akb_points + a.ne_akb_points;
   const sttPct = pakb ? Math.round(a.stt_points / pakb * 100) : 0;
   const akbPct = pakb ? Math.round(a.akb_points / pakb * 100) : 0;
@@ -175,6 +226,10 @@ function renderRouteCard(a, rank) {
           <div class="frow total"><span>Дефицит заказов</span><span>${a.deficit_orders}</span></div>
         </div>
       </div>
+      <div class="history-toggle" id="hist-${cardId}" onclick="toggleHistory('${cardId}', '${a.agent.replace(/'/g, "\\'")}', event)">
+        <div class="history-head"><span>Выполнение по дням (7 дней)</span><span>▾</span></div>
+        <div class="history-body" id="hist-body-${cardId}"><div class="empty" style="padding:10px 0">Загрузка...</div></div>
+      </div>
     </div>
   </details>`;
 }
@@ -198,6 +253,7 @@ function renderRoute(data) {
 
 async function main() {
   const telegramId = getTelegramId();
+  currentTelegramId = telegramId;
   if (!telegramId) {
     document.getElementById('topTitle').textContent = 'Нет доступа';
     document.getElementById('mainContent').innerHTML = '<div class="empty">Откройте через Telegram</div>';
