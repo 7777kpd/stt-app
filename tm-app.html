@@ -456,12 +456,11 @@ function renderDay(data) {
           <div class="adc-body">
             <div class="adc-metrics">
               ${factorTile(a.visits_today, a.visits_target, 'визиты')}
-              ${factorTile(a.orders_week_ago, a.orders_target, 'заказы нед.назад')}
+              ${factorTile(a.orders_today, a.orders_target, 'заказы сегодня')}
             </div>
             <div class="adc-metrics">
               <div class="adc-metric"><div class="val">${a.today_system_pct}%</div><div class="lbl">системная</div></div>
               <div class="adc-metric"><div class="val">${a.today_clean_pct}%</div><div class="lbl">чистая</div></div>
-              <div class="adc-metric"><div class="val">${a.avg_category_today != null ? a.avg_category_today + '%' : '—'}</div><div class="lbl">ср. категория</div></div>
             </div>
             ${focusSvHtml}
             <div class="lvl-tabs">${tabsHtml}</div>
