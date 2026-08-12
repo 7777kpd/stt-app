@@ -144,6 +144,9 @@
   .collapsible-card[open] > summary::after { content: '▼'; }
   .collapsible-card summary h3 { margin: 0; }
   .day-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .day-tiles-row { display: flex; gap: 5px; align-items: center; margin-top: 10px; }
+  .day-tiles-row .day-tile { flex: 1; }
+  .day-off { align-self: center; font-size: 11px; font-weight: 800; color: var(--red-dark); white-space: nowrap; text-align: center; line-height: 1.3; }
   .day-tile { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
   .day-tile .val { font-size: 18px; font-weight: 800; }
   .day-tile .lbl { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
@@ -404,7 +407,7 @@ function levelClass(level) {
 function renderDay(data) {
   const periodSwitch = `<div class="period-switch">
     <button class="period-btn ${currentPeriod === 'today' ? 'active' : ''}" onclick="loadDay('today')">Сегодня</button>
-    <button class="period-btn ${currentPeriod === 'prev' ? 'active' : ''}" onclick="loadDay('prev')">Прошлый день</button>
+    <button class="period-btn ${currentPeriod === 'prev' ? 'active' : ''}" onclick="loadDay('prev')">Вчера</button>
     <button class="period-btn ${currentPeriod === 'week' ? 'active' : ''}" onclick="loadDay('week')">Неделя назад</button>
   </div>`;
 
@@ -517,8 +520,11 @@ function renderDay(data) {
       <h3>Итог по территории</h3>
       <div class="day-grid">
         <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.system_orders}</div><div class="lbl">заказов<span style="color:var(--red-dark)"> · ${data.off_route_orders} вне</span></div></div>
+        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+      </div>
+      <div class="day-tiles-row">
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
+        <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>
         <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
       </div>
     </div>
