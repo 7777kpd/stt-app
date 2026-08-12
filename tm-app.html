@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>СТТ — Территориальный менеджер</title>
 <style>
+  /* 13.08.2026: -webkit-details-marker скрывает нативную стрелку только
+     в Safari/Chrome-семействе — стандартный ::marker (др. движки/версии)
+     отдельно, иначе у вложенных <details> вылезает вторая стрелка поверх
+     нашего собственного rc-chevron/span-индикатора. */
+  summary::marker { display: none; content: ''; }
+  summary::-webkit-details-marker { display: none; }
   :root {
     --bg: #F0EADC;
     --card: #FFFFFF;
@@ -524,7 +530,7 @@ function renderDay(data) {
       <summary><h3 style="display:inline">По супервайзерам</h3></summary>
       <div style="margin-top:10px">${svsHtml || '<div class="empty">Нет данных</div>'}</div>
     </details>
-    <details class="day-card collapsible-card" open>
+    <details class="day-card collapsible-card">
       <summary>
         <h3 style="display:inline">ТОП-5 сегодня</h3>
         <div class="top5-summary-badges">${badge(true)}<span class="top5-count ok">${top5GreenCount}</span>${badge(false)}<span class="top5-count bad">${top5RedCount}</span></div>
