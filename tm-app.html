@@ -137,15 +137,14 @@
   .day-tile .val { font-size: 18px; font-weight: 800; }
   .day-tile .lbl { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
 
-  .team-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
-  .team-row:last-child { border-bottom: none; }
-  .sv-row { padding: 9px 0; border-bottom: 1px solid var(--line); }
-  .sv-row:last-child { border-bottom: none; }
-  .sv-name { font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px; }
-  .sv-metrics { display: flex; gap: 10px; font-size: 11px; color: var(--ink-soft); flex-wrap: wrap; }
-  .sv-metrics span:first-child { font-weight: 800; color: var(--ink); }
-  .cat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; color: var(--ink-soft); }
-  .cat-row b { color: var(--ink); }
+  .bar-row { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .bar-row:last-child { border-bottom: none; }
+  .bar-row-label { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .bar-row-track-wrap { display: flex; align-items: center; gap: 8px; }
+  .bar-row-track { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar-row-fill { height: 100%; border-radius: 4px; }
+  .bar-row-count { font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+  .bar-row-pct { font-size: 13px; font-weight: 800; width: 38px; text-align: right; flex-shrink: 0; }
 
   details.agent-day-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; overflow: hidden; }
   details.agent-day-card summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; }
@@ -176,6 +175,8 @@
   .cat-chip.good { background: var(--green-bg); color: var(--green); }
   .cat-chip.bad { background: var(--yellow-bg); color: var(--amber); }
   .cat-chip.none { background: var(--line); color: var(--ink-soft); }
+  .cat-chip.avg { background: var(--blue-bg); color: var(--blue); font-weight: 800; }
+  .sv-cats-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
   .lvl-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
   .lvl-tab { flex: 1; font-size: 10px; font-weight: 700; padding: 7px 4px; border-radius: 8px; border: none; background: var(--bg); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
   .lvl-tab.active.lvl-tab-green { background: var(--green-bg); color: var(--green); }
@@ -388,17 +389,44 @@ function renderDay(data) {
     <button class="period-btn ${currentPeriod === 'week' ? 'active' : ''}" onclick="loadDay('week')">Неделя назад</button>
   </div>`;
 
-  const svsHtml = (data.svs || []).map(s => `
-    <div class="sv-row">
-      <span class="sv-name">${s.sv}</span>
-      <div class="sv-metrics">
-        <span title="система">${s.system_pct}%</span>
-        <span title="план визитов">${s.plan} план</span>
-        <span title="факт заказов">${s.orders} зак.</span>
-        <span title="вне системы" style="color:var(--red-dark)">${s.off_route} вне</span>
+  // 13.08.2026: единый рендер бара "N из M · %" в стиле реального экрана
+  // СВ ("Категории" на sv-app.html) — переиспользуется для всех трёх
+  // блоков (Категории/ТОП-5 маршрутов/По супервайзерам), а не три разных
+  // визуальных языка на одном экране.
+  function barRow(label, done, total, pct) {
+    const color = pct >= 75 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--red-dark)';
+    return `<div class="bar-row">
+      <div class="bar-row-label">${label}</div>
+      <div class="bar-row-track-wrap">
+        <div class="bar-row-track"><div class="bar-row-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
+        <span class="bar-row-count">${done} из ${total}</span>
+        <span class="bar-row-pct" style="color:${color}">${pct}%</span>
       </div>
-    </div>`).join('');
-  const catsHtml = (data.categories || []).map(c => `<div class="cat-row"><span>${c.name}</span><b>${c.pct}%</b></div>`).join('');
+    </div>`;
+  }
+
+  const svsHtml = (data.svs || []).map(s => {
+    const color = s.system_pct >= 75 ? 'var(--green)' : s.system_pct >= 40 ? 'var(--amber)' : 'var(--red-dark)';
+    const catsChips = (s.categories || []).map(c => {
+      const cls = c.pct >= 75 ? 'good' : 'bad';
+      return `<span class="cat-chip ${cls}">${c.name.slice(0,4)} ${c.pct}%</span>`;
+    }).join('');
+    const avgChip = s.avg_category != null ? `<span class="cat-chip avg">ср. ${s.avg_category}%</span>` : '';
+    return `<div class="bar-row">
+      <div class="bar-row-label">${s.sv}</div>
+      <div class="bar-row-track-wrap">
+        <div class="bar-row-track"><div class="bar-row-fill" style="width:${Math.min(s.system_pct,100)}%;background:${color}"></div></div>
+        <span class="bar-row-count">${s.orders} из ${s.plan}</span>
+        <span class="bar-row-pct" style="color:${color}">${s.system_pct}%</span>
+      </div>
+      ${catsChips || avgChip ? `<div class="sv-cats-row">${catsChips}${avgChip}</div>` : ''}
+    </div>`;
+  }).join('');
+  const catsHtml = (data.categories || []).map(c => barRow(c.name, c.orders, c.total, c.pct)).join('');
+  const top5BarsHtml = (data.top5_today || []).map(a => {
+    const pct = a.month_need_orders ? Math.round(a.month_orders / a.month_need_orders * 100) : 0;
+    return barRow(a.agent, a.month_orders, a.month_need_orders, pct);
+  }).join('');
 
   const top5Html = data.top5_focus_ready
     ? (data.top5_today || []).map((a, agentIdx) => {
@@ -447,10 +475,14 @@ function renderDay(data) {
           : '';
 
         function factorTile(actual, target, label) {
-          const ok = actual >= target;
-          const color = ok ? 'var(--green)' : 'var(--red-dark)';
+          const diff = actual - target;
+          const sign = diff >= 0 ? '+' : '';
+          const color = diff >= 0 ? 'var(--green)' : 'var(--red-dark)';
           return `<div class="adc-metric">
-            <div class="val" style="color:${color}">${actual}/${target}</div>
+            <div style="display:flex;align-items:baseline;justify-content:center;gap:5px">
+              <span class="val">${actual}/${target}</span>
+              <span style="font-size:11px;font-weight:800;color:${color}">${sign}${diff}</span>
+            </div>
             <div class="lbl">${label} · есть/нужно</div>
           </div>`;
         }
@@ -487,8 +519,9 @@ function renderDay(data) {
         <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
       </div>
     </div>
-    <div class="day-card"><h3>По супервайзерам</h3>${svsHtml || '<div class="empty">Нет данных</div>'}</div>
     <div class="day-card"><h3>Категории</h3>${catsHtml || '<div class="empty">Нет данных</div>'}</div>
+    <div class="day-card"><h3>ТОП-5 маршрутов</h3>${top5BarsHtml || '<div class="empty">Нет данных</div>'}</div>
+    <div class="day-card"><h3>По супервайзерам</h3>${svsHtml || '<div class="empty">Нет данных</div>'}</div>
     <div class="sub" style="margin:14px 0 10px">ТОП-5 сегодня</div>
     ${top5Html}`;
 }
