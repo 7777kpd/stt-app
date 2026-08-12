@@ -108,6 +108,7 @@
   .week-load-zone-tag { position: absolute; left: 2px; top: -6px; font-size: 6px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
   .week-load-num { font-size: 10px; font-weight: 700; }
   .week-load-num-sys { font-size: 9px; font-weight: 700; color: var(--blue); }
+  .week-load-num-sys.low { color: var(--red-dark); font-weight: 800; }
   .week-load-zone-days { border-top: none; padding-top: 2px; }
   .week-load-day { font-size: 9px; color: var(--ink-soft); font-weight: 600; }
   .week-load-legend { font-size: 8px; color: var(--ink-soft); text-align: center; margin-top: 8px; opacity: .8; }
@@ -273,13 +274,18 @@ function renderRouteCard(a, rank) {
   const avgLine = a.daily_avg || 0;
   const avgLinePct = Math.round(avgLine / maxLoad * 100);
   const weekShortMap = {'понедельник':'Пн','вторник':'Вт','среда':'Ср','четверг':'Чт','пятница':'Пт','суббота':'Сб','воскресенье':'Вс'};
+  // Критерий подсветки столбика (11.08.2026, по просьбе): не порог ±30% от
+  // среднего, а просто 2 САМЫХ НИЗКИХ дня по визитам — те, что реально
+  // стоит перераспределить в первую очередь.
+  const sortedCounts = [...counts].sort((x,y) => x-y);
+  const lowThreshold = sortedCounts[1]; // 2-е по величине снизу = граница "двух худших"
   const weeklyLoadHtml = `<div class="week-load-block">
     <div class="week-load-label">План посещений по дням недели</div>
     <div class="week-load-bars" style="position:relative">
       <div class="week-load-avg-line" style="bottom:${avgLinePct}%"><span class="week-load-avg-num">${avgLine}</span></div>
       ${weekEntries.map(([d, v]) => {
         const h = Math.round(v.avg_count/maxLoad*100);
-        const off = v.avg_count > avgLine*1.3 || v.avg_count < avgLine*0.7;
+        const off = v.avg_count <= lowThreshold;
         return `<div class="week-load-col">
           <div class="week-load-bar-wrap"><div class="week-load-bar ${off?'off':''}" style="height:${h}%"></div></div>
         </div>`;
@@ -291,13 +297,14 @@ function renderRouteCard(a, rank) {
     <div class="week-load-zone week-load-zone-system">
       ${weekEntries.map(([d, v], j) => {
         const pctTxt = v.system_pct != null ? v.system_pct + '%' : '—';
-        return `<div class="week-load-col-lbl">${j===0?'<span class=\"week-load-zone-tag\">система</span>':''}<span class="week-load-num-sys">${pctTxt}</span></div>`;
+        // Критерий (11.08.2026, по просьбе): красным и жирным — система < 75%.
+        const low = v.system_pct != null && v.system_pct < 75;
+        return `<div class="week-load-col-lbl">${j===0?'<span class=\"week-load-zone-tag\">система</span>':''}<span class="week-load-num-sys ${low?'low':''}">${pctTxt}</span></div>`;
       }).join('')}
     </div>
     <div class="week-load-zone week-load-zone-days">
       ${weekEntries.map(([d]) => `<div class="week-load-col-lbl"><span class="week-load-day">${weekShortMap[d] || d.slice(0,2)}</span></div>`).join('')}
     </div>
-    <div class="week-load-legend">пунктир (${avgLine}) — средний план визитов в день (план÷рабочие дни)</div>
   </div>`;
 
   return `<details class="route-card">
