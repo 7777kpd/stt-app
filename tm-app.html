@@ -132,6 +132,11 @@
 
   .day-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
   .day-card h3 { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .02em; }
+  .collapsible-card summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  .collapsible-card summary::-webkit-details-marker { display: none; }
+  .collapsible-card summary::after { content: '▶'; font-size: 11px; color: var(--ink-soft); }
+  .collapsible-card[open] summary::after { content: '▼'; }
+  .collapsible-card summary h3 { margin: 0; }
   .day-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .day-tile { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
   .day-tile .val { font-size: 18px; font-weight: 800; }
@@ -422,11 +427,7 @@ function renderDay(data) {
       ${catsChips || avgChip ? `<div class="sv-cats-row">${catsChips}${avgChip}</div>` : ''}
     </div>`;
   }).join('');
-  const catsHtml = (data.categories || []).map(c => barRow(c.name, c.orders, c.total, c.pct)).join('');
-  const top5BarsHtml = (data.top5_today || []).map(a => {
-    const pct = a.month_need_orders ? Math.round(a.month_orders / a.month_need_orders * 100) : 0;
-    return barRow(a.agent, a.month_orders, a.month_need_orders, pct);
-  }).join('');
+  const catsHtml = (data.categories || []).slice().sort((a,b) => b.pct - a.pct).map(c => barRow(c.name, c.orders, c.total, c.pct)).join('');
 
   const top5Html = data.top5_focus_ready
     ? (data.top5_today || []).map((a, agentIdx) => {
@@ -514,13 +515,15 @@ function renderDay(data) {
       <h3>Итог по территории</h3>
       <div class="day-grid">
         <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.system_orders} <span style="color:var(--red-dark);font-size:11px">−${data.off_route_orders}</span></div><div class="lbl">заказов</div></div>
+        <div class="day-tile"><div class="val">${data.system_orders}</div><div class="lbl">заказов<span style="color:var(--red-dark)"> · ${data.off_route_orders} вне</span></div></div>
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
         <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
       </div>
     </div>
-    <div class="day-card"><h3>Категории</h3>${catsHtml || '<div class="empty">Нет данных</div>'}</div>
-    <div class="day-card"><h3>ТОП-5 маршрутов</h3>${top5BarsHtml || '<div class="empty">Нет данных</div>'}</div>
+    <details class="day-card collapsible-card">
+      <summary><h3 style="display:inline">Категории</h3></summary>
+      <div style="margin-top:10px">${catsHtml || '<div class="empty">Нет данных</div>'}</div>
+    </details>
     <div class="day-card"><h3>По супервайзерам</h3>${svsHtml || '<div class="empty">Нет данных</div>'}</div>
     <div class="sub" style="margin:14px 0 10px">ТОП-5 сегодня</div>
     ${top5Html}`;
