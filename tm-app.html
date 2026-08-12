@@ -139,9 +139,9 @@
   .day-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
   .day-card h3 { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .02em; }
   .collapsible-card summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
-  .collapsible-card summary::-webkit-details-marker { display: none; }
-  .collapsible-card summary::after { content: '▶'; font-size: 11px; color: var(--ink-soft); }
-  .collapsible-card[open] summary::after { content: '▼'; }
+  .collapsible-card > summary::-webkit-details-marker { display: none; }
+  .collapsible-card > summary::after { content: '▶'; font-size: 11px; color: var(--ink-soft); }
+  .collapsible-card[open] > summary::after { content: '▼'; }
   .collapsible-card summary h3 { margin: 0; }
   .day-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .day-tile { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
