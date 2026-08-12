@@ -152,10 +152,18 @@
   .bar-row-pct { font-size: 13px; font-weight: 800; width: 38px; text-align: right; flex-shrink: 0; }
 
   details.agent-day-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; overflow: hidden; }
-  details.agent-day-card summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; }
+  details.agent-day-card summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
   details.agent-day-card summary::-webkit-details-marker { display: none; }
   .adc-name { font-size: 13px; font-weight: 700; }
   .adc-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
+  .status-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+  .status-badge.ok { background: var(--green-bg); color: var(--green); }
+  .status-badge.bad { background: var(--red-bg); color: var(--red-dark); }
+  .top5-summary-badges { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+  .top5-count { font-size: 12px; font-weight: 700; }
+  .top5-count.ok { color: var(--green); }
+  .top5-count.bad { color: var(--red-dark); }
+  .focus-sv-ok { background: var(--green-bg); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--green); }
   .adc-body { padding: 0 14px 14px; }
   .adc-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
   .adc-metric { flex: 1 1 30%; background: var(--bg); border-radius: 9px; padding: 8px 4px; text-align: center; min-width: 0; }
@@ -398,6 +406,12 @@ function renderDay(data) {
   // СВ ("Категории" на sv-app.html) — переиспользуется для всех трёх
   // блоков (Категории/ТОП-5 маршрутов/По супервайзерам), а не три разных
   // визуальных языка на одном экране.
+  // 13.08.2026: единый значок выполнения — кружок ✓/✗ вместо эмодзи,
+  // используется в сводке ТОП-5, у каждого агента и в Фокус СВ.
+  function badge(ok) {
+    return `<span class="status-badge ${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</span>`;
+  }
+
   function barRow(label, done, total, pct) {
     const color = pct >= 75 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--red-dark)';
     return `<div class="bar-row">
@@ -431,49 +445,29 @@ function renderDay(data) {
 
   const top5Html = data.top5_focus_ready
     ? (data.top5_today || []).map((a, agentIdx) => {
-        const levelOrder = ['Не АКБ', 'АКБ', 'СТТ'];
-        const levelClassMap = {'СТТ': 'green', 'АКБ': 'yellow', 'Не АКБ': 'red'};
-        const aid = `a${agentIdx}`;
+        // 13.08.2026: критерий "выполнил" — ЗАКАЗЫ сегодня относительно
+        // нормы, даже если план визитов не выполнен (заказы важнее самих
+        // визитов — это то, ради чего вообще всё считается).
+        const ok = a.orders_today >= a.orders_target;
 
-        const tabsHtml = levelOrder.map((lvl, i) => {
-          const count = (a.points_by_level && a.points_by_level[lvl] || []).length;
-          return `<button class="lvl-tab lvl-tab-${levelClassMap[lvl]} ${i === 0 ? 'active' : ''}" data-aid="${aid}" data-lvl="${lvl}" onclick="switchLevelTab(this)">${lvl} · ${count}</button>`;
-        }).join('');
-
-        const groupsHtml = levelOrder.map((lvl, i) => {
-          const pts = (a.points_by_level && a.points_by_level[lvl]) || [];
-          const rows = pts.map(p => {
-            const dots = p.sequence.map(had => `<span class="visit-dot ${had ? 'yes' : 'no'}"></span>`).join('');
-            const catsHtml = Object.entries(p.cat_stts || {}).map(([cat, val]) => {
-              if (val === null || val === undefined) return `<span class="cat-chip none">${cat.slice(0,4)} —</span>`;
-              const cls = val >= 75 ? 'good' : 'bad';
-              return `<span class="cat-chip ${cls}">${cat.slice(0,4)} ${val}%</span>`;
-            }).join('');
-            return `<div class="point-row">
-              <div class="point-info">
-                <div class="point-client">${p.name}${p.in_focus_sv ? ' <span style="color:var(--red-dark)">⚠</span>' : ''}</div>
-                <div class="point-addr">${p.address}</div>
-                <div class="visit-dots">${dots}${catsHtml}</div>
-              </div>
-              <div class="point-pct-wrap"><span class="point-pct">${p.pct}%</span><span class="point-pct-lbl">система</span></div>
-            </div>`;
-          }).join('') || '<div class="empty" style="padding:8px 0;font-size:11px">Нет точек</div>';
-          return `<div class="lvl-panel" data-aid="${aid}" data-lvl="${lvl}" style="display:${i === 0 ? 'block' : 'none'}">${rows}</div>`;
-        }).join('');
-
-        const focusSvHtml = (a.focus_sv && a.focus_sv.length)
+        const focusList = a.focus_sv || [];
+        const focusDone = focusList.filter(fp => fp.had_order).length;
+        const focusSvHtml = focusList.length
           ? `<details class="focus-sv-block">
-              <summary class="focus-sv-head"><span>👁 Фокус СВ · ${a.focus_sv.length}</span><span class="rc-chevron">▶</span></summary>
-              ${a.focus_sv.map(fp => `
+              <summary class="focus-sv-head">
+                <span>👁 Фокус СВ · ${focusDone}/${focusList.length} сделано</span>
+                <span class="rc-chevron">▶</span>
+              </summary>
+              ${focusList.map(fp => `
                 <div class="point-row">
-                  <span class="${fp.had_order ? 'check-yes' : 'check-no'}">${fp.had_order ? '✓' : '✗'}</span>
+                  ${badge(fp.had_order)}
                   <div class="point-info">
                     <div class="point-client">${fp.name}</div>
                     <div class="point-addr">${fp.address} · ${fp.missed_streak} пропусков подряд</div>
                   </div>
                 </div>`).join('')}
             </details>`
-          : '';
+          : `<div class="focus-sv-ok">${badge(true)}<span>Фокус СВ · нет проблемных точек</span></div>`;
 
         function factorTile(actual, target, label) {
           const diff = actual - target;
@@ -490,7 +484,8 @@ function renderDay(data) {
 
         return `<details class="agent-day-card">
           <summary>
-            <div><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
+            ${badge(ok)}
+            <div style="flex:1;min-width:0"><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
             <span class="rc-chevron">▶</span>
           </summary>
           <div class="adc-body">
@@ -503,12 +498,13 @@ function renderDay(data) {
               <div class="adc-metric"><div class="val">${a.today_clean_pct}%</div><div class="lbl">чистая</div></div>
             </div>
             ${focusSvHtml}
-            <div class="lvl-tabs">${tabsHtml}</div>
-            ${groupsHtml}
           </div>
         </details>`;
       }).join('')
     : '<div class="empty" style="padding:12px 0">Итоги прошлого месяца ещё не закрыты — ТОП-5 недоступен</div>';
+
+  const top5GreenCount = data.top5_focus_ready ? (data.top5_today || []).filter(a => a.orders_today >= a.orders_target).length : 0;
+  const top5RedCount = data.top5_focus_ready ? (data.top5_today || []).length - top5GreenCount : 0;
 
   return `${periodSwitch}
     <div class="day-card">
@@ -524,9 +520,17 @@ function renderDay(data) {
       <summary><h3 style="display:inline">Категории</h3></summary>
       <div style="margin-top:10px">${catsHtml || '<div class="empty">Нет данных</div>'}</div>
     </details>
-    <div class="day-card"><h3>По супервайзерам</h3>${svsHtml || '<div class="empty">Нет данных</div>'}</div>
-    <div class="sub" style="margin:14px 0 10px">ТОП-5 сегодня</div>
-    ${top5Html}`;
+    <details class="day-card collapsible-card">
+      <summary><h3 style="display:inline">По супервайзерам</h3></summary>
+      <div style="margin-top:10px">${svsHtml || '<div class="empty">Нет данных</div>'}</div>
+    </details>
+    <details class="day-card collapsible-card" open>
+      <summary>
+        <h3 style="display:inline">ТОП-5 сегодня</h3>
+        <div class="top5-summary-badges">${badge(true)}<span class="top5-count ok">${top5GreenCount}</span>${badge(false)}<span class="top5-count bad">${top5RedCount}</span></div>
+      </summary>
+      <div style="margin-top:12px">${top5Html}</div>
+    </details>`;
 }
 
 async function loadDay(period) {
