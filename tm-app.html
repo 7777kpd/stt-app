@@ -151,6 +151,10 @@
   .best-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
   .best-name { font-size: 16px; font-weight: 800; }
   .best-pct { font-size: 22px; font-weight: 800; color: var(--green); }
+  .rating-delta { font-size: 11px; font-weight: 700; }
+  .rating-delta.up { color: var(--green); }
+  .rating-delta.down { color: var(--red-dark); }
+  .rating-delta.neutral { color: var(--ink-soft); font-weight: 600; }
   .best-sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
   .best-chips { display: flex; gap: 6px; flex-wrap: wrap; }
   .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
@@ -650,9 +654,20 @@ function renderMonth(data) {
   function ratingCard(r, rank) {
     const isBest = rank === 1;
     const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
+    let deltaHtml = '';
+    if (r.delta !== null && r.delta !== undefined) {
+      const up = r.delta >= 0;
+      const sign = up ? '+' : '';
+      deltaHtml = `<span class="rating-delta ${up?'up':'down'}">${sign}${r.delta.toFixed(1)}%</span>`;
+    } else if (data.is_current_month) {
+      deltaHtml = `<span class="rating-delta neutral">впервые в рейтинге</span>`;
+    }
     return `<div class="${isBest ? 'best-card' : 'day-card'}">
       ${isBest ? `<p class="best-label">Лучший результат — ${data.month}</p>` : `<p class="card-label" style="margin-bottom:8px">#${rank}</p>`}
-      <div class="best-head"><span class="best-name">${isAgent ? r.agent : r.sv}</span><span class="best-pct" style="${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span></div>
+      <div class="best-head">
+        <span class="best-name">${isAgent ? r.agent : r.sv}</span>
+        <div style="text-align:right"><span class="best-pct" style="display:block;${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span>${deltaHtml}</div>
+      </div>
       <p class="best-sub">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
       <div class="best-chips">${chips}</div>
     </div>`;
