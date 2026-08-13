@@ -640,13 +640,16 @@ function renderMonth(data) {
 
   function ratingCard(r, rank) {
     const isBest = rank === 1;
-    const off = r.off > 0 ? '−' + r.off : '—';
     const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
     return `<div class="${isBest ? 'best-card' : 'day-card'}">
       ${isBest ? `<p class="best-label">Лучший результат — ${data.month}</p>` : `<p class="card-label" style="margin-bottom:8px">#${rank}</p>`}
       <div class="best-head"><span class="best-name">${isAgent ? r.agent : r.sv}</span><span class="best-pct" style="${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span></div>
-      <p class="best-sub">План ${r.plan} · Заказы ${r.orders} · Вне <span style="color:var(--red-dark)">${off}</span></p>
-      <p class="best-sub" style="margin-bottom:8px">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
+      <div class="day-grid" style="margin:10px 0">
+        <div class="day-tile"><div class="val">${r.plan}</div><div class="lbl">план</div></div>
+        <div class="day-tile"><div class="val">${r.orders}</div><div class="lbl">заказы</div></div>
+        <div class="day-tile"><div class="val">${r.system_pct.toFixed(1)}%</div><div class="lbl">системная</div></div>
+        <div class="day-tile"><div class="val">${r.clean_pct.toFixed(1)}%</div><div class="lbl">чистая</div></div>
+      </div>
       <div class="best-chips">${chips}</div>
     </div>`;
   }
@@ -656,18 +659,19 @@ function renderMonth(data) {
   return `
     <div class="top-row"><span></span><span class="month-pill">${data.month}</span></div>
     <div class="period-switch">
-      <button class="period-btn ${currentMonthPeriod==='current'?'active':''}" onclick="loadMonth('current')">Текущий (накопительно)</button>
+      <button class="period-btn ${currentMonthPeriod==='current'?'active':''}" onclick="loadMonth('current')">Текущий месяц</button>
       <button class="period-btn ${currentMonthPeriod==='prev'?'active':''}" onclick="loadMonth('prev')">Прошлый месяц</button>
     </div>
     <div class="day-card">
-      <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <span class="card-label">Итог по территории</span>
-        <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${data.planned_visits} плановых визитов</span>
-      </div>
+      <h3>Итог по территории</h3>
       ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
+      <div class="day-grid">
+        <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
+        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+      </div>
       <div class="day-tiles-row">
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
-        <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне</span></span>
+        <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>
         <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
       </div>
     </div>
