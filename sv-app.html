@@ -595,63 +595,69 @@ function renderStt(data) {
     </div>`;
   }).join('');
 
-  // Рейтинг
-  const ratingRows = (data.rating || []).map(r => {
-    const shortName = r.agent.split(' ').slice(0, 2).join(' ');
-    const netColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
-    const dotColor = netColor;
-    const off = r.off > 0 ? '−' + r.off : '—';
-    return '<tr style="border-bottom:0.5px solid var(--line)">' +
-      '<td style="padding:9px 8px;text-align:left"><span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>' + shortName + '</td>' +
-      '<td style="padding:9px 8px;text-align:right">' + (r.visits != null ? r.visits : '—') + '</td>' +
-      '<td style="padding:9px 8px;text-align:right">' + (r.orders != null ? r.orders : '—') + '</td>' +
-      '<td style="padding:9px 8px;text-align:right;color:var(--red)">' + off + '</td>' +
-      '<td style="padding:9px 8px;text-align:right;font-weight:800;color:' + netColor + '">' + r.net + '%</td>' +
-      '</tr>';
-  }).join('');
-  const ratingHtml = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed"><colgroup><col style="width:40%"><col style="width:15%"><col style="width:15%"><col style="width:15%"><col style="width:15%"></colgroup><thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Визиты</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th><th style="padding:7px 8px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Чистая</th></tr></thead><tbody>' + ratingRows + '</tbody></table>';
-
-  // Категории по каждому торговому (текущий период) — до 3 колонок под мобильную ширину
-  // + колонка "Средняя" (среднее по ВСЕМ категориям агента, не только по видимым) —
-  // по ней и сортируем таблицу, лучший по категориям агент — сверху
-  const catNames = (data.categories || []).map(c => c.name).slice(0, 3);
-  let catsTableHtml = '';
-  if (catNames.length) {
-    const catHeadCells = catNames.map(n =>
-      `<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${n}</th>`
-    ).join('') + '<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Средняя</th>';
-
-    const rowsWithAvg = (data.rating || []).map(r => {
-      const allVals = Object.values(r.categories || {});
-      const avg = allVals.length ? Math.round(allVals.reduce((a,b) => a+b, 0) / allVals.length) : null;
-      return { r, avg };
-    });
-    rowsWithAvg.sort((a, b) => (b.avg ?? -1) - (a.avg ?? -1));
-
-    const catRows = rowsWithAvg.map(({r, avg}) => {
-      const shortName = r.agent.split(' ').slice(0, 2).join(' ');
-      const dotColor = r.dot === 'green' ? 'var(--green)' : r.dot === 'red' ? 'var(--red)' : 'var(--yellow)';
-      const dotHtml = '<span style="width:8px;height:8px;border-radius:50%;background:' + dotColor + ';display:inline-block;margin-right:6px;vertical-align:middle"></span>';
-      const cells = catNames.map(n => {
-        const v = (r.categories || {})[n];
-        if (v == null) return '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>';
-        const color = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--yellow)' : 'var(--red)';
-        return `<td style="padding:7px 6px;text-align:right;color:${color};font-weight:700">${v}%</td>`;
-      }).join('');
-      const avgCell = avg == null
-        ? '<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>'
-        : `<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avg>=75?'var(--green)':avg>=50?'var(--yellow)':'var(--red)'}">${avg}%</td>`;
-      return `<tr style="border-bottom:0.5px solid var(--line)"><td style="padding:9px 8px;text-align:left">${dotHtml}${shortName}</td>${cells}${avgCell}</tr>`;
-    }).join('');
-    catsTableHtml = `
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:14px 0 6px;">Категории — текущий период</div>
-      <div class="card" style="padding:6px 0">
-        <table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
-          <thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Торговый</th>${catHeadCells}</tr></thead>
-          <tbody>${catRows}</tbody>
-        </table>
-      </div>`;
+  // Рейтинг — 13.08.2026: карточки вместо двух таблиц, тот же паттерн, что
+  // уже сделан для ТМ (Итоги месяца) — единый балл (avg_score, среднее
+  // системная+чистая+категории), дельта к прошлому месяцу, "Глаз ТМ"
+  // (если этот торговый попал в ТОП-5 фокуса своего территориального
+  // менеджера — показать ту же формулу, что видна ТМ на "Маршрут").
+  function svBadge(ok) {
+    return `<span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:11px;font-weight:800;flex-shrink:0;background:${ok?'var(--green-bg)':'var(--red-bg)'};color:${ok?'var(--green)':'var(--red-dark)'}">${ok?'✓':'✗'}</span>`;
   }
+
+  function tmFocusBlock(tf) {
+    if (!tf) return '';
+    return `<details style="background:var(--amber-bg);border-radius:10px;margin-top:10px;overflow:hidden">
+      <summary style="list-style:none;cursor:pointer;padding:10px 12px;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:12px;font-weight:700;color:var(--amber)">👁 Глаз ТМ — в фокусе территории</span>
+        <span style="font-size:11px;color:var(--amber)">▶</span>
+      </summary>
+      <div style="padding:0 12px 12px;font-size:11px">
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(217,138,61,.15)"><span style="color:var(--amber);opacity:.85">План визитов (мес)</span><span style="font-weight:700;color:var(--amber)">${tf.plan}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(217,138,61,.15)"><span style="color:var(--amber);opacity:.85">Средний по команде</span><span style="font-weight:700;color:var(--amber)">${tf.team_average_plan}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(217,138,61,.15)"><span style="color:var(--amber);opacity:.85">Требуемый план заказов = ${tf.base}×75%</span><span style="font-weight:700;color:var(--amber)">${tf.need_orders}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(217,138,61,.15)"><span style="color:var(--amber);opacity:.85">Заказов по факту</span><span style="font-weight:700;color:var(--amber)">${tf.orders}</span></div>
+        <div style="display:flex;justify-content:space-between;padding-top:6px;margin-top:2px;font-size:12px"><span style="font-weight:800;color:var(--amber)">Дефицит заказов</span><span style="font-weight:800;color:var(--red-dark);font-size:14px">${tf.deficit_orders}</span></div>
+      </div>
+    </details>`;
+  }
+
+  function svRatingCard(r, rank) {
+    const isBest = rank === 1;
+    const color = r.avg_score >= 75 ? 'var(--green)' : r.avg_score >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const chips = Object.entries(r.categories || {}).map(([name, v]) => {
+      const c = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--yellow)' : 'var(--red)';
+      const bg = v >= 75 ? 'var(--green-bg)' : 'var(--yellow-bg)';
+      return `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${bg};color:${c}">${name} ${v}%</span>`;
+    }).join('');
+    let deltaHtml = '';
+    if (r.delta !== null && r.delta !== undefined) {
+      const up = r.delta >= 0;
+      deltaHtml = `<span style="font-size:11px;font-weight:700;color:${up?'var(--green)':'var(--red-dark)'}">${up?'+':''}${r.delta}%</span>`;
+    } else if (data.is_current_month) {
+      deltaHtml = `<span style="font-size:11px;font-weight:600;color:var(--ink-soft)">впервые в рейтинге</span>`;
+    }
+    return `<div class="card" style="padding:16px;margin-bottom:10px;${isBest?'background:var(--green-bg)':''}">
+      ${isBest ? `<p style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;margin:0 0 8px">Лучший результат — ${data.month || ''}</p>` : `<p style="font-size:11px;font-weight:700;color:var(--ink-soft);margin:0 0 8px">#${rank}</p>`}
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:${isBest?16:15}px;font-weight:800">${r.agent}</span>
+        <div style="text-align:right"><span style="display:block;font-size:${isBest?22:18}px;font-weight:800;color:${isBest?'var(--green)':'var(--ink)'}">${r.avg_score}%</span>${deltaHtml}</div>
+      </div>
+      <p style="font-size:13px;color:var(--ink-soft);margin:8px 0">Системная ${r.sys}% · Чистая ${r.net}% · Вне ${r.off > 0 ? '−' + r.off : '—'}</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+      ${tmFocusBlock(r.tm_focus)}
+    </div>`;
+  }
+
+  function renderSvRatingCards() {
+    const rows = data.rating || [];
+    const visible = Math.min(window._svRatingVisible || 5, rows.length);
+    const cards = rows.slice(0, visible).map((r, i) => svRatingCard(r, i + 1)).join('');
+    const showMore = visible < rows.length
+      ? `<button onclick="showMoreSvRating()" style="display:block;width:100%;font-size:13px;font-weight:700;padding:12px;border-radius:12px;border:1px dashed var(--ink-soft);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:inherit;margin-top:4px">+5 (ещё ${rows.length - visible})</button>`
+      : '';
+    return (cards || '<div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px">Нет данных</div>') + showMore;
+  }
+  window.renderSvRatingCards = renderSvRatingCards;
 
   // Тренд по неделям
   const weeks = data.trend_weekdays || data.trend_weeks || [];
@@ -777,10 +783,7 @@ function renderStt(data) {
     </div>
 
     <div id="view-rating" class="sub-view active">
-      <div class="card" style="padding:6px 0">
-        ${ratingHtml}
-      </div>
-      ${catsTableHtml}
+      ${renderSvRatingCards()}
     </div>
 
     <div id="view-trend" class="sub-view">
@@ -788,6 +791,12 @@ function renderStt(data) {
         <div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Загрузка...</div>
       </div>
     </div>`;
+}
+
+function showMoreSvRating() {
+  window._svRatingVisible = (window._svRatingVisible || 5) + 5;
+  const el = document.getElementById('view-rating');
+  if (el && window.renderSvRatingCards) el.innerHTML = window.renderSvRatingCards();
 }
 
 function sttView(name) {
