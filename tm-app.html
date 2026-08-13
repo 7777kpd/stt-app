@@ -145,6 +145,7 @@
   .rating-toggle { display: flex; gap: 6px; margin: 14px 0 10px; }
   .rating-toggle button { flex: 1; font-size: 13px; font-weight: 700; padding: 10px; border-radius: 9px; border: none; font-family: inherit; cursor: pointer; background: transparent; color: var(--ink-soft); }
   .rating-toggle button.active { background: var(--card); color: var(--ink); }
+  .show-more-btn { display: block; width: 100%; font-size: 13px; font-weight: 700; padding: 12px; border-radius: 12px; border: 1px dashed var(--ink-soft); background: transparent; color: var(--ink-soft); cursor: pointer; font-family: inherit; margin-top: 4px; }
   .best-card { background: var(--green-bg); border-radius: 16px; padding: 16px; margin-bottom: 10px; }
   .best-label { font-size: 10px; font-weight: 700; color: var(--green); text-transform: uppercase; margin: 0 0 8px; }
   .best-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
@@ -587,6 +588,13 @@ async function loadDay(period) {
 
 let currentMonthPeriod = 'current';
 let currentRatingTab = 'agents';
+let ratingVisibleCount = 5;
+
+function showMoreRating() {
+  ratingVisibleCount += 5;
+  const data = monthCache[currentMonthPeriod];
+  if (data) document.getElementById('mainContent').innerHTML = renderMonth(data);
+}
 const monthCache = {};
 
 function ratingRow(r, isAgent) {
@@ -630,6 +638,7 @@ function categoriesRatingTable(rows, isAgent) {
 
 function switchRatingTab(tab) {
   currentRatingTab = tab;
+  ratingVisibleCount = 5;
   const data = monthCache[currentMonthPeriod];
   if (data) document.getElementById('mainContent').innerHTML = renderMonth(data);
 }
@@ -644,17 +653,21 @@ function renderMonth(data) {
     return `<div class="${isBest ? 'best-card' : 'day-card'}">
       ${isBest ? `<p class="best-label">Лучший результат — ${data.month}</p>` : `<p class="card-label" style="margin-bottom:8px">#${rank}</p>`}
       <div class="best-head"><span class="best-name">${isAgent ? r.agent : r.sv}</span><span class="best-pct" style="${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span></div>
-      <div class="day-grid" style="margin:10px 0">
-        <div class="day-tile"><div class="val">${r.plan}</div><div class="lbl">план</div></div>
-        <div class="day-tile"><div class="val">${r.orders}</div><div class="lbl">заказы</div></div>
-        <div class="day-tile"><div class="val">${r.system_pct.toFixed(1)}%</div><div class="lbl">системная</div></div>
-        <div class="day-tile"><div class="val">${r.clean_pct.toFixed(1)}%</div><div class="lbl">чистая</div></div>
-      </div>
+      <p class="best-sub">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
       <div class="best-chips">${chips}</div>
     </div>`;
   }
 
-  const ratingCards = rows.length ? rows.map((r, i) => ratingCard(r, i + 1)).join('') : '<div class="empty">Нет данных</div>';
+  // 13.08.2026: "Рейтинг торговых" может быть длинным (десятки агентов) —
+  // показываем по 5 с кнопкой "+5" вместо всего списка разом. "Рейтинг
+  // СВ" короткий (несколько человек) — показывается целиком.
+  const visibleCount = isAgent ? Math.min(ratingVisibleCount, rows.length) : rows.length;
+  const ratingCards = rows.length
+    ? rows.slice(0, visibleCount).map((r, i) => ratingCard(r, i + 1)).join('')
+    : '<div class="empty">Нет данных</div>';
+  const showMoreBtn = (isAgent && visibleCount < rows.length)
+    ? `<button class="show-more-btn" onclick="showMoreRating()">+5 (ещё ${rows.length - visibleCount})</button>`
+    : '';
 
   return `
     <div class="top-row"><span></span><span class="month-pill">${data.month}</span></div>
@@ -684,11 +697,13 @@ function renderMonth(data) {
       <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
     </div>
     ${ratingCards}
+    ${showMoreBtn}
   `;
 }
 
 async function loadMonth(period) {
   currentMonthPeriod = period;
+  ratingVisibleCount = 5;
   if (monthCache[period]) {
     document.getElementById('mainContent').innerHTML = renderMonth(monthCache[period]);
     return;
