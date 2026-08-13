@@ -138,6 +138,23 @@
 
   .day-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
   .day-card h3 { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .02em; }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .month-pill { background: var(--card); border-radius: 100px; padding: 6px 14px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .card-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; }
+  .card-note { font-size: 11px; color: var(--ink-soft); margin: 4px 0 0; }
+  .rating-toggle { display: flex; gap: 6px; margin: 14px 0 10px; }
+  .rating-toggle button { flex: 1; font-size: 13px; font-weight: 700; padding: 10px; border-radius: 9px; border: none; font-family: inherit; cursor: pointer; background: transparent; color: var(--ink-soft); }
+  .rating-toggle button.active { background: var(--card); color: var(--ink); }
+  .best-card { background: var(--green-bg); border-radius: 16px; padding: 16px; margin-bottom: 10px; }
+  .best-label { font-size: 10px; font-weight: 700; color: var(--green); text-transform: uppercase; margin: 0 0 8px; }
+  .best-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .best-name { font-size: 16px; font-weight: 800; }
+  .best-pct { font-size: 22px; font-weight: 800; color: var(--green); }
+  .best-sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
+  .best-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+  .chip.good { background: var(--green-bg); color: var(--green); }
+  .chip.bad { background: var(--yellow-bg); color: var(--amber); }
   .collapsible-card summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
   .collapsible-card > summary::-webkit-details-marker { display: none; }
   .collapsible-card > summary::after { content: '▶'; font-size: 11px; color: var(--ink-soft); }
@@ -228,6 +245,7 @@
     <div class="tabbar" id="tabbar">
       <button class="tab active" data-screen="route" onclick="switchScreen('route')"><span class="icon">🗺️</span>Маршрут</button>
       <button class="tab" data-screen="day" onclick="switchScreen('day')"><span class="icon">📋</span>Итоги дня</button>
+      <button class="tab" data-screen="month" onclick="switchScreen('month')"><span class="icon">📊</span>Итоги месяца</button>
     </div>
   </div>
 </div>
@@ -383,9 +401,12 @@ function switchScreen(screen) {
   if (screen === 'route') {
     document.getElementById('topTitle').textContent = 'Маршрут';
     loadRoute();
-  } else {
+  } else if (screen === 'day') {
     document.getElementById('topTitle').textContent = 'Итоги дня';
     loadDay(currentPeriod);
+  } else {
+    document.getElementById('topTitle').textContent = 'Итоги месяца';
+    loadMonth(currentMonthPeriod);
   }
 }
 
@@ -561,6 +582,138 @@ async function loadDay(period) {
     document.getElementById('mainContent').innerHTML = renderDay(data);
   } catch (e) {
     document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить итоги дня</div>';
+  }
+}
+
+let currentMonthPeriod = 'current';
+let currentRatingTab = 'agents';
+const monthCache = {};
+
+function ratingRow(r, isAgent) {
+  const color = r.avg_score >= 75 ? 'var(--green)' : r.avg_score >= 50 ? 'var(--amber)' : 'var(--red-dark)';
+  const off = r.off > 0 ? '−' + r.off : '—';
+  const name = isAgent ? r.agent : r.sv;
+  return `<tr>
+    <td style="padding:9px 8px;text-align:left"><span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;margin-right:6px;vertical-align:middle"></span>${name}</td>
+    <td style="padding:9px 6px;text-align:right">${r.plan}</td>
+    <td style="padding:9px 6px;text-align:right">${r.orders}</td>
+    <td style="padding:9px 6px;text-align:right;color:var(--red-dark)">${off}</td>
+    <td style="padding:9px 6px;text-align:right;font-weight:800;color:${color}">${r.avg_score}%</td>
+  </tr>`;
+}
+
+function categoriesRatingTable(rows, isAgent) {
+  if (!rows.length) return '<div class="empty">Нет данных</div>';
+  const allCats = [...new Set(rows.flatMap(r => r.categories.map(c => c.name)))];
+  const withCatAvg = rows.map(r => {
+    const avg = r.categories.length ? r.categories.reduce((s,c) => s + c.pct, 0) / r.categories.length : 0;
+    return {r, avg: Math.round(avg * 10) / 10};
+  }).sort((a,b) => b.avg - a.avg);
+  const headCells = allCats.map(n => `<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${n}</th>`).join('')
+    + `<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Средняя</th>`;
+  const trs = withCatAvg.map(({r, avg}) => {
+    const name = isAgent ? r.agent : r.sv;
+    const cellsByName = Object.fromEntries(r.categories.map(c => [c.name, c.pct]));
+    const cells = allCats.map(n => {
+      const v = cellsByName[n];
+      if (v === undefined) return `<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>`;
+      const color = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--amber)' : 'var(--red-dark)';
+      return `<td style="padding:7px 6px;text-align:right;color:${color};font-weight:700">${v}%</td>`;
+    }).join('');
+    const avgColor = avg >= 75 ? 'var(--green)' : avg >= 50 ? 'var(--amber)' : 'var(--red-dark)';
+    return `<tr><td style="padding:9px 8px;text-align:left">${name}</td>${cells}<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avgColor}">${avg}%</td></tr>`;
+  }).join('');
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
+    <thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Имя</th>${headCells}</tr></thead>
+    <tbody>${trs}</tbody></table>`;
+}
+
+function switchRatingTab(tab) {
+  currentRatingTab = tab;
+  const data = monthCache[currentMonthPeriod];
+  if (data) document.getElementById('mainContent').innerHTML = renderMonth(data);
+}
+
+function renderMonth(data) {
+  const rows = currentRatingTab === 'agents' ? (data.rating.agents || []) : (data.rating.svs || []);
+  const isAgent = currentRatingTab === 'agents';
+  const best = rows[0];
+
+  const bestHtml = best ? `<div class="best-card">
+    <p class="best-label">Лучший результат — ${data.month}</p>
+    <div class="best-head"><span class="best-name">${isAgent ? best.agent : best.sv}</span><span class="best-pct">${best.avg_score}%</span></div>
+    <p class="best-sub">Системная ${best.system_pct}% · Чистая ${best.clean_pct}%</p>
+    <div class="best-chips">${best.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct}%</span>`).join('')}</div>
+  </div>` : '<div class="empty">Нет данных</div>';
+
+  const mainRows = rows.map(r => ratingRow(r, isAgent)).join('');
+  const mainTable = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
+    <thead><tr style="border-bottom:1px solid var(--line)">
+      <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${isAgent?'Торговый':'СВ'}</th>
+      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">План</th>
+      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th>
+      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th>
+      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Балл</th>
+    </tr></thead><tbody>${mainRows}</tbody></table>` : '<div class="empty">Нет данных</div>';
+
+  return `
+    <div class="top-row"><p style="font-size:13px;font-weight:700;margin:0">Итоги месяца</p><span class="month-pill">${data.month}</span></div>
+    <div class="period-switch">
+      <button class="period-btn ${currentMonthPeriod==='current'?'active':''}" onclick="loadMonth('current')">Текущий (накопительно)</button>
+      <button class="period-btn ${currentMonthPeriod==='prev'?'active':''}" onclick="loadMonth('prev')">Прошлый месяц</button>
+    </div>
+    <div class="day-card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="card-label">Итог по территории</span>
+        <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${data.planned_visits} плановых визитов</span>
+      </div>
+      ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
+      <div class="tiles-row" style="margin-top:10px">
+        <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
+        <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне</span></span>
+        <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
+      </div>
+    </div>
+    <div class="day-card">
+      <span class="card-label">Продажи по категориям</span>
+      <div style="margin-top:10px">${(data.categories||[]).map(c => `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:var(--green)"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:var(--green)">${c.pct}%</span></div></div>`).join('') || '<div class="empty">Нет данных</div>'}</div>
+    </div>
+    <div class="rating-toggle">
+      <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
+      <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
+    </div>
+    ${bestHtml}
+    <div class="day-card" style="padding:16px 6px"><span class="card-label" style="padding:0 10px;display:block;margin-bottom:6px">Полный рейтинг</span>${mainTable}</div>
+    <div class="day-card" style="padding:16px 6px"><span class="card-label" style="padding:0 10px;display:block;margin-bottom:6px">Категории — сортировка по средней</span>${categoriesRatingTable(rows, isAgent)}</div>
+  `;
+}
+
+async function loadMonth(period) {
+  currentMonthPeriod = period;
+  if (monthCache[period]) {
+    document.getElementById('mainContent').innerHTML = renderMonth(monthCache[period]);
+    return;
+  }
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const today = new Date();
+    let m = today.getMonth() + 1, y = today.getFullYear();
+    if (period === 'prev') {
+      m = m > 1 ? m - 1 : 12;
+      y = m === 12 ? y - 1 : y;
+    }
+    const [summaryRes, ratingRes] = await Promise.all([
+      fetch(`${API}/api/tm/${currentTelegramId}/month?month=${m}&year=${y}`),
+      fetch(`${API}/api/tm/${currentTelegramId}/month-rating?month=${m}&year=${y}`),
+    ]);
+    if (!summaryRes.ok || !ratingRes.ok) throw new Error('bad response');
+    const summary = await summaryRes.json();
+    const ratingData = await ratingRes.json();
+    const merged = { ...summary, rating: { agents: ratingData.agents, svs: ratingData.svs } };
+    monthCache[period] = merged;
+    document.getElementById('mainContent').innerHTML = renderMonth(merged);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить итоги месяца</div>';
   }
 }
 
