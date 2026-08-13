@@ -598,7 +598,7 @@ function ratingRow(r, isAgent) {
     <td style="padding:9px 6px;text-align:right">${r.plan}</td>
     <td style="padding:9px 6px;text-align:right">${r.orders}</td>
     <td style="padding:9px 6px;text-align:right;color:var(--red-dark)">${off}</td>
-    <td style="padding:9px 6px;text-align:right;font-weight:800;color:${color}">${r.avg_score}%</td>
+    <td style="padding:9px 6px;text-align:right;font-weight:800;color:${color}">${r.avg_score.toFixed(1)}%</td>
   </tr>`;
 }
 
@@ -618,10 +618,10 @@ function categoriesRatingTable(rows, isAgent) {
       const v = cellsByName[n];
       if (v === undefined) return `<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>`;
       const color = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--amber)' : 'var(--red-dark)';
-      return `<td style="padding:7px 6px;text-align:right;color:${color};font-weight:700">${v}%</td>`;
+      return `<td style="padding:7px 6px;text-align:right;color:${color};font-weight:700">${v.toFixed(1)}%</td>`;
     }).join('');
     const avgColor = avg >= 75 ? 'var(--green)' : avg >= 50 ? 'var(--amber)' : 'var(--red-dark)';
-    return `<tr><td style="padding:9px 8px;text-align:left">${name}</td>${cells}<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avgColor}">${avg}%</td></tr>`;
+    return `<tr><td style="padding:9px 8px;text-align:left">${name}</td>${cells}<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avgColor}">${avg.toFixed(1)}%</td></tr>`;
   }).join('');
   return `<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
     <thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Имя</th>${headCells}</tr></thead>
@@ -637,27 +637,24 @@ function switchRatingTab(tab) {
 function renderMonth(data) {
   const rows = currentRatingTab === 'agents' ? (data.rating.agents || []) : (data.rating.svs || []);
   const isAgent = currentRatingTab === 'agents';
-  const best = rows[0];
 
-  const bestHtml = best ? `<div class="best-card">
-    <p class="best-label">Лучший результат — ${data.month}</p>
-    <div class="best-head"><span class="best-name">${isAgent ? best.agent : best.sv}</span><span class="best-pct">${best.avg_score}%</span></div>
-    <p class="best-sub">Системная ${best.system_pct}% · Чистая ${best.clean_pct}%</p>
-    <div class="best-chips">${best.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct}%</span>`).join('')}</div>
-  </div>` : '<div class="empty">Нет данных</div>';
+  function ratingCard(r, rank) {
+    const isBest = rank === 1;
+    const off = r.off > 0 ? '−' + r.off : '—';
+    const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
+    return `<div class="${isBest ? 'best-card' : 'day-card'}">
+      ${isBest ? `<p class="best-label">Лучший результат — ${data.month}</p>` : `<p class="card-label" style="margin-bottom:8px">#${rank}</p>`}
+      <div class="best-head"><span class="best-name">${isAgent ? r.agent : r.sv}</span><span class="best-pct" style="${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span></div>
+      <p class="best-sub">План ${r.plan} · Заказы ${r.orders} · Вне <span style="color:var(--red-dark)">${off}</span></p>
+      <p class="best-sub" style="margin-bottom:8px">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
+      <div class="best-chips">${chips}</div>
+    </div>`;
+  }
 
-  const mainRows = rows.map(r => ratingRow(r, isAgent)).join('');
-  const mainTable = rows.length ? `<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
-    <thead><tr style="border-bottom:1px solid var(--line)">
-      <th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${isAgent?'Торговый':'СВ'}</th>
-      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">План</th>
-      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Заказы</th>
-      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Вне</th>
-      <th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Балл</th>
-    </tr></thead><tbody>${mainRows}</tbody></table>` : '<div class="empty">Нет данных</div>';
+  const ratingCards = rows.length ? rows.map((r, i) => ratingCard(r, i + 1)).join('') : '<div class="empty">Нет данных</div>';
 
   return `
-    <div class="top-row"><p style="font-size:13px;font-weight:700;margin:0">Итоги месяца</p><span class="month-pill">${data.month}</span></div>
+    <div class="top-row"><span></span><span class="month-pill">${data.month}</span></div>
     <div class="period-switch">
       <button class="period-btn ${currentMonthPeriod==='current'?'active':''}" onclick="loadMonth('current')">Текущий (накопительно)</button>
       <button class="period-btn ${currentMonthPeriod==='prev'?'active':''}" onclick="loadMonth('prev')">Прошлый месяц</button>
@@ -668,7 +665,7 @@ function renderMonth(data) {
         <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">${data.planned_visits} плановых визитов</span>
       </div>
       ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
-      <div class="tiles-row" style="margin-top:10px">
+      <div class="day-tiles-row">
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
         <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне</span></span>
         <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
@@ -682,9 +679,7 @@ function renderMonth(data) {
       <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
       <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
     </div>
-    ${bestHtml}
-    <div class="day-card" style="padding:16px 6px"><span class="card-label" style="padding:0 10px;display:block;margin-bottom:6px">Полный рейтинг</span>${mainTable}</div>
-    <div class="day-card" style="padding:16px 6px"><span class="card-label" style="padding:0 10px;display:block;margin-bottom:6px">Категории — сортировка по средней</span>${categoriesRatingTable(rows, isAgent)}</div>
+    ${ratingCards}
   `;
 }
 
