@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>СТТ — Территориальный менеджер</title>
+<style>
+  /* 13.08.2026: -webkit-details-marker скрывает нативную стрелку только
+     в Safari/Chrome-семействе — стандартный ::marker (др. движки/версии)
+     отдельно, иначе у вложенных <details> вылезает вторая стрелка поверх
+     нашего собственного rc-chevron/span-индикатора. */
+  summary::marker { display: none; content: ''; }
+  summary::-webkit-details-marker { display: none; }
+  :root {
+    --bg: #F0EADC;
+    --card: #FFFFFF;
+    --ink: #2C2A26;
+    --ink-soft: #8B8578;
+    --line: #ECE6D8;
+    --green: #3FAE6A;
+    --green-bg: #E6F4EC;
+    --yellow: #E2A335;
+    --yellow-bg: #FBF1DF;
+    --red: #DC5B4E;
+    --red-bg: #FAE7E4;
+    --red-dark: #A93B30;
+    --amber: #D98A3D;
+    --amber-bg: #F8EBDB;
+    --blue: #3B7DDB;
+    --blue-bg: #E7EFFB;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  .phone {
+    width: 100%; max-width: 480px; background: var(--bg);
+    height: 100dvh; display: flex; flex-direction: column;
+  }
+  .topbar { padding: 22px 20px 14px; display: flex; align-items: baseline; justify-content: space-between; flex-shrink: 0; }
+  .topbar h1 { font-size: 20px; font-weight: 700; margin: 0; }
+  .top-pill { font-size: 13px; color: var(--ink-soft); background: var(--card); border-radius: 100px; padding: 6px 12px; font-weight: 600; }
+  .content { padding: 4px 16px 24px; overflow-y: auto; flex: 1; }
+  .tabbar { display: flex; background: var(--card); border-top: 1px solid var(--line); padding: 9px 4px 14px; flex-shrink: 0; }
+  .tab { flex: 1; text-align: center; font-size: 10px; font-weight: 700; color: var(--ink-soft); background: none; border: none; font-family: inherit; cursor: pointer; padding: 6px 2px 0; }
+  .tab.active { color: var(--ink); }
+  .tab .icon { width: 26px; height: 26px; margin: 0 auto 4px; border-radius: 8px; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .tab.active .icon { background: #D9CFAE; }
+  .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 40px 16px; color: var(--ink-soft); font-size: 14px; }
+
+  /* ============ ЭКРАН МАРШРУТ (ТМ) — ТОП-5 в фокусе ============ */
+  .sub { font-size: 12px; color: var(--ink-soft); font-weight: 600; margin: -4px 0 14px; }
+
+  details.route-card {
+    background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden;
+    border: 1px solid var(--line);
+  }
+  details.route-card[open] {
+    margin: 14px 0; box-shadow: 0 6px 18px rgba(60,50,20,.10);
+  }
+  details.route-card summary {
+    list-style: none; cursor: pointer; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  details.route-card summary::-webkit-details-marker { display: none; }
+  .rc-name { font-size: 14px; font-weight: 700; }
+  .rc-sub { font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
+  .rc-right { display: flex; align-items: center; gap: 10px; }
+  .rc-deficit { text-align: right; }
+  .rc-deficit .num { font-size: 18px; font-weight: 800; color: var(--red-dark); line-height: 1.1; }
+  .rc-deficit .lbl { font-size: 9px; color: var(--red-dark); opacity: .8; }
+  .rc-chevron { font-size: 13px; color: var(--ink-soft); transition: transform .15s; }
+  details[open] .rc-chevron { transform: rotate(90deg); }
+
+  .rc-body { padding: 0 16px 16px; }
+  .rc-tiles { display: flex; gap: 5px; margin-bottom: 14px; align-items: stretch; }
+  .rc-tile { flex: 1; background: var(--bg); border-radius: 9px; padding: 7px 3px; text-align: center; min-width: 0; }
+  .rc-tile .val { font-size: 13px; font-weight: 800; }
+  .rc-tile .lbl { font-size: 8px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+  .rc-tile .sub { font-size: 7px; color: var(--ink-soft); opacity: .75; margin: 1px 0 0; font-weight: 500; }
+  .rc-off { align-self: center; font-size: 10px; font-weight: 800; color: var(--red-dark); white-space: nowrap; }
+
+  .formula-toggle { cursor: pointer; background: var(--blue-bg); border-left: 3px solid var(--blue); border-radius: 10px; padding: 10px 12px; }
+  .formula-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--blue); }
+  .formula-body { margin-top: 8px; display: none; }
+  .formula-toggle.open .formula-body { display: block; }
+  .frow { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid rgba(59,125,219,.12); font-size: 11px; }
+  .frow:last-of-type { border-bottom: none; }
+  .frow span:first-child { color: var(--blue); opacity: .8; }
+  .frow span:last-child { font-weight: 700; color: var(--blue); }
+  .frow.total { padding-top: 6px; border-top: 1px solid rgba(59,125,219,.25); margin-top: 4px; font-size: 12px; }
+  .frow.total span:last-child { color: var(--red-dark); font-size: 14px; }
+
+  .rest-toggle { text-align: center; padding: 12px 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); cursor: pointer; }
+  .rest-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .rest-row span:last-child { color: var(--ink-soft); font-weight: 600; }
+
+  .week-load-block { margin-bottom: 4px; }
+  .week-load-label { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-bottom: 8px; }
+  .week-load-bars { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px; height: 56px; }
+  .week-load-avg-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--blue); opacity: .7; }
+  .week-load-avg-num { position: absolute; right: 0; top: -14px; font-size: 8px; font-weight: 800; color: var(--blue); background: var(--card); padding: 0 3px; border-radius: 4px; }
+  .week-load-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; position: relative; z-index: 1; }
+  .week-load-bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
+  .week-load-bar { width: 100%; background: var(--ink-soft); opacity: .35; border-radius: 3px 3px 0 0; min-height: 2px; }
+  .week-load-bar.off { background: var(--red); opacity: .7; }
+  .week-load-zone { display: flex; justify-content: space-between; gap: 4px; padding: 5px 0; border-top: 1px solid var(--line); }
+  .week-load-col-lbl { flex: 1; text-align: center; position: relative; min-width: 0; }
+  .week-load-zone-tag { position: absolute; left: 2px; top: -6px; font-size: 6px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; white-space: nowrap; }
+  .week-load-num { font-size: 10px; font-weight: 700; }
+  .week-load-num-sys { font-size: 9px; font-weight: 700; color: var(--blue); }
+  .week-load-num-sys.low { color: var(--red-dark); font-weight: 800; }
+  .week-load-zone-days { border-top: none; padding-top: 2px; }
+  .week-load-day { font-size: 9px; color: var(--ink-soft); font-weight: 600; }
+  .week-load-legend { font-size: 8px; color: var(--ink-soft); text-align: center; margin-top: 8px; opacity: .8; }
+
+  .history-toggle { cursor: pointer; background: var(--bg); border-radius: 10px; padding: 10px 12px; margin-top: 8px; }
+  .history-head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .history-body { margin-top: 10px; display: none; }
+  .history-toggle.open .history-body { display: block; }
+  .history-days { display: flex; gap: 6px; justify-content: space-between; }
+  .history-day { text-align: center; }
+  .history-day .dot { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; margin: 0 auto 4px; }
+  .history-day .dot.done { background: var(--green-bg); color: var(--green); }
+  .history-day .dot.miss { background: var(--red-bg); color: var(--red-dark); }
+  .history-day .lbl { font-size: 9px; color: var(--ink-soft); font-weight: 600; }
+  .history-summary { text-align: center; font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-top: 10px; }
+
+  /* ============ ЭКРАН ИТОГИ ДНЯ (ТМ) ============ */
+  .period-switch { display: flex; gap: 6px; margin-bottom: 14px; }
+  .period-btn { flex: 1; font-size: 11px; font-weight: 700; padding: 8px 4px; border-radius: 9px; border: none; background: var(--card); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
+  .period-btn.active { background: var(--ink); color: #fff; }
+
+  .day-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .day-card h3 { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 0 0 10px; text-transform: uppercase; letter-spacing: .02em; }
+  .top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .month-pill { background: var(--card); border-radius: 100px; padding: 6px 14px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+  .card-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; }
+  .card-note { font-size: 11px; color: var(--ink-soft); margin: 4px 0 0; }
+  .rating-toggle { display: flex; gap: 6px; margin: 14px 0 10px; }
+  .rating-toggle button { flex: 1; font-size: 13px; font-weight: 700; padding: 10px; border-radius: 9px; border: none; font-family: inherit; cursor: pointer; background: transparent; color: var(--ink-soft); }
+  .rating-toggle button.active { background: var(--card); color: var(--ink); }
+  .show-more-btn { display: block; width: 100%; font-size: 13px; font-weight: 700; padding: 12px; border-radius: 12px; border: 1px dashed var(--ink-soft); background: transparent; color: var(--ink-soft); cursor: pointer; font-family: inherit; margin-top: 4px; }
+  .best-card { background: var(--green-bg); border-radius: 16px; padding: 16px; margin-bottom: 10px; }
+  .best-label { font-size: 10px; font-weight: 700; color: var(--green); text-transform: uppercase; margin: 0 0 8px; }
+  .best-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .best-name { font-size: 16px; font-weight: 800; }
+  .best-pct { font-size: 22px; font-weight: 800; color: var(--green); }
+  .rating-delta { font-size: 11px; font-weight: 700; }
+  .rating-delta.up { color: var(--green); }
+  .rating-delta.down { color: var(--red-dark); }
+  .rating-delta.neutral { color: var(--ink-soft); font-weight: 600; }
+  .best-sub { font-size: 12px; color: var(--ink-soft); margin: 0 0 8px; }
+  .best-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+  .chip.good { background: var(--green-bg); color: var(--green); }
+  .chip.bad { background: var(--yellow-bg); color: var(--amber); }
+  .collapsible-card summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; }
+  .collapsible-card > summary::-webkit-details-marker { display: none; }
+  .collapsible-card > summary::after { content: '▶'; font-size: 11px; color: var(--ink-soft); }
+  .collapsible-card[open] > summary::after { content: '▼'; }
+  .collapsible-card summary h3 { margin: 0; }
+  .day-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .day-tiles-row { display: flex; gap: 5px; align-items: center; margin-top: 10px; }
+  .day-tiles-row .day-tile { flex: 1; }
+  .day-off { align-self: center; font-size: 11px; font-weight: 800; color: var(--red-dark); white-space: nowrap; text-align: center; line-height: 1.3; }
+  .day-tile { background: var(--bg); border-radius: 10px; padding: 10px; text-align: center; }
+  .day-tile .val { font-size: 18px; font-weight: 800; }
+  .day-tile .lbl { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+
+  .bar-row { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .bar-row:last-child { border-bottom: none; }
+  .bar-row-label { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .bar-row-track-wrap { display: flex; align-items: center; gap: 8px; }
+  .bar-row-track { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+  .bar-row-fill { height: 100%; border-radius: 4px; }
+  .bar-row-count { font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+  .bar-row-pct { font-size: 13px; font-weight: 800; width: 38px; text-align: right; flex-shrink: 0; }
+
+  details.agent-day-card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 8px; overflow: hidden; }
+  details.agent-day-card summary { list-style: none; cursor: pointer; padding: 12px 14px; display: flex; align-items: center; gap: 10px; }
+  details.agent-day-card summary::-webkit-details-marker { display: none; }
+  .adc-name { font-size: 13px; font-weight: 700; }
+  .adc-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-left: 4px; }
+  .status-badge { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+  .status-badge.ok { background: var(--green-bg); color: var(--green); }
+  .status-badge.bad { background: var(--red-bg); color: var(--red-dark); }
+  .top5-summary-badges { display: flex; align-items: center; gap: 5px; margin-left: auto; }
+  .top5-count { font-size: 12px; font-weight: 700; }
+  .top5-count.ok { color: var(--green); }
+  .top5-count.bad { color: var(--red-dark); }
+  .focus-sv-ok { background: var(--green-bg); border-radius: 10px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--green); }
+  .adc-body { padding: 0 14px 14px; }
+  .adc-metrics { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .adc-metric { flex: 1 1 30%; background: var(--bg); border-radius: 9px; padding: 8px 4px; text-align: center; min-width: 0; }
+  .adc-metric .val { font-size: 14px; font-weight: 800; }
+  .adc-metric .delta { font-size: 9px; font-weight: 700; margin-top: 1px; }
+  .adc-metric .lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; line-height: 1.2; }
+  .level-bar { height: 6px; border-radius: 3px; overflow: hidden; display: flex; margin-bottom: 4px; }
+  .level-bar-labels { display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; margin-bottom: 10px; }
+  .point-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; font-size: 12px; border-bottom: 1px solid var(--line); }
+  .point-row:last-child { border-bottom: none; }
+  .point-info { flex: 1; min-width: 0; }
+  .point-client { color: var(--ink); font-weight: 600; }
+  .point-addr { color: var(--ink-soft); font-size: 10px; margin-top: 1px; }
+  .point-pct-wrap { flex-shrink: 0; text-align: right; }
+  .point-pct { font-size: 13px; font-weight: 800; display: block; }
+  .point-pct-lbl { font-size: 7px; color: var(--ink-soft); font-weight: 600; }
+  .visit-dots { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; align-items: center; }
+  .visit-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .visit-dot.yes { background: var(--green); }
+  .visit-dot.no { background: var(--line); border: 1px solid var(--ink-soft); }
+  .cat-chip { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 6px; }
+  .cat-chip.good { background: var(--green-bg); color: var(--green); }
+  .cat-chip.bad { background: var(--yellow-bg); color: var(--amber); }
+  .cat-chip.none { background: var(--line); color: var(--ink-soft); }
+  .cat-chip.avg { background: var(--blue-bg); color: var(--blue); font-weight: 800; }
+  .sv-cats-row { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .lvl-tabs { display: flex; gap: 6px; margin: 4px 0 10px; }
+  .lvl-tab { flex: 1; font-size: 10px; font-weight: 700; padding: 7px 4px; border-radius: 8px; border: none; background: var(--bg); color: var(--ink-soft); cursor: pointer; font-family: inherit; }
+  .lvl-tab.active.lvl-tab-green { background: var(--green-bg); color: var(--green); }
+  .lvl-tab.active.lvl-tab-yellow { background: var(--yellow-bg); color: var(--amber); }
+  .lvl-tab.active.lvl-tab-red { background: var(--red-bg); color: var(--red-dark); }
+  details.focus-sv-block { background: var(--red-bg); border-radius: 10px; padding: 0; margin-bottom: 10px; overflow: hidden; }
+  details.focus-sv-block[open] { padding: 8px 10px; }
+  .focus-sv-head { list-style: none; cursor: pointer; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--red-dark); }
+  details.focus-sv-block[open] .focus-sv-head { padding: 0 0 6px; }
+  .focus-sv-head::-webkit-details-marker { display: none; }
+  details.focus-sv-block[open] .rc-chevron { transform: rotate(90deg); }
+  .focus-sv-block .point-row { border-bottom: 1px solid rgba(169,59,48,.12); }
+  .check-yes { color: var(--green); font-weight: 800; }
+  .check-no { color: var(--red-dark); font-weight: 800; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="phone">
+    <div class="topbar">
+      <h1 id="topTitle">Загрузка...</h1>
+      <div class="top-pill" id="topPill" style="display:none"></div>
+    </div>
+    <div class="content" id="mainContent">
+      <div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>
+    </div>
+    <div class="tabbar" id="tabbar">
+      <button class="tab active" data-screen="route" onclick="switchScreen('route')"><span class="icon">🗺️</span>Маршрут</button>
+      <button class="tab" data-screen="day" onclick="switchScreen('day')"><span class="icon">📋</span>Итоги дня</button>
+      <button class="tab" data-screen="month" onclick="switchScreen('month')"><span class="icon">📊</span>Итоги месяца</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
+
+function getTelegramId() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('id')) return p.get('id');
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
+    return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  return null;
+}
+
+function toggleFormula(el, ev) {
+  ev.stopPropagation();
+  el.classList.toggle('open');
+}
+
+let currentTelegramId = null;
+const historyCache = {};
+
+async function toggleHistory(cardId, agentName, ev) {
+  ev.stopPropagation();
+  const toggle = document.getElementById(`hist-${cardId}`);
+  const body = document.getElementById(`hist-body-${cardId}`);
+  const wasOpen = toggle.classList.contains('open');
+  toggle.classList.toggle('open');
+  if (wasOpen) return;
+
+  if (historyCache[agentName]) {
+    body.innerHTML = renderHistoryDots(historyCache[agentName]);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/api/tm/${currentTelegramId}/route-history?agent=${encodeURIComponent(agentName)}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    historyCache[agentName] = data.history;
+    body.innerHTML = renderHistoryDots(data.history);
+  } catch (e) {
+    body.innerHTML = '<div class="empty" style="padding:10px 0">Не удалось загрузить историю</div>';
+  }
+}
+
+function renderHistoryDots(history) {
+  const doneCount = history.filter(d => d.completed).length;
+  const days = history.map(d => `
+    <div class="history-day">
+      <div class="dot ${d.completed ? 'done' : 'miss'}">${d.completed ? '✓' : '✗'}</div>
+      <div class="lbl">${d.weekday.slice(0, 2)}</div>
+    </div>`).join('');
+  return `<div class="history-days">${days}</div>
+    <div class="history-summary">${doneCount} из ${history.length} дней — задача выполнена</div>`;
+}
+
+function renderRouteCard(a, rank) {
+  const cardId = rank;
+
+  const weekEntries = Object.entries(a.weekly_load || {});
+  const counts = weekEntries.map(([,v]) => v.avg_count);
+  const maxLoad = Math.max(...counts, a.daily_avg || 0, 1);
+  const avgLine = a.daily_avg || 0;
+  const avgLinePct = Math.round(avgLine / maxLoad * 100);
+  const weekShortMap = {'понедельник':'Пн','вторник':'Вт','среда':'Ср','четверг':'Чт','пятница':'Пт','суббота':'Сб','воскресенье':'Вс'};
+  // Критерий подсветки столбика (11.08.2026, по просьбе): не порог ±30% от
+  // среднего, а просто 2 САМЫХ НИЗКИХ дня по визитам — те, что реально
+  // стоит перераспределить в первую очередь.
+  const sortedCounts = [...counts].sort((x,y) => x-y);
+  const lowThreshold = sortedCounts[1]; // 2-е по величине снизу = граница "двух худших"
+  const weeklyLoadHtml = `<div class="week-load-block">
+    <div class="week-load-label">План посещений по дням недели</div>
+    <div class="week-load-bars" style="position:relative">
+      <div class="week-load-avg-line" style="bottom:${avgLinePct}%"><span class="week-load-avg-num">${avgLine}</span></div>
+      ${weekEntries.map(([d, v]) => {
+        const h = Math.round(v.avg_count/maxLoad*100);
+        const off = v.avg_count <= lowThreshold;
+        return `<div class="week-load-col">
+          <div class="week-load-bar-wrap"><div class="week-load-bar ${off?'off':''}" style="height:${h}%"></div></div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="week-load-zone week-load-zone-visits">
+      ${weekEntries.map(([d, v], j) => `<div class="week-load-col-lbl">${j===0?'<span class=\"week-load-zone-tag\">визитов (ср)</span>':''}<span class="week-load-num">${v.avg_count}</span></div>`).join('')}
+    </div>
+    <div class="week-load-zone week-load-zone-system">
+      ${weekEntries.map(([d, v], j) => {
+        const pctTxt = v.system_pct != null ? v.system_pct + '%' : '—';
+        // Критерий (11.08.2026, по просьбе): красным и жирным — система < 75%.
+        const low = v.system_pct != null && v.system_pct < 75;
+        return `<div class="week-load-col-lbl">${j===0?'<span class=\"week-load-zone-tag\">система</span>':''}<span class="week-load-num-sys ${low?'low':''}">${pctTxt}</span></div>`;
+      }).join('')}
+    </div>
+    <div class="week-load-zone week-load-zone-days">
+      ${weekEntries.map(([d]) => `<div class="week-load-col-lbl"><span class="week-load-day">${weekShortMap[d] || d.slice(0,2)}</span></div>`).join('')}
+    </div>
+  </div>`;
+
+  return `<details class="route-card">
+    <summary>
+      <div><span class="rc-name">${rank} · ${a.agent}</span><span class="rc-sub">${a.sv || ''}</span></div>
+      <div class="rc-right">
+        <div class="rc-deficit"><div class="num">${a.deficit_orders}</div><div class="lbl">дефицит заказов</div></div>
+        <span class="rc-chevron">▶</span>
+      </div>
+    </summary>
+    <div class="rc-body">
+      <div class="formula-toggle" onclick="toggleFormula(this, event)">
+        <div class="formula-head"><span>Как посчитали ${a.deficit_orders}?</span><span>▾</span></div>
+        <div class="formula-body">
+          <div class="frow"><span>План визитов (мес)</span><span>${a.plan}</span></div>
+          <div class="frow"><span>Средний по команде</span><span>${a.team_average_plan}</span></div>
+          <div class="frow"><span>Требуемый план заказов = ${a.base}×75%</span><span>${a.need_orders}</span></div>
+          <div class="frow"><span>Заказов по факту</span><span>${a.orders}</span></div>
+          <div class="frow total"><span>Дефицит заказов</span><span>${a.deficit_orders}</span></div>
+          <div class="frow" style="border-top:1px dashed rgba(59,111,160,.3);margin-top:4px;padding-top:8px"><span>Плановых визитов в день = ${a.base}÷раб.дни</span><span>${a.daily_avg}</span></div>
+          <div class="frow"><span>Плановых заказов в день = ${a.need_orders}÷раб.дни</span><span>${a.daily_orders_avg}</span></div>
+        </div>
+      </div>
+      ${weeklyLoadHtml}
+    </div>
+  </details>`;
+}
+
+function renderRoute(data) {
+  if (!data.archive_ready) {
+    return `<div class="sub">ТОП-5 в фокусе · ${data.month}</div>
+      <div class="empty">Итоги ${data.month} ещё не закрыты — ТОП-5 появится после закрытия месяца.</div>`;
+  }
+
+  const top5Html = data.top5.map((a, i) => renderRouteCard(a, i + 1)).join('');
+  const restHtml = data.rest.length
+    ? `<div class="rest-toggle" onclick="document.getElementById('restList').style.display = document.getElementById('restList').style.display === 'none' ? 'block' : 'none'">Остальные маршруты (${data.rest.length}) ▾</div>
+       <div id="restList" style="display:none">
+         ${data.rest.map(a => `<div class="rest-row"><span>${a.agent}</span><span>дефицит ${a.deficit_orders}</span></div>`).join('')}
+       </div>`
+    : '';
+
+  return `<div class="sub">ТОП-5 в фокусе · ${data.month}</div>${top5Html}${restHtml}`;
+}
+
+let currentScreen = 'route';
+let currentPeriod = 'today';
+const dayCache = {};
+
+function switchScreen(screen) {
+  currentScreen = screen;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === screen));
+  if (screen === 'route') {
+    document.getElementById('topTitle').textContent = 'Маршрут';
+    loadRoute();
+  } else if (screen === 'day') {
+    document.getElementById('topTitle').textContent = 'Итоги дня';
+    loadDay(currentPeriod);
+  } else {
+    document.getElementById('topTitle').textContent = 'Итоги месяца';
+    loadMonth(currentMonthPeriod);
+  }
+}
+
+function switchLevelTab(btn) {
+  const aid = btn.dataset.aid;
+  const lvl = btn.dataset.lvl;
+  document.querySelectorAll(`.lvl-tab[data-aid="${aid}"]`).forEach(b => b.classList.toggle('active', b === btn));
+  document.querySelectorAll(`.lvl-panel[data-aid="${aid}"]`).forEach(p => {
+    p.style.display = p.dataset.lvl === lvl ? 'block' : 'none';
+  });
+}
+
+function levelClass(level) {
+  if (level === '🟢') return 'green';
+  if (level === '🟡') return 'yellow';
+  return 'red';
+}
+
+function renderDay(data) {
+  const periodSwitch = `<div class="period-switch">
+    <button class="period-btn ${currentPeriod === 'today' ? 'active' : ''}" onclick="loadDay('today')">Сегодня</button>
+    <button class="period-btn ${currentPeriod === 'prev' ? 'active' : ''}" onclick="loadDay('prev')">Вчера</button>
+    <button class="period-btn ${currentPeriod === 'week' ? 'active' : ''}" onclick="loadDay('week')">Неделя назад</button>
+  </div>`;
+
+  // 13.08.2026: единый рендер бара "N из M · %" в стиле реального экрана
+  // СВ ("Категории" на sv-app.html) — переиспользуется для всех трёх
+  // блоков (Категории/ТОП-5 маршрутов/По супервайзерам), а не три разных
+  // визуальных языка на одном экране.
+  // 13.08.2026: единый значок выполнения — кружок ✓/✗ вместо эмодзи,
+  // используется в сводке ТОП-5, у каждого агента и в Фокус СВ.
+  function badge(ok) {
+    return `<span class="status-badge ${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'}</span>`;
+  }
+
+  function barRow(label, done, total, pct) {
+    const color = pct >= 75 ? 'var(--green)' : pct >= 40 ? 'var(--amber)' : 'var(--red-dark)';
+    return `<div class="bar-row">
+      <div class="bar-row-label">${label}</div>
+      <div class="bar-row-track-wrap">
+        <div class="bar-row-track"><div class="bar-row-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div></div>
+        <span class="bar-row-count">${done} из ${total}</span>
+        <span class="bar-row-pct" style="color:${color}">${pct}%</span>
+      </div>
+    </div>`;
+  }
+
+  const svsHtml = (data.svs || []).map(s => {
+    const color = s.system_pct >= 75 ? 'var(--green)' : s.system_pct >= 40 ? 'var(--amber)' : 'var(--red-dark)';
+    const catsChips = (s.categories || []).map(c => {
+      const cls = c.pct >= 75 ? 'good' : 'bad';
+      return `<span class="cat-chip ${cls}">${c.name.slice(0,4)} ${c.pct}%</span>`;
+    }).join('');
+    const avgChip = s.avg_category != null ? `<span class="cat-chip avg">ср. ${s.avg_category}%</span>` : '';
+    return `<div class="bar-row">
+      <div class="bar-row-label">${s.sv}</div>
+      <div class="bar-row-track-wrap">
+        <div class="bar-row-track"><div class="bar-row-fill" style="width:${Math.min(s.system_pct,100)}%;background:${color}"></div></div>
+        <span class="bar-row-count">${s.orders} из ${s.plan}</span>
+        <span class="bar-row-pct" style="color:${color}">${s.system_pct}%</span>
+      </div>
+      ${catsChips || avgChip ? `<div class="sv-cats-row">${catsChips}${avgChip}</div>` : ''}
+    </div>`;
+  }).join('');
+  const catsHtml = (data.categories || []).slice().sort((a,b) => b.pct - a.pct).map(c => barRow(c.name, c.orders, c.total, c.pct)).join('');
+
+  const top5Html = data.top5_focus_ready
+    ? (data.top5_today || []).map((a, agentIdx) => {
+        // 13.08.2026: критерий "выполнил" — ЗАКАЗЫ сегодня относительно
+        // нормы, даже если план визитов не выполнен (заказы важнее самих
+        // визитов — это то, ради чего вообще всё считается).
+        const ok = a.orders_today >= a.orders_target;
+
+        const focusList = a.focus_sv || [];
+        const focusDone = focusList.filter(fp => fp.had_order).length;
+        const focusSvHtml = focusList.length
+          ? `<details class="focus-sv-block">
+              <summary class="focus-sv-head">
+                <span>👁 Фокус СВ · ${focusDone}/${focusList.length} сделано</span>
+                <span class="rc-chevron">▶</span>
+              </summary>
+              ${focusList.map(fp => `
+                <div class="point-row">
+                  ${badge(fp.had_order)}
+                  <div class="point-info">
+                    <div class="point-client">${fp.name}</div>
+                    <div class="point-addr">${fp.address} · ${fp.missed_streak} пропусков подряд</div>
+                  </div>
+                </div>`).join('')}
+            </details>`
+          : `<div class="focus-sv-ok">${badge(true)}<span>Фокус СВ · нет проблемных точек</span></div>`;
+
+        function factorTile(actual, target, label) {
+          const diff = actual - target;
+          const sign = diff >= 0 ? '+' : '';
+          const color = diff >= 0 ? 'var(--green)' : 'var(--red-dark)';
+          return `<div class="adc-metric">
+            <div style="display:flex;align-items:baseline;justify-content:center;gap:5px">
+              <span class="val">${actual}/${target}</span>
+              <span style="font-size:11px;font-weight:800;color:${color}">${sign}${diff}</span>
+            </div>
+            <div class="lbl">${label} · есть/нужно</div>
+          </div>`;
+        }
+
+        return `<details class="agent-day-card">
+          <summary>
+            ${badge(ok)}
+            <div style="flex:1;min-width:0"><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
+            <span class="rc-chevron">▶</span>
+          </summary>
+          <div class="adc-body">
+            <div class="adc-metrics">
+              ${factorTile(a.visits_today, a.visits_target, 'визиты')}
+              ${factorTile(a.orders_today, a.orders_target, 'заказы сегодня')}
+            </div>
+            <div class="adc-metrics">
+              <div class="adc-metric"><div class="val">${a.today_system_pct}%</div><div class="lbl">системная</div></div>
+              <div class="adc-metric"><div class="val">${a.today_clean_pct}%</div><div class="lbl">чистая</div></div>
+            </div>
+            ${focusSvHtml}
+          </div>
+        </details>`;
+      }).join('')
+    : '<div class="empty" style="padding:12px 0">Итоги прошлого месяца ещё не закрыты — ТОП-5 недоступен</div>';
+
+  const top5GreenCount = data.top5_focus_ready ? (data.top5_today || []).filter(a => a.orders_today >= a.orders_target).length : 0;
+  const top5RedCount = data.top5_focus_ready ? (data.top5_today || []).length - top5GreenCount : 0;
+
+  return `${periodSwitch}
+    <div class="day-card">
+      <h3>Итог по территории</h3>
+      <div class="day-grid">
+        <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
+        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+      </div>
+      <div class="day-tiles-row">
+        <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
+        <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>
+        <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
+      </div>
+    </div>
+    <details class="day-card collapsible-card">
+      <summary><h3 style="display:inline">Категории</h3></summary>
+      <div style="margin-top:10px">${catsHtml || '<div class="empty">Нет данных</div>'}</div>
+    </details>
+    <details class="day-card collapsible-card">
+      <summary><h3 style="display:inline">По супервайзерам</h3></summary>
+      <div style="margin-top:10px">${svsHtml || '<div class="empty">Нет данных</div>'}</div>
+    </details>
+    <details class="day-card collapsible-card">
+      <summary>
+        <h3 style="display:inline">ТОП-5 сегодня</h3>
+        <div class="top5-summary-badges">${badge(true)}<span class="top5-count ok">${top5GreenCount}</span>${badge(false)}<span class="top5-count bad">${top5RedCount}</span></div>
+      </summary>
+      <div style="margin-top:12px">${top5Html}</div>
+    </details>`;
+}
+
+async function loadDay(period) {
+  currentPeriod = period;
+  document.querySelectorAll('.period-btn').forEach(b => {});
+  if (dayCache[period]) {
+    document.getElementById('mainContent').innerHTML = renderDay(dayCache[period]);
+    return;
+  }
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const res = await fetch(`${API}/api/tm/${currentTelegramId}/day?period=${period}`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    dayCache[period] = data;
+    document.getElementById('mainContent').innerHTML = renderDay(data);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить итоги дня</div>';
+  }
+}
+
+let currentMonthPeriod = 'current';
+let currentRatingTab = 'agents';
+let ratingVisibleCount = 5;
+
+function showMoreRating() {
+  ratingVisibleCount += 5;
+  const data = monthCache[currentMonthPeriod];
+  if (data) document.getElementById('mainContent').innerHTML = renderMonth(data);
+}
+const monthCache = {};
+
+function ratingRow(r, isAgent) {
+  const color = r.avg_score >= 75 ? 'var(--green)' : r.avg_score >= 50 ? 'var(--amber)' : 'var(--red-dark)';
+  const off = r.off > 0 ? '−' + r.off : '—';
+  const name = isAgent ? r.agent : r.sv;
+  return `<tr>
+    <td style="padding:9px 8px;text-align:left"><span style="width:8px;height:8px;border-radius:50%;background:${color};display:inline-block;margin-right:6px;vertical-align:middle"></span>${name}</td>
+    <td style="padding:9px 6px;text-align:right">${r.plan}</td>
+    <td style="padding:9px 6px;text-align:right">${r.orders}</td>
+    <td style="padding:9px 6px;text-align:right;color:var(--red-dark)">${off}</td>
+    <td style="padding:9px 6px;text-align:right;font-weight:800;color:${color}">${r.avg_score.toFixed(1)}%</td>
+  </tr>`;
+}
+
+function categoriesRatingTable(rows, isAgent) {
+  if (!rows.length) return '<div class="empty">Нет данных</div>';
+  const allCats = [...new Set(rows.flatMap(r => r.categories.map(c => c.name)))];
+  const withCatAvg = rows.map(r => {
+    const avg = r.categories.length ? r.categories.reduce((s,c) => s + c.pct, 0) / r.categories.length : 0;
+    return {r, avg: Math.round(avg * 10) / 10};
+  }).sort((a,b) => b.avg - a.avg);
+  const headCells = allCats.map(n => `<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">${n}</th>`).join('')
+    + `<th style="padding:7px 6px;text-align:right;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Средняя</th>`;
+  const trs = withCatAvg.map(({r, avg}) => {
+    const name = isAgent ? r.agent : r.sv;
+    const cellsByName = Object.fromEntries(r.categories.map(c => [c.name, c.pct]));
+    const cells = allCats.map(n => {
+      const v = cellsByName[n];
+      if (v === undefined) return `<td style="padding:7px 6px;text-align:right;color:var(--ink-soft)">—</td>`;
+      const color = v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--amber)' : 'var(--red-dark)';
+      return `<td style="padding:7px 6px;text-align:right;color:${color};font-weight:700">${v.toFixed(1)}%</td>`;
+    }).join('');
+    const avgColor = avg >= 75 ? 'var(--green)' : avg >= 50 ? 'var(--amber)' : 'var(--red-dark)';
+    return `<tr><td style="padding:9px 8px;text-align:left">${name}</td>${cells}<td style="padding:7px 6px;text-align:right;font-weight:800;color:${avgColor}">${avg.toFixed(1)}%</td></tr>`;
+  }).join('');
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed">
+    <thead><tr style="border-bottom:1px solid var(--line)"><th style="padding:7px 8px;text-align:left;font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase">Имя</th>${headCells}</tr></thead>
+    <tbody>${trs}</tbody></table>`;
+}
+
+function switchRatingTab(tab) {
+  currentRatingTab = tab;
+  ratingVisibleCount = 5;
+  const data = monthCache[currentMonthPeriod];
+  if (data) document.getElementById('mainContent').innerHTML = renderMonth(data);
+}
+
+function renderMonth(data) {
+  const rows = currentRatingTab === 'agents' ? (data.rating.agents || []) : (data.rating.svs || []);
+  const isAgent = currentRatingTab === 'agents';
+
+  function ratingCard(r, rank) {
+    const isBest = rank === 1;
+    const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
+    let deltaHtml = '';
+    if (r.delta !== null && r.delta !== undefined) {
+      const up = r.delta >= 0;
+      const sign = up ? '+' : '';
+      deltaHtml = `<span class="rating-delta ${up?'up':'down'}">${sign}${r.delta.toFixed(1)}%</span>`;
+    } else if (data.is_current_month) {
+      deltaHtml = `<span class="rating-delta neutral">впервые в рейтинге</span>`;
+    }
+    return `<div class="${isBest ? 'best-card' : 'day-card'}">
+      ${isBest ? `<p class="best-label">Лучший результат — ${data.month}</p>` : `<p class="card-label" style="margin-bottom:8px">#${rank}</p>`}
+      <div class="best-head">
+        <span class="best-name">${isAgent ? r.agent : r.sv}</span>
+        <div style="text-align:right"><span class="best-pct" style="display:block;${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span>${deltaHtml}</div>
+      </div>
+      <p class="best-sub">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
+      <div class="best-chips">${chips}</div>
+    </div>`;
+  }
+
+  // 13.08.2026: "Рейтинг торговых" может быть длинным (десятки агентов) —
+  // показываем по 5 с кнопкой "+5" вместо всего списка разом. "Рейтинг
+  // СВ" короткий (несколько человек) — показывается целиком.
+  const visibleCount = isAgent ? Math.min(ratingVisibleCount, rows.length) : rows.length;
+  const ratingCards = rows.length
+    ? rows.slice(0, visibleCount).map((r, i) => ratingCard(r, i + 1)).join('')
+    : '<div class="empty">Нет данных</div>';
+  const showMoreBtn = (isAgent && visibleCount < rows.length)
+    ? `<button class="show-more-btn" onclick="showMoreRating()">+5 (ещё ${rows.length - visibleCount})</button>`
+    : '';
+
+  return `
+    <div class="top-row"><span></span><span class="month-pill">${data.month}</span></div>
+    <div class="period-switch">
+      <button class="period-btn ${currentMonthPeriod==='current'?'active':''}" onclick="loadMonth('current')">Текущий месяц</button>
+      <button class="period-btn ${currentMonthPeriod==='prev'?'active':''}" onclick="loadMonth('prev')">Прошлый месяц</button>
+    </div>
+    <div class="day-card">
+      <h3>Итог по территории</h3>
+      ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
+      <div class="day-grid">
+        <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
+        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+      </div>
+      <div class="day-tiles-row">
+        <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
+        <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>
+        <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
+      </div>
+    </div>
+    <div class="day-card">
+      <span class="card-label">Продажи по категориям</span>
+      <div style="margin-top:10px">${(data.categories||[]).map(c => `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:var(--green)"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:var(--green)">${c.pct}%</span></div></div>`).join('') || '<div class="empty">Нет данных</div>'}</div>
+    </div>
+    <div class="rating-toggle">
+      <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
+      <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
+    </div>
+    ${ratingCards}
+    ${showMoreBtn}
+  `;
+}
+
+async function loadMonth(period) {
+  currentMonthPeriod = period;
+  ratingVisibleCount = 5;
+  if (monthCache[period]) {
+    document.getElementById('mainContent').innerHTML = renderMonth(monthCache[period]);
+    return;
+  }
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const today = new Date();
+    let m = today.getMonth() + 1, y = today.getFullYear();
+    if (period === 'prev') {
+      m = m > 1 ? m - 1 : 12;
+      y = m === 12 ? y - 1 : y;
+    }
+    const [summaryRes, ratingRes] = await Promise.all([
+      fetch(`${API}/api/tm/${currentTelegramId}/month?month=${m}&year=${y}`),
+      fetch(`${API}/api/tm/${currentTelegramId}/month-rating?month=${m}&year=${y}`),
+    ]);
+    if (!summaryRes.ok || !ratingRes.ok) throw new Error('bad response');
+    const summary = await summaryRes.json();
+    const ratingData = await ratingRes.json();
+    const merged = { ...summary, rating: { agents: ratingData.agents, svs: ratingData.svs } };
+    monthCache[period] = merged;
+    document.getElementById('mainContent').innerHTML = renderMonth(merged);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить итоги месяца</div>';
+  }
+}
+
+async function loadRoute() {
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const res = await fetch(`${API}/api/tm/${currentTelegramId}/route`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    document.getElementById('mainContent').innerHTML = renderRoute(data);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршрут</div>';
+  }
+}
+
+async function main() {
+  const telegramId = getTelegramId();
+  currentTelegramId = telegramId;
+  if (!telegramId) {
+    document.getElementById('topTitle').textContent = 'Нет доступа';
+    document.getElementById('mainContent').innerHTML = '<div class="empty">Откройте через Telegram</div>';
+    return;
+  }
+  document.getElementById('topTitle').textContent = 'Маршрут';
+  await loadRoute();
+}
+
+main();
+</script>
+</body>
+</html>
