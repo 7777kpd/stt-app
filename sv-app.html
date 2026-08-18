@@ -777,6 +777,26 @@ function renderStt(data) {
       ${catsHtml ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:4px 0 8px;">Продажи по категориям</div>${catsHtml}` : ''}
     </div>
 
+    ${(() => {
+      const tGreen = data.green || 0, tYellow = data.yellow || 0, tRed = data.red || 0;
+      const tTotal = tGreen + tYellow + tRed;
+      if (!tTotal) return '';
+      const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
+      return `<div class="card">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-bottom:10px;">Территория</div>
+        <div style="display:flex;height:14px;border-radius:8px;overflow:hidden;margin-bottom:12px;">
+          <div style="width:${gp}%;background:var(--green)"></div>
+          <div style="width:${yp}%;background:var(--yellow)"></div>
+          <div style="width:${rp}%;background:var(--red)"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">СТТ</span><div style="font-size:15px;font-weight:800;color:var(--green)">${tGreen} <span style="font-size:11px;font-weight:600">(${gp}%)</span></div></div>
+          <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">АКБ</span><div style="font-size:15px;font-weight:800;color:var(--yellow)">${tYellow} <span style="font-size:11px;font-weight:600">(${yp}%)</span></div></div>
+          <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">Не АКБ</span><div style="font-size:15px;font-weight:800;color:var(--red)">${tRed} <span style="font-size:11px;font-weight:600">(${rp}%)</span></div></div>
+        </div>
+      </div>`;
+    })()}
+
     <div class="segment">
       <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг торговых</button>
       <button id="btn-trend" onclick="sttView('trend')">Рейтинг СВ</button>
