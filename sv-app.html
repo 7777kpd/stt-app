@@ -1215,7 +1215,12 @@ function renderDay(data) {
     const ptLabel = ptCount > 0 ? `контрольных точек: ${ptDone} из ${ptCount} сделано` : 'нет контрольных точек';
     const aTile = 'background:var(--bg);border-radius:8px;padding:7px 10px;text-align:center;';
     const tilesHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;"><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.planned}</div><div style="font-size:9px;color:var(--ink-soft)">визитов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.orders}</div><div style="font-size:9px;color:var(--ink-soft)">заказов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700;color:var(--red)">−${a.off_route || a.off || 0}</div><div style="font-size:9px;color:var(--ink-soft)">вне</div></div></div>`;
-    const pointsHtml = (a.control_points || []).map(p => {
+    const sortedPoints = [...(a.control_points || [])].sort((p1, p2) => {
+      const done1 = (p1.visited_today || p1.had_order || p1.visited) ? 1 : 0;
+      const done2 = (p2.visited_today || p2.had_order || p2.visited) ? 1 : 0;
+      return done2 - done1;
+    });
+    const pointsHtml = sortedPoints.map(p => {
       const result = (p.visited_today || p.had_order || p.visited) ? '<span style="color:var(--green);font-weight:700;font-size:14px">✓</span>' : '<span style="color:var(--red);font-weight:700;font-size:14px">✕</span>';
       const nameLine = p.client ? `<div style="font-size:12px;font-weight:700">${p.client}</div><div style="font-size:10px;color:var(--ink-soft)">${p.name}</div>` : `<div style="font-size:12px">${p.name}</div>`;
       return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div>${nameLine}</div>${result}</div>`;
