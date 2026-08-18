@@ -1211,7 +1211,8 @@ function renderDay(data) {
     const sttColor = dotColor;
     const shortName = a.name.split(' ').slice(0, 2).join(' ');
     const ptCount = (a.control_points || []).length;
-    const ptLabel = ptCount > 0 ? ptCount + ' контрольных точек' : 'нет контрольных точек';
+    const ptDone = (a.control_points || []).filter(p => p.visited_today || p.had_order || p.visited).length;
+    const ptLabel = ptCount > 0 ? `контрольных точек: ${ptDone} из ${ptCount} сделано` : 'нет контрольных точек';
     const aTile = 'background:var(--bg);border-radius:8px;padding:7px 10px;text-align:center;';
     const tilesHtml = `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;"><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.planned}</div><div style="font-size:9px;color:var(--ink-soft)">визитов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700">${a.orders}</div><div style="font-size:9px;color:var(--ink-soft)">заказов</div></div><div style="${aTile}"><div style="font-size:15px;font-weight:700;color:var(--red)">−${a.off_route || a.off || 0}</div><div style="font-size:9px;color:var(--ink-soft)">вне</div></div></div>`;
     const pointsHtml = (a.control_points || []).map(p => {
@@ -1219,7 +1220,7 @@ function renderDay(data) {
       const nameLine = p.client ? `<div style="font-size:12px;font-weight:700">${p.client}</div><div style="font-size:10px;color:var(--ink-soft)">${p.name}</div>` : `<div style="font-size:12px">${p.name}</div>`;
       return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div>${nameLine}</div>${result}</div>`;
     }).join('');
-    return `<details style="border-bottom:1.5px solid var(--line)"><summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 0"><div style="display:flex;align-items:center;gap:8px;flex:1"><span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span><div><div style="font-size:13px;font-weight:700">${shortName}</div><div style="font-size:11px;color:var(--ink-soft)">${ptLabel}</div></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><span style="font-size:15px;font-weight:700;color:${sttColor}">${clean}%</span><span style="font-size:10px;color:var(--ink-soft)">▶</span></div></summary><div style="padding:4px 0 10px 16px">${tilesHtml}${pointsHtml}</div></details>`;
+    return `<details style="border-bottom:1.5px solid var(--line)"><summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 0"><div style="display:flex;align-items:center;gap:8px;flex:1"><span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span><div><div style="font-size:13px;font-weight:700">${shortName}</div><div style="font-size:11px;color:var(--ink-soft)">${ptLabel}</div></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div style="text-align:right"><span style="font-size:15px;font-weight:700;color:${sttColor}">${clean}%</span><div style="font-size:8px;color:var(--ink-soft);font-weight:600">чистая дистрибуция</div></div><span style="font-size:10px;color:var(--ink-soft)">▶</span></div></summary><div style="padding:4px 0 10px 16px">${tilesHtml}${pointsHtml}</div></details>`;
   }).join('');
   const cardStyle = 'background:var(--card);border-radius:14px;padding:14px 16px;margin-bottom:12px;';
   const labelStyle = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--ink-soft);margin-bottom:10px;';
