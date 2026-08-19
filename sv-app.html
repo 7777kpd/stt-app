@@ -154,7 +154,7 @@
   #screen-stt .category-bar-track { flex: 1; height: 7px; background: var(--bg); border-radius: 100px; overflow: hidden; }
   #screen-stt .category-bar-fill { height: 100%; border-radius: 100px; }
   #screen-stt .category-pct { width: 34px; text-align: right; font-size: 12.5px; font-weight: 700; }
-  #screen-stt .segment { display: flex; background: #E5DDC8; border-radius: 12px; padding: 3px; margin-bottom: 14px; }
+  #screen-stt .segment { display: flex; background: #E5DDC8; border-radius: 12px; padding: 3px; margin: 16px 0 14px; }
   #screen-stt .segment button { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); padding: 9px 0; border-radius: 9px; cursor: pointer; }
   #screen-stt .segment button.active { background: var(--card); color: var(--ink); }
   #screen-stt .sub-view { display: none; }
@@ -582,15 +582,19 @@ function renderStt(data) {
   const lvSys = levelClass(data.system_stt || 0);
 
   // Категории
-  const totalOrders = data.system_orders || 0;
+  // 19.08.2026 (исправлено): было data.system_orders (только системные
+  // заказы, без учёта вне маршрута) — знаменатель категорий должен быть
+  // РЕАЛЬНЫМ числом заказов (система+вне маршрута), которое сервер уже
+  // правильно считает и присылает в каждом c.total. count тоже теперь
+  // берётся готовым из c.orders, а не восстанавливается округлением
+  // c.pct*total/100 (источник лишней погрешности).
   const catsHtml = (data.categories || []).map(c => {
-    const count = Math.round(c.pct * totalOrders / 100);
     const color = c.pct >= 75 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)';
     return `
     <div class="category-row">
       <span class="category-name">${c.name}</span>
       <div class="category-bar-track"><div class="category-bar-fill" style="width:${c.pct}%;background:${color}"></div></div>
-      <span style="font-size:11px;color:var(--ink-soft);white-space:nowrap">${count} из ${totalOrders}</span>
+      <span style="font-size:11px;color:var(--ink-soft);white-space:nowrap">${c.orders} из ${c.total}</span>
       <span class="category-pct" style="color:${color}">${c.pct}%</span>
     </div>`;
   }).join('');
@@ -645,6 +649,7 @@ function renderStt(data) {
       <p style="font-size:13px;color:var(--ink-soft);margin:8px 0">Системная ${r.sys}% · Чистая ${r.net}% · Вне ${r.off > 0 ? '−' + r.off : '—'}</p>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
       ${tmFocusBlock(r.tm_focus)}
+      ${pakbMiniBar(r.pakb)}
     </div>`;
   }
 
@@ -783,11 +788,14 @@ function renderStt(data) {
       if (!tTotal) return '';
       const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
       return `<div class="card">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-bottom:10px;">Территория</div>
-        <div style="display:flex;height:14px;border-radius:8px;overflow:hidden;margin-bottom:12px;">
-          <div style="width:${gp}%;background:var(--green)"></div>
-          <div style="width:${yp}%;background:var(--yellow)"></div>
-          <div style="width:${rp}%;background:var(--red)"></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">Территория</span>
+          <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
+        </div>
+        <div style="display:flex;gap:3px;height:7px;margin-bottom:14px;">
+          <div style="flex:${tGreen};background:var(--green);border-radius:4px;"></div>
+          <div style="flex:${tYellow};background:var(--yellow);border-radius:4px;"></div>
+          <div style="flex:${tRed};background:var(--red);border-radius:4px;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;">
           <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">СТТ</span><div style="font-size:15px;font-weight:800;color:var(--green)">${tGreen} <span style="font-size:11px;font-weight:600">(${gp}%)</span></div></div>
@@ -830,6 +838,31 @@ function sttView(name) {
 }
 
 let _svRatingLoaded = false;
+
+function pakbMiniBar(pakb) {
+  if (!pakb) return '';
+  const g = pakb.green || 0, y = pakb.yellow || 0, r = pakb.red || 0;
+  const total = g + y + r;
+  if (!total) return '';
+  const gp = Math.round(g / total * 100), yp = Math.round(y / total * 100), rp = Math.round(r / total * 100);
+  // 19.08.2026: легенда переоформлена как у блока "Территория" (3 колонки,
+  // число+% под каждым цветом) — раньше была одна приглушённая строка
+  // текстом ("ПАКБ 44 · СТТ 9 · АКБ 29 · Не АКБ 6"), просили привести к
+  // единому виду с "Территорией".
+  return `<div style="margin:8px 0">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-bottom:6px;">ПАКБ ${total}</div>
+    <div style="display:flex;gap:2px;height:5px;margin-bottom:8px;">
+      <div style="flex:${g};background:var(--green);border-radius:3px;"></div>
+      <div style="flex:${y};background:var(--yellow);border-radius:3px;"></div>
+      <div style="flex:${r};background:var(--red);border-radius:3px;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;">
+      <div><span style="font-size:12px;font-weight:700;color:var(--green)">СТТ ${g}</span> <span style="font-size:10.5px;color:var(--ink-soft)">${gp}%</span></div>
+      <div><span style="font-size:12px;font-weight:700;color:var(--yellow)">АКБ ${y}</span> <span style="font-size:10.5px;color:var(--ink-soft)">${yp}%</span></div>
+      <div><span style="font-size:12px;font-weight:700;color:var(--red)">Не АКБ ${r}</span> <span style="font-size:10.5px;color:var(--ink-soft)">${rp}%</span></div>
+    </div>
+  </div>`;
+}
 
 async function loadSvRating() {
   const area = document.getElementById('sv-rating-area');
@@ -876,6 +909,7 @@ async function loadSvRating() {
             Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false)}</div>
+          ${pakbMiniBar(r.pakb)}
         </div>`;
     }).join('');
 
@@ -897,6 +931,7 @@ async function loadSvRating() {
                 Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
               </div>
               <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}</div>
+              ${pakbMiniBar(r.pakb)}
             </div>`;
         }).join('')}
       </div>` : '';
