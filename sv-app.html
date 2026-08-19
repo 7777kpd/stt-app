@@ -154,7 +154,7 @@
   #screen-stt .category-bar-track { flex: 1; height: 7px; background: var(--bg); border-radius: 100px; overflow: hidden; }
   #screen-stt .category-bar-fill { height: 100%; border-radius: 100px; }
   #screen-stt .category-pct { width: 34px; text-align: right; font-size: 12.5px; font-weight: 700; }
-  #screen-stt .segment { display: flex; background: #E5DDC8; border-radius: 12px; padding: 3px; margin-bottom: 14px; }
+  #screen-stt .segment { display: flex; background: #E5DDC8; border-radius: 12px; padding: 3px; margin: 16px 0 14px; }
   #screen-stt .segment button { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 13.5px; font-weight: 700; color: var(--ink-soft); padding: 9px 0; border-radius: 9px; cursor: pointer; }
   #screen-stt .segment button.active { background: var(--card); color: var(--ink); }
   #screen-stt .sub-view { display: none; }
@@ -792,10 +792,10 @@ function renderStt(data) {
           <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">Территория</span>
           <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
         </div>
-        <div style="display:flex;height:14px;border-radius:8px;overflow:hidden;margin-bottom:12px;">
-          <div style="width:${gp}%;background:var(--green)"></div>
-          <div style="width:${yp}%;background:var(--yellow)"></div>
-          <div style="width:${rp}%;background:var(--red)"></div>
+        <div style="display:flex;gap:3px;height:7px;margin-bottom:14px;">
+          <div style="flex:${tGreen};background:var(--green);border-radius:4px;"></div>
+          <div style="flex:${tYellow};background:var(--yellow);border-radius:4px;"></div>
+          <div style="flex:${tRed};background:var(--red);border-radius:4px;"></div>
         </div>
         <div style="display:flex;justify-content:space-between;">
           <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">СТТ</span><div style="font-size:15px;font-weight:800;color:var(--green)">${tGreen} <span style="font-size:11px;font-weight:600">(${gp}%)</span></div></div>
@@ -851,10 +851,10 @@ function pakbMiniBar(pakb) {
   // единому виду с "Территорией".
   return `<div style="margin:8px 0">
     <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-bottom:6px;">ПАКБ ${total}</div>
-    <div style="display:flex;height:6px;border-radius:4px;overflow:hidden;margin-bottom:8px;">
-      <div style="width:${gp}%;background:var(--green)"></div>
-      <div style="width:${yp}%;background:var(--yellow)"></div>
-      <div style="width:${rp}%;background:var(--red)"></div>
+    <div style="display:flex;gap:2px;height:5px;margin-bottom:8px;">
+      <div style="flex:${g};background:var(--green);border-radius:3px;"></div>
+      <div style="flex:${y};background:var(--yellow);border-radius:3px;"></div>
+      <div style="flex:${r};background:var(--red);border-radius:3px;"></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;">
       <div><span style="font-size:12px;font-weight:700;color:var(--green)">СТТ ${g}</span> <span style="font-size:10.5px;color:var(--ink-soft)">${gp}%</span></div>
