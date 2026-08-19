@@ -845,13 +845,22 @@ function pakbMiniBar(pakb) {
   const total = g + y + r;
   if (!total) return '';
   const gp = Math.round(g / total * 100), yp = Math.round(y / total * 100), rp = Math.round(r / total * 100);
+  // 19.08.2026: легенда переоформлена как у блока "Территория" (3 колонки,
+  // число+% под каждым цветом) — раньше была одна приглушённая строка
+  // текстом ("ПАКБ 44 · СТТ 9 · АКБ 29 · Не АКБ 6"), просили привести к
+  // единому виду с "Территорией".
   return `<div style="margin:8px 0">
-    <div style="display:flex;height:6px;border-radius:4px;overflow:hidden;margin-bottom:4px;">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin-bottom:6px;">ПАКБ ${total}</div>
+    <div style="display:flex;height:6px;border-radius:4px;overflow:hidden;margin-bottom:8px;">
       <div style="width:${gp}%;background:var(--green)"></div>
       <div style="width:${yp}%;background:var(--yellow)"></div>
       <div style="width:${rp}%;background:var(--red)"></div>
     </div>
-    <div style="font-size:10px;color:var(--ink-soft)">ПАКБ ${total} · СТТ ${g} · АКБ ${y} · Не АКБ ${r}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;text-align:center;">
+      <div><span style="font-size:12px;font-weight:700;color:var(--green)">СТТ ${g}</span> <span style="font-size:10.5px;color:var(--ink-soft)">${gp}%</span></div>
+      <div><span style="font-size:12px;font-weight:700;color:var(--yellow)">АКБ ${y}</span> <span style="font-size:10.5px;color:var(--ink-soft)">${yp}%</span></div>
+      <div><span style="font-size:12px;font-weight:700;color:var(--red)">Не АКБ ${r}</span> <span style="font-size:10.5px;color:var(--ink-soft)">${rp}%</span></div>
+    </div>
   </div>`;
 }
 
