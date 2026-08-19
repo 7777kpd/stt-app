@@ -546,7 +546,7 @@ function renderDay(data) {
       <h3>Итог по территории</h3>
       <div class="day-grid">
         <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+        <div class="day-tile"><div class="val">${data.system_orders}</div><div class="lbl">заказов по маршруту</div></div>
       </div>
       <div class="day-tiles-row">
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
@@ -695,7 +695,7 @@ function renderMonth(data) {
       ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
       <div class="day-grid">
         <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+        <div class="day-tile"><div class="val">${data.system_orders}</div><div class="lbl">заказов по маршруту</div></div>
       </div>
       <div class="day-tiles-row">
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
