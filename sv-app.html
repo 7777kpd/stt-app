@@ -647,9 +647,9 @@ function renderStt(data) {
         <div style="text-align:right"><span style="display:block;font-size:${isBest?22:18}px;font-weight:800;color:${isBest?'var(--green)':'var(--ink)'}">${r.avg_score}%</span>${deltaHtml}</div>
       </div>
       <p style="font-size:13px;color:var(--ink-soft);margin:8px 0">Системная ${r.sys}% · Чистая ${r.net}% · Вне ${r.off > 0 ? '−' + r.off : '—'}</p>
-      ${pakbMiniBar(r.pakb)}
       <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
       ${tmFocusBlock(r.tm_focus)}
+      ${pakbMiniBar(r.pakb)}
     </div>`;
   }
 
@@ -908,8 +908,8 @@ async function loadSvRating() {
           <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
             Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
           </div>
-          ${pakbMiniBar(r.pakb)}
           <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false)}</div>
+          ${pakbMiniBar(r.pakb)}
         </div>`;
     }).join('');
 
@@ -930,8 +930,8 @@ async function loadSvRating() {
               <div style="font-size:12px;color:var(--ink-soft);margin-bottom:9px;">
                 Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
               </div>
-              ${pakbMiniBar(r.pakb)}
               <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}</div>
+              ${pakbMiniBar(r.pakb)}
             </div>`;
         }).join('')}
       </div>` : '';
