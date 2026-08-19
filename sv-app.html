@@ -643,6 +643,7 @@ function renderStt(data) {
         <div style="text-align:right"><span style="display:block;font-size:${isBest?22:18}px;font-weight:800;color:${isBest?'var(--green)':'var(--ink)'}">${r.avg_score}%</span>${deltaHtml}</div>
       </div>
       <p style="font-size:13px;color:var(--ink-soft);margin:8px 0">Системная ${r.sys}% · Чистая ${r.net}% · Вне ${r.off > 0 ? '−' + r.off : '—'}</p>
+      ${pakbMiniBar(r.pakb)}
       <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
       ${tmFocusBlock(r.tm_focus)}
     </div>`;
@@ -783,7 +784,10 @@ function renderStt(data) {
       if (!tTotal) return '';
       const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
       return `<div class="card">
-        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin-bottom:10px;">Территория</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">Территория</span>
+          <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
+        </div>
         <div style="display:flex;height:14px;border-radius:8px;overflow:hidden;margin-bottom:12px;">
           <div style="width:${gp}%;background:var(--green)"></div>
           <div style="width:${yp}%;background:var(--yellow)"></div>
@@ -831,6 +835,22 @@ function sttView(name) {
 
 let _svRatingLoaded = false;
 
+function pakbMiniBar(pakb) {
+  if (!pakb) return '';
+  const g = pakb.green || 0, y = pakb.yellow || 0, r = pakb.red || 0;
+  const total = g + y + r;
+  if (!total) return '';
+  const gp = Math.round(g / total * 100), yp = Math.round(y / total * 100), rp = Math.round(r / total * 100);
+  return `<div style="margin:8px 0">
+    <div style="display:flex;height:6px;border-radius:4px;overflow:hidden;margin-bottom:4px;">
+      <div style="width:${gp}%;background:var(--green)"></div>
+      <div style="width:${yp}%;background:var(--yellow)"></div>
+      <div style="width:${rp}%;background:var(--red)"></div>
+    </div>
+    <div style="font-size:10px;color:var(--ink-soft)">ПАКБ ${total} · СТТ ${g} · АКБ ${y} · Не АКБ ${r}</div>
+  </div>`;
+}
+
 async function loadSvRating() {
   const area = document.getElementById('sv-rating-area');
   try {
@@ -875,6 +895,7 @@ async function loadSvRating() {
           <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
             Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
           </div>
+          ${pakbMiniBar(r.pakb)}
           <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false)}</div>
         </div>`;
     }).join('');
@@ -896,6 +917,7 @@ async function loadSvRating() {
               <div style="font-size:12px;color:var(--ink-soft);margin-bottom:9px;">
                 Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
               </div>
+              ${pakbMiniBar(r.pakb)}
               <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}</div>
             </div>`;
         }).join('')}
