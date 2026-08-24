@@ -459,38 +459,60 @@ function renderDay(data) {
     </div>`;
   }
 
+  function fmtPct(x) {
+    return (Math.round(x * 10) / 10).toFixed(1).replace('.', ',') + '%';
+  }
+
   const svsHtml = (data.svs || []).map(s => {
     const color = s.system_pct >= 75 ? 'var(--green)' : s.system_pct >= 40 ? 'var(--amber)' : 'var(--red-dark)';
     const catsChips = (s.categories || []).map(c => {
       const cls = c.pct >= 75 ? 'good' : 'bad';
-      return `<span class="cat-chip ${cls}">${c.name.slice(0,4)} ${c.pct}%</span>`;
+      return `<span class="cat-chip ${cls}">${c.name.slice(0,4)} ${fmtPct(c.pct)}</span>`;
     }).join('');
-    // 24.08.2026 (по просьбе): убрана строка "N из M" (сырые цифры заказов)
-    // из полоски — вместо неё под полоской теперь общий показатель СВ
-    // (среднее системная+чистая+все категории, s.avg), крупным текстом.
-    const avgLine = s.avg != null
-      ? `<div class="sv-avg-row" style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-top:4px;">Общий показатель: <span style="color:var(--ink);font-weight:800;">${s.avg}%</span></div>`
+    // 24.08.2026 (по просьбе): большая цифра справа от полоски теперь —
+    // общий показатель (s.avg, среднее системная+чистая+категории), а не
+    // system_pct, с подписью "средний" под ней. Под полоской — отдельная
+    // строка "Системная · Чистая" (её не было вообще). Все проценты — с
+    // точностью до 1 знака, формат "73,5%".
+    const avgBlock = s.avg != null
+      ? `<div style="text-align:right"><span class="bar-row-pct" style="color:${color}">${fmtPct(s.avg)}</span><div style="font-size:10px;font-weight:700;color:var(--ink-soft);margin-top:1px;">средний</div></div>`
       : '';
+    const sysCleanLine = `<div style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:4px 0 2px;">Системная ${fmtPct(s.system_pct)} · Чистая ${fmtPct(s.clean_pct)}</div>`;
     return `<div class="bar-row">
       <div class="bar-row-label">${s.sv}</div>
       <div class="bar-row-track-wrap">
         <div class="bar-row-track"><div class="bar-row-fill" style="width:${Math.min(s.system_pct,100)}%;background:${color}"></div></div>
-        <span class="bar-row-pct" style="color:${color}">${s.system_pct}%</span>
+        ${avgBlock}
       </div>
-      ${avgLine}
+      ${sysCleanLine}
       ${catsChips ? `<div class="sv-cats-row">${catsChips}</div>` : ''}
     </div>`;
   }).join('');
   const catsHtml = (data.categories || []).slice().sort((a,b) => b.pct - a.pct).map(c => barRow(c.name, c.orders, c.total, c.pct)).join('');
 
   const top5Html = data.top5_focus_ready
-    ? (data.top5_today || []).map((a, agentIdx) => {
+    ? (data.top5_today || [])
+        // 24.08.2026 (по просьбе, п.5): агенты с ✓ (выполнили план заказов
+        // сегодня) — наверх списка, ✗ — вниз.
+        .slice()
+        .sort((a, b) => {
+          const okA = a.orders_today >= a.orders_target ? 1 : 0;
+          const okB = b.orders_today >= b.orders_target ? 1 : 0;
+          return okB - okA;
+        })
+        .map((a, agentIdx) => {
         // 13.08.2026: критерий "выполнил" — ЗАКАЗЫ сегодня относительно
         // нормы, даже если план визитов не выполнен (заказы важнее самих
         // визитов — это то, ради чего вообще всё считается).
         const ok = a.orders_today >= a.orders_target;
 
-        const focusList = a.focus_sv || [];
+        // 24.08.2026 (по просьбе, п.8): внутри "Фокус СВ" — точки с ✓
+        // (был заказ сегодня) наверх, точки с ✗ вниз, а среди ✗ — по
+        // убыванию "пропусков подряд" (самые запущенные первыми).
+        const focusList = (a.focus_sv || []).slice().sort((fa, fb) => {
+          if (fa.had_order !== fb.had_order) return fa.had_order ? -1 : 1;
+          return fb.missed_streak - fa.missed_streak;
+        });
         const focusDone = focusList.filter(fp => fp.had_order).length;
         const focusSvHtml = focusList.length
           ? `<details class="focus-sv-block">
@@ -498,14 +520,26 @@ function renderDay(data) {
                 <span>👁 Фокус СВ · ${focusDone}/${focusList.length} сделано</span>
                 <span class="rc-chevron">▶</span>
               </summary>
-              ${focusList.map(fp => `
+              ${focusList.map(fp => {
+                // 24.08.2026 (по просьбе, п.6+7): точка могла попасть в
+                // "Фокус СВ" НЕ из-за пропусков (missed_streak может быть
+                // 0), а из-за заказа вне маршрута (off_route>0) — раньше
+                // эта причина нигде не показывалась, отсюда и вопрос
+                // "почему тут точка без пропусков". Показываем обе причины
+                // явно, жирным, если они есть.
+                const parts = [];
+                if (fp.missed_streak > 0) parts.push(`<b>${fp.missed_streak} пропусков подряд</b>`);
+                if (fp.off_route > 0) parts.push(`<b>${fp.off_route} вне маршрута</b>`);
+                const reasonText = parts.length ? parts.join(' · ') : '0 пропусков подряд';
+                return `
                 <div class="point-row">
                   ${badge(fp.had_order)}
                   <div class="point-info">
                     <div class="point-client">${fp.name}</div>
-                    <div class="point-addr">${fp.address} · ${fp.missed_streak} пропусков подряд</div>
+                    <div class="point-addr">${fp.address} · ${reasonText}</div>
                   </div>
-                </div>`).join('')}
+                </div>`;
+              }).join('')}
             </details>`
           : `<div class="focus-sv-ok">${badge(true)}<span>Фокус СВ · нет проблемных точек</span></div>`;
 
@@ -532,10 +566,6 @@ function renderDay(data) {
             <div class="adc-metrics">
               ${factorTile(a.visits_today, a.visits_target, 'визиты')}
               ${factorTile(a.orders_today, a.orders_target, 'заказы сегодня')}
-            </div>
-            <div class="adc-metrics">
-              <div class="adc-metric"><div class="val">${a.today_system_pct}%</div><div class="lbl">системная</div></div>
-              <div class="adc-metric"><div class="val">${a.today_clean_pct}%</div><div class="lbl">чистая</div></div>
             </div>
             ${focusSvHtml}
           </div>
