@@ -465,15 +465,20 @@ function renderDay(data) {
       const cls = c.pct >= 75 ? 'good' : 'bad';
       return `<span class="cat-chip ${cls}">${c.name.slice(0,4)} ${c.pct}%</span>`;
     }).join('');
-    const avgChip = s.avg_category != null ? `<span class="cat-chip avg">ср. ${s.avg_category}%</span>` : '';
+    // 24.08.2026 (по просьбе): убрана строка "N из M" (сырые цифры заказов)
+    // из полоски — вместо неё под полоской теперь общий показатель СВ
+    // (среднее системная+чистая+все категории, s.avg), крупным текстом.
+    const avgLine = s.avg != null
+      ? `<div class="sv-avg-row" style="font-size:12px;font-weight:700;color:var(--ink-soft);margin-top:4px;">Общий показатель: <span style="color:var(--ink);font-weight:800;">${s.avg}%</span></div>`
+      : '';
     return `<div class="bar-row">
       <div class="bar-row-label">${s.sv}</div>
       <div class="bar-row-track-wrap">
         <div class="bar-row-track"><div class="bar-row-fill" style="width:${Math.min(s.system_pct,100)}%;background:${color}"></div></div>
-        <span class="bar-row-count">${s.orders} из ${s.plan}</span>
         <span class="bar-row-pct" style="color:${color}">${s.system_pct}%</span>
       </div>
-      ${catsChips || avgChip ? `<div class="sv-cats-row">${catsChips}${avgChip}</div>` : ''}
+      ${avgLine}
+      ${catsChips ? `<div class="sv-cats-row">${catsChips}</div>` : ''}
     </div>`;
   }).join('');
   const catsHtml = (data.categories || []).slice().sort((a,b) => b.pct - a.pct).map(c => barRow(c.name, c.orders, c.total, c.pct)).join('');
@@ -546,7 +551,7 @@ function renderDay(data) {
       <h3>Итог по территории</h3>
       <div class="day-grid">
         <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.system_orders}</div><div class="lbl">заказов по маршруту</div></div>
+        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
       </div>
       <div class="day-tiles-row">
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
@@ -695,7 +700,7 @@ function renderMonth(data) {
       ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
       <div class="day-grid">
         <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.system_orders}</div><div class="lbl">заказов по маршруту</div></div>
+        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
       </div>
       <div class="day-tiles-row">
         <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
