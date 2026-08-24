@@ -749,7 +749,21 @@ function renderStt(data) {
 
   const deltaHtml = '';
 
+  // 19.08.2026 (ВРЕМЕННО — диагностика бага дельты, убрать после решения):
+  // показывает вживую содержимое _debug_delta с сервера прямо на экране,
+  // без консоли разработчика — сфотографировать и прислать.
+  const debugHtml = data._debug_delta ? `
+    <div style="background:#fff3cd;border:1px solid #d4a72c;border-radius:10px;padding:10px;margin-bottom:14px;font-size:11px;line-height:1.6;color:#5c4a00;">
+      <b>ВРЕМЕННАЯ ДИАГНОСТИКА (убрать потом)</b><br>
+      Запрошен архив: ${data._debug_delta.prev_month_requested}<br>
+      Всего записей в архиве: ${data._debug_delta.prev_archived_count}<br>
+      Имена в архиве: ${JSON.stringify(data._debug_delta.prev_archived_names)}<br>
+      Имена в команде (сейчас): ${JSON.stringify(data._debug_delta.team_agents_names)}<br>
+      Совпало (прошли фильтр): ${JSON.stringify(data._debug_delta.prev_scores_matched)}
+    </div>` : '';
+
   return `
+    ${debugHtml}
     <div class="segment">
       <button class="${_sttMonthOffset === 0 ? 'active' : ''}" onclick="switchSttMonth(0)">Текущий месяц</button>
       <button class="${_sttMonthOffset === 1 ? 'active' : ''}" onclick="switchSttMonth(1)">Прошлый месяц</button>
@@ -1273,12 +1287,24 @@ function renderDay(data) {
     const sortedPoints = [...(a.control_points || [])].sort((p1, p2) => {
       const done1 = (p1.visited_today || p1.had_order || p1.visited) ? 1 : 0;
       const done2 = (p2.visited_today || p2.had_order || p2.visited) ? 1 : 0;
-      return done2 - done1;
+      if (done1 !== done2) return done2 - done1;
+      // 24.08.2026 (по просьбе, как у ТМ): среди невыполненных — по
+      // убыванию пропусков подряд, самые запущенные точки первыми.
+      return (p2.missed_streak || 0) - (p1.missed_streak || 0);
     });
     const pointsHtml = sortedPoints.map(p => {
-      const result = (p.visited_today || p.had_order || p.visited) ? '<span style="color:var(--green);font-weight:700;font-size:14px">✓</span>' : '<span style="color:var(--red);font-weight:700;font-size:14px">✕</span>';
+      const done = (p.visited_today || p.had_order || p.visited);
+      const result = done ? '<span style="color:var(--green);font-weight:700;font-size:14px">✓</span>' : '<span style="color:var(--red);font-weight:700;font-size:14px">✕</span>';
       const nameLine = p.client ? `<div style="font-size:12px;font-weight:700">${p.client}</div><div style="font-size:10px;color:var(--ink-soft)">${p.name}</div>` : `<div style="font-size:12px">${p.name}</div>`;
-      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div>${nameLine}</div>${result}</div>`;
+      // 24.08.2026 (по просьбе): причина попадания точки в список — сколько
+      // пропусков подряд и/или сколько заказов вне маршрута, жирным. Точка
+      // могла попасть сюда только из-за вне маршрута (пропусков 0) — раньше
+      // причина нигде не показывалась.
+      const reasons = [];
+      if (p.missed_streak > 0) reasons.push(`<b>${p.missed_streak} пропусков подряд</b>`);
+      if (p.off_route > 0) reasons.push(`<b>${p.off_route} вне маршрута</b>`);
+      const reasonLine = reasons.length ? `<div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${reasons.join(' · ')}</div>` : '';
+      return `<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);gap:8px"><div>${nameLine}${reasonLine}</div>${result}</div>`;
     }).join('');
     return `<details style="border-bottom:1.5px solid var(--line)"><summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:12px 0"><div style="display:flex;align-items:center;gap:8px;flex:1"><span style="width:8px;height:8px;border-radius:50%;background:${dotColor};flex-shrink:0;display:inline-block"></span><div><div style="font-size:13px;font-weight:700">${shortName}</div><div style="font-size:11px;color:var(--ink-soft)">${ptLabel}</div></div></div><div style="display:flex;align-items:center;gap:6px;flex-shrink:0"><div style="text-align:right"><span style="font-size:15px;font-weight:700;color:${sttColor}">${clean}%</span><div style="font-size:8px;color:var(--ink-soft);font-weight:600">чистая дистрибуция</div></div><span style="font-size:10px;color:var(--ink-soft)">▶</span></div></summary><div style="padding:4px 0 10px 16px">${tilesHtml}${pointsHtml}</div></details>`;
   }).join('');
