@@ -244,10 +244,6 @@
     background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden;
     border-left: 4px solid var(--line);
   }
-  #screen-training details.coach-agent-card.level-red { border-left-color: var(--red); }
-  #screen-training details.coach-agent-card.level-yellow { border-left-color: var(--yellow); }
-  #screen-training details.coach-agent-card.level-green { border-left-color: var(--green); }
-  #screen-training details.coach-agent-card.level-gray { border-left-color: var(--line); }
   #screen-training details.coach-agent-card summary {
     list-style: none; display: flex; align-items: center; gap: 8px; justify-content: space-between;
     padding: 13px 16px; cursor: pointer;
@@ -259,15 +255,6 @@
   #screen-training .ca-trend.up { color: var(--green); }
   #screen-training .ca-trend.flat { color: var(--yellow); }
   #screen-training .ca-trend.down { color: var(--red); }
-  #screen-training .ca-status { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 100px; }
-  #screen-training .ca-status.red { background: var(--red-bg); color: var(--red); }
-  #screen-training .ca-status.yellow { background: var(--yellow-bg); color: var(--yellow); }
-  #screen-training .ca-status.green { background: var(--green-bg); color: var(--green); }
-  #screen-training .ca-status.gray { background: var(--line); color: var(--ink-soft); }
-  #screen-training .ca-new-signal {
-    font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 100px;
-    background: var(--blue-bg); color: var(--blue); white-space: nowrap;
-  }
   #screen-training .coach-signals-card {
     background: var(--blue-bg); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px;
   }
@@ -275,10 +262,15 @@
     font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
     color: var(--blue); margin-bottom: 8px;
   }
-  #screen-training .coach-signal-row { font-size: 12.5px; line-height: 1.5; color: var(--ink); margin-bottom: 6px; }
+  #screen-training .coach-signal-row { font-size: 12.5px; line-height: 1.5; color: var(--ink); margin-bottom: 6px; display: flex; gap: 6px; align-items: baseline; }
   #screen-training .coach-signal-row:last-child { margin-bottom: 0; }
-  #screen-training .coach-signal-agent { font-weight: 700; }
+  #screen-training .coach-signal-count { flex-shrink: 0; font-size: 10px; font-weight: 800; color: var(--blue); background: #fff; border-radius: 100px; padding: 1px 7px; }
+  #screen-training .coach-signal-agents { font-size: 10.5px; color: var(--ink-soft); }
   #screen-training .coach-signals-empty { font-size: 12px; color: var(--ink-soft); }
+  #screen-training .coach-signals-btn {
+    width: 100%; background: var(--blue); color: #fff; border: none; border-radius: 10px;
+    padding: 9px 14px; font-size: 12.5px; font-weight: 700; font-family: inherit; cursor: pointer; margin-top: 4px;
+  }
   #screen-training .ca-body { padding: 4px 16px 14px; border-top: 1px solid var(--line); }
   #screen-training .ca-body-cap { font-size: 10.5px; color: var(--ink-soft); line-height: 1.4; margin: 10px 0 10px; }
   #screen-training .ca-response { background: var(--bg); border-radius: 12px; padding: 12px; margin-bottom: 8px; }
@@ -288,12 +280,6 @@
   #screen-training .ca-row:last-child { margin-bottom: 0; }
   #screen-training .ca-row-label { flex-shrink: 0; width: 60px; font-size: 9.5px; font-weight: 800; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.02em; padding-top: 1px; }
   #screen-training .ca-row-text { font-size: 12.5px; line-height: 1.4; flex: 1; color: var(--ink); }
-  #screen-training .ca-row.conclusion { border-top: 1px solid var(--line); padding-top: 7px; margin-top: 2px; }
-  #screen-training .ca-row.conclusion .ca-row-text { font-weight: 600; }
-  #screen-training .ca-score-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; }
-  #screen-training .ca-score-dot.d1 { background: var(--red); }
-  #screen-training .ca-score-dot.d2 { background: var(--yellow); }
-  #screen-training .ca-score-dot.d3 { background: var(--green); }
   #screen-training .ca-no-responses { font-size: 12px; color: var(--ink-soft); text-align: center; padding: 12px 0; }
   #screen-training .coach-sv-card {
     background: #FAE7E4; border: 1px solid #F1C9C2; border-radius: 16px;
@@ -341,7 +327,6 @@ let _telegramId = null;
 let _sttMonth = '';
 let _sttMonthOffset = 0;   // 0 = текущий месяц, 1 = прошлый — переключатель на "Итоги месяца"
 let _coachPeriod = '';
-let _coachPatterns = [];
 let _dayDate = new Date();   // текущая просматриваемая дата на вкладке "Итог дня"
 
 // ГГГГ-ММ-ДД по МЕСТНОМУ времени (не toISOString — та берёт UTC и может
@@ -1051,58 +1036,39 @@ function _coachTrendArrow(dots) {
 
 function renderCoach(data) {
   _coachPeriod = data.period || '7 дней';
-  _coachPatterns = data.patterns_for_topic || [];
   _coachWeek = data.week || 'current';
   const ts = data.team_summary || {};
 
-  const newSignals = data.new_signals || [];
-  const newSignalsHtml = newSignals.length === 0
-    ? `<div class="coach-signals-empty">Новых сигналов на этой неделе нет.</div>`
-    : newSignals.map(s => `
-        <div class="coach-signal-row">
-          <span class="coach-signal-agent">${s.agent}:</span> ${s.reason}
-        </div>`).join('');
-
   const agentsHtml = (data.agents || []).map(a => {
-    const responses = a.last_responses || [];
-    const bodyHtml = responses.length === 0
+    const r = a.last_response;
+    const bodyHtml = !r
       ? `<div class="ca-no-responses">Ещё не отвечал(а) на этой неделе.</div>`
-      : responses.map(r => {
-          const scoreCls = r.ai_score >= 3 ? 'd3' : r.ai_score === 2 ? 'd2' : 'd1';
-          return `
-            <div class="ca-response">
-              <div class="ca-response-date">${r.date || ''}</div>
-              <div class="ca-row">
-                <div class="ca-row-label">Причина</div>
-                <div class="ca-row-text">${r.reason || '—'}</div>
-              </div>
-              <div class="ca-row">
-                <div class="ca-row-label">Действие</div>
-                <div class="ca-row-text">${r.action || '—'}</div>
-              </div>
-              <div class="ca-row">
-                <div class="ca-row-label">Помощь</div>
-                <div class="ca-row-text">${r.seed || '—'}</div>
-              </div>
-              ${r.ai_reasoning ? `
-              <div class="ca-row conclusion">
-                <div class="ca-row-label">Вывод ИИ</div>
-                <div class="ca-row-text"><span class="ca-score-dot ${scoreCls}"></span>${r.ai_reasoning}</div>
-              </div>` : ''}
-            </div>`;
-        }).join('');
+      : `
+          <div class="ca-response">
+            <div class="ca-response-date">${r.date || ''}</div>
+            <div class="ca-row">
+              <div class="ca-row-label">Причина</div>
+              <div class="ca-row-text">${r.reason || '—'}</div>
+            </div>
+            <div class="ca-row">
+              <div class="ca-row-label">Действие</div>
+              <div class="ca-row-text">${r.action || '—'}</div>
+            </div>
+            <div class="ca-row">
+              <div class="ca-row-label">Помощь</div>
+              <div class="ca-row-text">${r.seed || '—'}</div>
+            </div>
+          </div>`;
 
     return `
-      <details class="coach-agent-card level-${a.status_color}">
+      <details class="coach-agent-card">
         <summary>
           <span class="ca-name">${a.name}</span>
           <span class="ca-days">${a.days_answered} ${a.days_answered === 1 ? 'день' : 'дн.'}</span>
           ${_coachTrendArrow(a.trend_dots)}
-          ${a.new_signal ? '<span class="ca-new-signal">новый сигнал</span>' : ''}
-          <span class="ca-status ${a.status_color}">${a.status}</span>
         </summary>
         <div class="ca-body">
-          <div class="ca-body-cap">Последние ответы — что написал(а) агент и вывод ИИ по каждому дню:</div>
+          <div class="ca-body-cap">Последний ответ — что написал(а) агент:</div>
           ${bodyHtml}
         </div>
       </details>`;
@@ -1141,12 +1107,15 @@ function renderCoach(data) {
     </div>
 
     <div class="coach-signals-card">
-      <div class="coach-signals-label">Новые сигналы за неделю</div>
-      ${newSignalsHtml}
+      <div class="coach-signals-label">Командный голос</div>
+      <div id="team-voice-area">
+        <div class="coach-signals-empty">Нажмите, чтобы найти общие темы недели.</div>
+        <button class="coach-signals-btn" onclick="loadTeamVoice()">✦ Найти общие темы</button>
+      </div>
     </div>
 
     <div class="coach-section-label">По агентам</div>
-    <p class="coach-section-cap">Нажмите на агента — увидите его последние ответы и что решил ИИ.</p>
+    <p class="coach-section-cap">Нажмите на агента — увидите его последний ответ и статус.</p>
     ${agentsHtml}
 
     <div class="coach-section-label">Программа обучения на неделю</div>
@@ -1179,6 +1148,47 @@ async function switchCoachWeek(week) {
     container.innerHTML = renderCoach(data);
   } catch (e) {
     console.error('switchCoachWeek error', e);
+  }
+}
+
+// ============================================================
+// КОМАНДНЫЙ ГОЛОС (ИИ-кластеризация общих тем недели, 04.08.2026)
+// ============================================================
+async function loadTeamVoice() {
+  const area = document.getElementById('team-voice-area');
+  if (!area) return;
+  area.innerHTML = '<div class="coach-signals-empty">⏳ Ищу общие темы…</div>';
+
+  try {
+    const res = await fetch(
+      `${API}/api/sv/${_telegramId}/coach/team-voice?week=${_coachWeek}`,
+      { method: 'POST' }
+    );
+    if (!res.ok) throw new Error(`request failed: ${res.status}`);
+
+    const data = await res.json();
+    const themes = data.themes || [];
+
+    if (!themes.length) {
+      area.innerHTML = `
+        <div class="coach-signals-empty">Общих тем на этой неделе не нашлось — каждый говорит о своём.</div>
+        <button class="coach-signals-btn" onclick="loadTeamVoice()">✦ Найти общие темы</button>`;
+      return;
+    }
+
+    area.innerHTML = themes.map(t => `
+      <div class="coach-signal-row">
+        <span class="coach-signal-count">${t.count}</span>
+        <span>
+          ${t.theme}
+          <div class="coach-signal-agents">${(t.agents || []).join(', ')}</div>
+        </span>
+      </div>`).join('');
+
+  } catch (e) {
+    area.innerHTML = `
+      <div class="coach-signals-empty">Не удалось получить темы.</div>
+      <button class="coach-signals-btn" onclick="loadTeamVoice()">Попробовать ещё раз</button>`;
   }
 }
 
