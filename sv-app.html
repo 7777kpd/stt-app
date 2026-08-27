@@ -238,6 +238,10 @@
   #screen-training details.coach-agent-card summary::-webkit-details-marker { display: none; }
   #screen-training .ca-name { font-size: 14px; font-weight: 700; flex: 1; }
   #screen-training .ca-days { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); }
+  #screen-training .ca-trend { font-size: 14px; font-weight: 800; }
+  #screen-training .ca-trend.up { color: var(--green); }
+  #screen-training .ca-trend.flat { color: var(--yellow); }
+  #screen-training .ca-trend.down { color: var(--red); }
   #screen-training .coach-signals-card {
     background: var(--blue-bg); border-radius: 16px; padding: 14px 16px; margin-bottom: 16px;
   }
@@ -1011,6 +1015,7 @@ let _coachWeek = 'current';
 function renderCoach(data) {
   _coachPeriod = data.period || '7 дней';
   _coachWeek = data.week || 'current';
+  const ts = data.team_summary || {};
 
   const agentsHtml = (data.agents || []).map(a => {
     const r = a.last_response;
@@ -1038,6 +1043,7 @@ function renderCoach(data) {
         <summary>
           <span class="ca-name">${a.name}</span>
           <span class="ca-days">${a.days_answered} ${a.days_answered === 1 ? 'день' : 'дн.'}</span>
+          ${_coachTrendArrow(a.trend_dots)}
         </summary>
         <div class="ca-body">
           <div class="ca-body-cap">Последний ответ — что написал(а) агент:</div>
