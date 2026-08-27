@@ -319,6 +319,12 @@ function renderRouteCard(a, rank) {
   const maxLoad = Math.max(...counts, a.daily_avg || 0, 1);
   const avgLine = a.daily_avg || 0;
   const avgLinePct = Math.round(avgLine / maxLoad * 100);
+  // 27.08.2026 (ВРЕМЕННО, диагностика — убрать после решения)
+  const debugWdHtml = a._debug_working_days ? `
+    <div style="background:#fff3cd;border:1px solid #d4a72c;border-radius:10px;padding:10px;margin-bottom:10px;font-size:11px;line-height:1.7;color:#5c4a00;">
+      <b>ВРЕМЕННАЯ ДИАГНОСТИКА (убрать потом)</b><br>
+      ${Object.entries(a._debug_working_days).map(([k,v]) => `${k}: <b>${JSON.stringify(v)}</b>`).join('<br>')}
+    </div>` : '';
   const weekShortMap = {'понедельник':'Пн','вторник':'Вт','среда':'Ср','четверг':'Чт','пятница':'Пт','суббота':'Сб','воскресенье':'Вс'};
   // Критерий подсветки столбика (11.08.2026, по просьбе): не порог ±30% от
   // среднего, а просто 2 САМЫХ НИЗКИХ дня по визитам — те, что реально
@@ -374,6 +380,7 @@ function renderRouteCard(a, rank) {
           <div class="frow"><span>Плановых заказов в день = ${a.need_orders}÷раб.дни</span><span>${a.daily_orders_avg}</span></div>
         </div>
       </div>
+      ${debugWdHtml}
       ${weeklyLoadHtml}
     </div>
   </details>`;
