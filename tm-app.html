@@ -102,6 +102,7 @@
 
   .week-load-block { margin-bottom: 4px; }
   .week-load-label { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-bottom: 8px; }
+  .week-load-note { font-size: 9.5px; color: var(--ink-soft); opacity: 0.85; line-height: 1.4; margin: -4px 0 10px; }
   .week-load-bars { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px; height: 56px; }
   .week-load-avg-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--blue); opacity: .7; }
   .week-load-avg-num { position: absolute; right: 0; top: -14px; font-size: 8px; font-weight: 800; color: var(--blue); background: var(--card); padding: 0 3px; border-radius: 4px; }
@@ -311,7 +312,7 @@ function renderHistoryDots(history) {
     <div class="history-summary">${doneCount} из ${history.length} дней — задача выполнена</div>`;
 }
 
-function renderRouteCard(a, rank) {
+function renderRouteCard(a, rank, monthLabel) {
   const cardId = rank;
 
   const weekEntries = Object.entries(a.weekly_load || {});
@@ -327,6 +328,11 @@ function renderRouteCard(a, rank) {
   const lowThreshold = sortedCounts[1]; // 2-е по величине снизу = граница "двух худших"
   const weeklyLoadHtml = `<div class="week-load-block">
     <div class="week-load-label">План посещений по дням недели</div>
+    <div class="week-load-note">
+      Данные за: ${monthLabel || 'прошлый месяц'} — та же база, что и в
+      расчёте дефицита выше. Не совпадает с планом на текущий месяц,
+      если маршрут агента с тех пор менялся.
+    </div>
     <div class="week-load-bars" style="position:relative">
       <div class="week-load-avg-line" style="bottom:${avgLinePct}%"><span class="week-load-avg-num">${avgLine}</span></div>
       ${weekEntries.map(([d, v]) => {
@@ -385,7 +391,7 @@ function renderRoute(data) {
       <div class="empty">Итоги ${data.month} ещё не закрыты — ТОП-5 появится после закрытия месяца.</div>`;
   }
 
-  const top5Html = data.top5.map((a, i) => renderRouteCard(a, i + 1)).join('');
+  const top5Html = data.top5.map((a, i) => renderRouteCard(a, i + 1, data.month)).join('');
   const restHtml = data.rest.length
     ? `<div class="rest-toggle" onclick="document.getElementById('restList').style.display = document.getElementById('restList').style.display === 'none' ? 'block' : 'none'">Остальные маршруты (${data.rest.length}) ▾</div>
        <div id="restList" style="display:none">
