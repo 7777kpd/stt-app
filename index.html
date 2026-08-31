@@ -74,6 +74,14 @@ body {
 .v-sep    { color: #d1d5db; font-size: 16px; margin: 0 2px; }
 .v-off    { background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 700; padding: 0 8px; height: 26px; display: flex; align-items: center; border-radius: 6px; margin-left: 4px; white-space: nowrap; }
 
+/* VISITS (31.08.2026) — ряд визитов с датами, заказ есть/нет/вне маршрута
+   вперемешку по хронологии, вместо голых значков + "+N вне" текстом */
+.visits-cells { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.v-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 30px; }
+.v-cell-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; }
+.v-cell-day { font-size: 9px; color: var(--muted); }
+.v-cell-future { background: #E4DCC8 !important; color: var(--muted) !important; font-size: 14px; }
+
 /* HINT */
 .hint { font-size: 12px; margin-top: 7px; font-weight: 600; }
 .hint-need        { color: var(--blue); }
@@ -257,12 +265,23 @@ function normalizePoint(pt) {
   if (pt.sequence) {
     pt.visits = [];
     for (const [day, has_order] of pt.sequence) {
-      pt.visits.push({ has_order, is_future: false });
+      // 31.08.2026 (исправлено): day раньше вообще не сохранялся — из-за
+      // этого нельзя было показать, В КАКОЙ день был визит/пропуск, только
+      // голую последовательность значков. Дата уже приходит с бэкенда
+      // (calc_point_stt.sequence), просто терялась здесь.
+      pt.visits.push({ day, has_order, is_future: false });
     }
     for (let i = 0; i < (pt.remaining || 0); i++) {
       pt.visits.push({ has_order: false, is_future: true });
     }
   }
+
+  // 31.08.2026: даты заказов вне маршрута (calc_point_stt.off_schedule_dates,
+  // добавлено на бэкенде 31.08.2026) — раньше был только счётчик
+  // (off_schedule_orders), теперь можно показать, В КАКОЙ день это было.
+  pt.off_route_days = Array.isArray(pt.off_schedule_dates)
+    ? pt.off_schedule_dates
+    : (pt.off_schedule_dates ? Object.values(pt.off_schedule_dates) : []);
 
   if (!pt.hint) {
     const need75 = pt.need_75 !== undefined ? pt.need_75 : null;
@@ -287,18 +306,42 @@ function normalizePoint(pt) {
   return pt;
 }
 
-function renderVisits(visits, offRoute) {
-  if (!visits?.length && !offRoute) return '';
-  let html = '<div class="visits">';
-  let sepDone = false;
-  for (const v of (visits || [])) {
-    if (!sepDone && v.is_future) { html += '<span class="v-sep">|</span>'; sepDone = true; }
-    if (v.is_future)      html += '<span class="v v-future">·</span>';
-    else if (v.has_order) html += '<span class="v v-ok">✓</span>';
-    else                  html += '<span class="v v-miss">✕</span>';
+function renderVisits(pt) {
+  const visits = pt.visits || [];
+  const offRouteDays = pt.off_route_days || [];
+  if (!visits.length && !offRouteDays.length) return '';
+
+  // 31.08.2026 (переработано): раньше был просто ряд значков без дат и
+  // отдельный текст "+N вне" — теперь один хронологический ряд (визит по
+  // плану + заказ вне маршрута вперемешку, по датам), с днём недели под
+  // каждой иконкой, тем же стилем, что и в "Анализ системности" у ТМ.
+  const shortWd = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+  const now = new Date();
+  function dayToWd(day) {
+    return shortWd[new Date(now.getFullYear(), now.getMonth(), day).getDay()];
   }
-  if (offRoute > 0) {
-    html += `<span class="v-off">+${offRoute} вне</span>`;
+
+  const past = visits.filter(v => !v.is_future && v.day != null);
+  const future = visits.filter(v => v.is_future);
+
+  const items = [
+    ...past.map(v => ({ day: v.day, type: v.has_order ? 'ok' : 'miss' })),
+    ...offRouteDays.map(day => ({ day, type: 'off' })),
+  ].sort((a, b) => a.day - b.day);
+
+  const STYLE = {
+    ok:   { bg: '#639922', icon: '✓' },
+    miss: { bg: '#E24B4A', icon: '✗' },
+    off:  { bg: '#378ADD', icon: '📍' },
+  };
+
+  let html = '<div class="visits-cells">';
+  html += items.map(it => {
+    const s = STYLE[it.type];
+    return `<div class="v-cell"><div class="v-cell-icon" style="background:${s.bg}">${s.icon}</div><span class="v-cell-day">${dayToWd(it.day)}</span></div>`;
+  }).join('');
+  if (future.length) {
+    html += `<div class="v-cell"><div class="v-cell-icon v-cell-future">${'·'.repeat(Math.min(future.length,3))}</div><span class="v-cell-day">ост.</span></div>`;
   }
   return html + '</div>';
 }
@@ -363,7 +406,7 @@ function renderCard(pt) {
       <div class="card-stt-wrap">${sttBlock}</div>
     </div>
     <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}</div>
-    ${renderVisits(pt.visits, offRoute)}
+    ${renderVisits(pt)}
     ${renderHint(pt)}
     ${renderCats(pt.cats)}
   </div>`;
