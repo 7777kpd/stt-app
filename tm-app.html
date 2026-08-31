@@ -103,6 +103,30 @@
   .week-load-block { margin-bottom: 4px; }
   .week-load-label { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-bottom: 8px; }
   .week-load-note { font-size: 9.5px; color: var(--ink-soft); opacity: 0.85; line-height: 1.4; margin: -4px 0 10px; }
+  .pp-block { border-top: 0.5px solid var(--line); margin: 14px -18px 0; padding: 14px 18px 0; }
+  .pp-title { font-size: 13px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .pp-tabs { display: flex; background: var(--bg); border-radius: 11px; padding: 3px; margin-bottom: 12px; }
+  .pp-tab { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ink-soft); padding: 8px 0; border-radius: 8px; cursor: pointer; }
+  .pp-tab.active { background: var(--card); color: var(--ink); }
+  .pp-legend { border: 0.5px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 14px; }
+  .pp-legend-title { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; }
+  .pp-legend-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .pp-legend-item { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--ink-soft); }
+  .pp-legend-icon { width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; flex-shrink: 0; }
+  .pp-list { display: flex; flex-direction: column; gap: 8px; }
+  .pp-empty { font-size: 12px; color: var(--ink-soft); padding: 8px 0; }
+  .pp-card { border-left: 3px solid; border-radius: 0 10px 10px 0; background: var(--bg); }
+  .pp-card summary { cursor: pointer; list-style: none; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .pp-card summary::-webkit-details-marker { display: none; }
+  .pp-card-name { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pp-card-right { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; flex-shrink: 0; }
+  .pp-card-right i { font-size: 14px; color: var(--ink-soft); }
+  .pp-card-body { padding: 0 12px 12px; }
+  .pp-card-addr { font-size: 11px; color: var(--ink-soft); margin-bottom: 8px; }
+  .pp-card-cells { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pp-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 30px; }
+  .pp-cell-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .pp-cell-day { font-size: 9px; color: var(--ink-soft); }
   .week-load-bars { display: flex; justify-content: space-between; align-items: flex-end; gap: 4px; height: 56px; }
   .week-load-avg-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1px dashed var(--blue); opacity: .7; }
   .week-load-avg-num { position: absolute; right: 0; top: -14px; font-size: 8px; font-weight: 800; color: var(--blue); background: var(--card); padding: 0 3px; border-radius: 4px; }
@@ -359,6 +383,63 @@ function renderRouteCard(a, rank, monthLabel) {
     </div>
   </div>`;
 
+  // 31.08.2026: карточки "Точки прошлого месяца" — вкладки Не АКБ/АКБ/СТТ,
+  // список точек каждого уровня, разворачивается по тапу в хронологию
+  // визитов (заказ есть/нет/вне маршрута). Данные уже готовы в архиве
+  // (calc_all_agents_month_summary), здесь только рендер — ничего не
+  // считаем и не запрашиваем.
+  const pointCards = a.point_cards || [];
+  const byLevel = {red: [], amber: [], green: []};
+  pointCards.forEach(p => { (byLevel[p.level] || byLevel.red).push(p); });
+  const levelMeta = {
+    red: {label: 'Не АКБ', border: '#E24B4A', bg: '#FCEBEB', text: '#A32D2D'},
+    amber: {label: 'АКБ', border: '#EF9F27', bg: '#FAEEDA', text: '#854F0B'},
+    green: {label: 'СТТ', border: '#639922', bg: '#EAF3DE', text: '#3B6D11'},
+  };
+  const itemStyle = {
+    ok: {bg: '#EAF3DE', fg: '#3B6D11', icon: 'ti-check'},
+    miss: {bg: '#FCEBEB', fg: '#A32D2D', icon: 'ti-x'},
+    off: {bg: '#E6F1FB', fg: '#185FA5', icon: 'ti-map-pin-off'},
+  };
+  const ppTabsHtml = ['red', 'amber', 'green'].map((lvl, i) => {
+    const m = levelMeta[lvl];
+    return `<button class="pp-tab${i===0?' active':''}" data-pp-level="${lvl}" data-pp-card="${cardId}" onclick="switchPointTab(this, event)">${m.label} (${byLevel[lvl].length})</button>`;
+  }).join('');
+  function pointCardHtml(p, lvl) {
+    const m = levelMeta[lvl];
+    const cells = (p.items || []).map(v => {
+      const s = itemStyle[v.type] || itemStyle.miss;
+      return `<div class="pp-cell"><div class="pp-cell-icon" style="background:${s.bg};color:${s.fg}"><i class="ti ${s.icon}" aria-hidden="true"></i></div><span class="pp-cell-day">${v.wd}</span></div>`;
+    }).join('');
+    return `<details class="pp-card" style="border-left-color:${m.border}">
+      <summary>
+        <div class="pp-card-name">${p.name}</div>
+        <div class="pp-card-right"><span style="color:${m.text}">${p.achieved}%</span><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
+      </summary>
+      <div class="pp-card-body">
+        <div class="pp-card-addr">${p.addr}</div>
+        <div class="pp-card-cells">${cells}</div>
+      </div>
+    </details>`;
+  }
+  const ppListsHtml = ['red', 'amber', 'green'].map((lvl, i) => `
+    <div class="pp-list" data-pp-list="${cardId}" data-pp-list-level="${lvl}" style="${i===0?'':'display:none'}">
+      ${byLevel[lvl].length ? byLevel[lvl].map(p => pointCardHtml(p, lvl)).join('') : '<div class="pp-empty">Точек этого уровня нет</div>'}
+    </div>`).join('');
+  const pointCardsBlockHtml = pointCards.length ? `<div class="pp-block">
+    <div class="pp-title">Точки прошлого месяца</div>
+    <div class="pp-tabs">${ppTabsHtml}</div>
+    <div class="pp-legend">
+      <div class="pp-legend-title">Обозначения</div>
+      <div class="pp-legend-row">
+        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#EAF3DE;color:#3B6D11"><i class="ti ti-check" aria-hidden="true"></i></span>заказ есть</span>
+        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#FCEBEB;color:#A32D2D"><i class="ti ti-x" aria-hidden="true"></i></span>заказа нет</span>
+        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#E6F1FB;color:#185FA5"><i class="ti ti-map-pin-off" aria-hidden="true"></i></span>вне маршрута</span>
+      </div>
+    </div>
+    ${ppListsHtml}
+  </div>` : '';
+
   return `<details class="route-card">
     <summary>
       <div><span class="rc-name">${rank} · ${a.agent}</span><span class="rc-sub">${a.sv || ''}</span></div>
@@ -381,8 +462,20 @@ function renderRouteCard(a, rank, monthLabel) {
         </div>
       </div>
       ${weeklyLoadHtml}
+      ${pointCardsBlockHtml}
     </div>
   </details>`;
+}
+
+function switchPointTab(btn, event) {
+  event.preventDefault();
+  const cardId = btn.dataset.ppCard;
+  const level = btn.dataset.ppLevel;
+  btn.parentElement.querySelectorAll('.pp-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll(`[data-pp-list="${cardId}"]`).forEach(el => {
+    el.style.display = el.dataset.ppListLevel === level ? '' : 'none';
+  });
 }
 
 function renderRoute(data) {
