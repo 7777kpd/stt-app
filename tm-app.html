@@ -423,7 +423,7 @@ function renderRouteCard(a, rank, monthLabel, monthNum, yearNum) {
       const s = itemStyle[type];
       return `<div class="pp-cell"><div class="pp-cell-icon" style="background:${s.bg};color:${s.fg}">${s.icon}</div><span class="pp-cell-day">${dayToWd(day)}</span></div>`;
     }).join('');
-    return `<details class="pp-card" style="border-left-color:${m.border}">
+    return `<details class="pp-card" open style="border-left-color:${m.border}">
       <summary>
         <div class="pp-card-name">${p.n}</div>
         <div class="pp-card-right"><span style="color:${m.text}">${p.s}%</span><span class="rc-chevron">▶</span></div>
@@ -440,7 +440,7 @@ function renderRouteCard(a, rank, monthLabel, monthNum, yearNum) {
     </div>`).join('');
   const pointCardsBlockHtml = pointCards.length ? `<details class="pp-block">
     <summary class="pp-title-row">
-      <span class="pp-title">Не системные торговые точки прошлого месяца</span>
+      <span class="pp-title">Анализ системности по точкам</span>
       <span class="rc-chevron pp-title-chevron">▶</span>
     </summary>
     <div class="pp-legend">
