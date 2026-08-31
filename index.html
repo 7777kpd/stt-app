@@ -612,6 +612,8 @@ function buildSttScreen(data) {
         <div class="stt-month-note">Доля заказов с категорией от всех заказов (${totalAllOrders})</div>
         <div class="cats-stt">${catHtml}</div>
       </div>
+
+      ${_pointAnalysisHtml(data.point_cards || [], data.month_num, data.year)}
     </div>`;
 
   document.querySelectorAll('#screen-stt [data-cat]').forEach(el => {
@@ -619,6 +621,98 @@ function buildSttScreen(data) {
       _sttOpenCat = _sttOpenCat === el.dataset.cat ? null : el.dataset.cat;
       buildSttScreen(_lastSttData);
     });
+  });
+}
+
+// 31.08.2026: "Анализ системности по точкам" — та же карточка (СТТ/АКБ/
+// Не АКБ вкладки + хронология визитов по датам), что уже есть у ТМ на
+// "Маршрут" (tm-app.html), для собственного "Итоги месяца" агента.
+// point_cards приходит готовым из архива (agent_stt, архивная ветка,
+// только для "Прошлый месяц") — здесь только рендер, ничего не считаем.
+function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
+  if (!pointCards.length) return '';
+
+  const byLevel = { red: [], amber: [], green: [] };
+  pointCards.forEach(p => { (byLevel[p.l] || byLevel.red).push(p); });
+  const levelMeta = {
+    red:   { label: 'Не АКБ', border: '#8B1A1A', bg: '#FCEBEB', tabBg: '#F7C1C1', text: '#791F1F' },
+    amber: { label: 'АКБ',    border: '#8B6914', bg: '#FAEEDA', tabBg: '#FAC775', text: '#633806' },
+    green: { label: 'СТТ',    border: '#2D5A1B', bg: '#EAF3DE', tabBg: '#C0DD97', text: '#27500A' },
+  };
+  const TYPE_NAME = ['ok', 'miss', 'off'];
+  const ICON = { ok: '✓', miss: '✗', off: '📍' };
+  const COLOR = { ok: '#22C55E', miss: '#EF4444', off: '#378ADD' };
+  const shortWd = ['Вс','Пн','Вт','Ср','Чт','Пт','Сб'];
+  function dayToWd(day) {
+    if (!monthNum || !yearNum) return '';
+    return shortWd[new Date(yearNum, monthNum - 1, day).getDay()];
+  }
+
+  function cardHtml(p, lvl) {
+    const m = levelMeta[lvl];
+    const cells = (p.i || []).map(([day, code]) => {
+      const type = TYPE_NAME[code] || 'miss';
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:30px;">
+        <div style="width:24px;height:24px;border-radius:6px;background:${COLOR[type]};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;">${ICON[type]}</div>
+        <span style="font-size:9px;color:var(--muted);">${dayToWd(day)}</span>
+      </div>`;
+    }).join('');
+    return `<details open style="border-left:3px solid ${m.border};border-radius:0 10px 10px 0;background:var(--bg);">
+      <summary style="cursor:pointer;list-style:none;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <div style="font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.n}</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:15px;font-weight:700;color:${m.text};flex-shrink:0;">${p.s}%<span style="font-size:13px;color:var(--muted);">▶</span></div>
+      </summary>
+      <div style="padding:0 12px 12px;">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${p.a}</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">${cells}</div>
+      </div>
+    </details>`;
+  }
+
+  const tabsHtml = ['red', 'amber', 'green'].map((lvl, i) => {
+    const m = levelMeta[lvl];
+    return `<button data-pa-level="${lvl}" data-active="${i===0}" style="flex:1;border:none;font-family:inherit;font-size:12px;font-weight:700;padding:8px 0;border-radius:8px;cursor:pointer;background:${i===0?m.tabBg:m.bg};color:${m.text};" onclick="_switchPointAnalysisTab(this)">${m.label} (${byLevel[lvl].length})</button>`;
+  }).join('');
+
+  const listsHtml = ['red', 'amber', 'green'].map((lvl, i) => `
+    <div data-pa-list="${lvl}" style="${i===0?'':'display:none'};display:flex;flex-direction:column;gap:8px;">
+      ${byLevel[lvl].length ? byLevel[lvl].map(p => cardHtml(p, lvl)).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Точек этого уровня нет</div>'}
+    </div>`).join('');
+
+  return `<div class="stt-card">
+    <details>
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span class="stt-card-head" style="margin:0"><span>📝</span><span class="stt-card-title">Анализ системности по точкам</span></span>
+        <span style="font-size:13px;color:var(--muted);">▶</span>
+      </summary>
+      <div style="border:0.5px solid var(--border);border-radius:10px;padding:10px 12px;margin:12px 0;">
+        <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Обозначения</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);"><span style="width:20px;height:20px;border-radius:6px;background:#22C55E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;">✓</span>заказ есть</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);"><span style="width:20px;height:20px;border-radius:6px;background:#EF4444;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;">✗</span>заказа нет</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);"><span style="width:20px;height:20px;border-radius:6px;background:#378ADD;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;">📍</span>вне маршрута</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:3px;background:var(--bg);border-radius:11px;padding:3px;margin-bottom:12px;">${tabsHtml}</div>
+      ${listsHtml}
+    </details>
+  </div>`;
+}
+
+function _switchPointAnalysisTab(btn) {
+  const level = btn.dataset.paLevel;
+  const parent = btn.parentElement;
+  parent.querySelectorAll('button').forEach(b => {
+    const lvl = b.dataset.paLevel;
+    const colors = { red: ['#FCEBEB','#791F1F'], amber: ['#FAEEDA','#633806'], green: ['#EAF3DE','#27500A'] };
+    const tabColors = { red: ['#F7C1C1','#791F1F'], amber: ['#FAC775','#633806'], green: ['#C0DD97','#27500A'] };
+    const isActive = b === btn;
+    const [bg, text] = isActive ? tabColors[lvl] : colors[lvl];
+    b.style.background = bg;
+    b.style.color = text;
+  });
+  parent.parentElement.querySelectorAll('[data-pa-list]').forEach(el => {
+    el.style.display = el.dataset.paList === level ? 'flex' : 'none';
   });
 }
 
