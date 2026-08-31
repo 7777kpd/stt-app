@@ -107,8 +107,6 @@
   .pp-title-row { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
   .pp-title-row::-webkit-details-marker { display: none; }
   .pp-title { font-size: 13px; font-weight: 700; color: var(--ink); }
-  .pp-title-chevron { font-size: 15px; color: var(--ink-soft); transition: transform .15s; }
-  .pp-block[open] .pp-title-chevron { transform: rotate(180deg); }
   .pp-tabs { display: flex; background: var(--bg); border-radius: 11px; padding: 3px; margin-bottom: 12px; }
   .pp-tab { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ink-soft); padding: 8px 0; border-radius: 8px; cursor: pointer; }
   .pp-tab.active { background: var(--card); color: var(--ink); }
@@ -124,7 +122,6 @@
   .pp-card summary::-webkit-details-marker { display: none; }
   .pp-card-name { font-size: 13px; font-weight: 700; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pp-card-right { display: flex; align-items: center; gap: 6px; font-size: 15px; font-weight: 700; flex-shrink: 0; }
-  .pp-card-right i { font-size: 14px; color: var(--ink-soft); }
   .pp-card-body { padding: 0 12px 12px; }
   .pp-card-addr { font-size: 11px; color: var(--ink-soft); margin-bottom: 8px; }
   .pp-card-cells { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -401,9 +398,9 @@ function renderRouteCard(a, rank, monthLabel, monthNum, yearNum) {
     green: {label: 'СТТ', border: '#639922', bg: '#EAF3DE', text: '#3B6D11', tabBg: '#C0DD97', tabText: '#27500A'},
   };
   const itemStyle = {
-    ok: {bg: '#639922', fg: '#FFFFFF', icon: 'ti-check'},
-    miss: {bg: '#E24B4A', fg: '#FFFFFF', icon: 'ti-x'},
-    off: {bg: '#378ADD', fg: '#FFFFFF', icon: 'ti-map-pin-off'},
+    ok: {bg: '#639922', fg: '#FFFFFF', icon: '✓'},
+    miss: {bg: '#E24B4A', fg: '#FFFFFF', icon: '✗'},
+    off: {bg: '#378ADD', fg: '#FFFFFF', icon: '📍'},
   };
   // 31.08.2026: формат в архиве сжат до [день_месяца, код_типа] (0=ok,
   // 1=miss, 2=off) — день недели здесь пересчитывается на лету из
@@ -424,12 +421,12 @@ function renderRouteCard(a, rank, monthLabel, monthNum, yearNum) {
     const cells = (p.i || []).map(([day, code]) => {
       const type = TYPE_NAME[code] || 'miss';
       const s = itemStyle[type];
-      return `<div class="pp-cell"><div class="pp-cell-icon" style="background:${s.bg};color:${s.fg}"><i class="ti ${s.icon}" aria-hidden="true"></i></div><span class="pp-cell-day">${dayToWd(day)}</span></div>`;
+      return `<div class="pp-cell"><div class="pp-cell-icon" style="background:${s.bg};color:${s.fg}">${s.icon}</div><span class="pp-cell-day">${dayToWd(day)}</span></div>`;
     }).join('');
     return `<details class="pp-card" style="border-left-color:${m.border}">
       <summary>
         <div class="pp-card-name">${p.n}</div>
-        <div class="pp-card-right"><span style="color:${m.text}">${p.s}%</span><i class="ti ti-chevron-down" aria-hidden="true"></i></div>
+        <div class="pp-card-right"><span style="color:${m.text}">${p.s}%</span><span class="rc-chevron">▶</span></div>
       </summary>
       <div class="pp-card-body">
         <div class="pp-card-addr">${p.a}</div>
@@ -444,17 +441,17 @@ function renderRouteCard(a, rank, monthLabel, monthNum, yearNum) {
   const pointCardsBlockHtml = pointCards.length ? `<details class="pp-block">
     <summary class="pp-title-row">
       <span class="pp-title">Не системные торговые точки прошлого месяца</span>
-      <i class="ti ti-chevron-down pp-title-chevron" aria-hidden="true"></i>
+      <span class="rc-chevron pp-title-chevron">▶</span>
     </summary>
-    <div class="pp-tabs">${ppTabsHtml}</div>
     <div class="pp-legend">
       <div class="pp-legend-title">Обозначения</div>
       <div class="pp-legend-row">
-        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#639922;color:#fff"><i class="ti ti-check" aria-hidden="true"></i></span>заказ есть</span>
-        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#E24B4A;color:#fff"><i class="ti ti-x" aria-hidden="true"></i></span>заказа нет</span>
-        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#378ADD;color:#fff"><i class="ti ti-map-pin-off" aria-hidden="true"></i></span>вне маршрута</span>
+        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#639922;color:#fff">✓</span>заказ есть</span>
+        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#E24B4A;color:#fff">✗</span>заказа нет</span>
+        <span class="pp-legend-item"><span class="pp-legend-icon" style="background:#378ADD;color:#fff">📍</span>вне маршрута</span>
       </div>
     </div>
+    <div class="pp-tabs">${ppTabsHtml}</div>
     ${ppListsHtml}
   </details>` : '';
 
