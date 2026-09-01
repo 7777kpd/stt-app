@@ -681,18 +681,47 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
       ${byLevel[lvl].length ? byLevel[lvl].map(p => cardHtml(p, lvl)).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Точек этого уровня нет</div>'}
     </div>`).join('');
 
+  // 01.09.2026: сумма по ВСЕМ точкам агента (все 3 уровня разом, не
+  // зависит от выбранной вкладки) — сколько раз за месяц было
+  // "заказ есть"/"заказа нет"/"вне маршрута" по всему списку точек.
+  // ВАЖНО: point_cards строится через calc_point_stt, которая проходит
+  // ТОЛЬКО по точкам, которые есть в плане агента — если заказ был на
+  // точке, которой в плане вообще нет, она сюда не попадёт. Поэтому
+  // totals.off здесь МЕНЬШЕ, чем "вне" в карточке "Система" выше (та
+  // цифра честная, включает и полностью неучтённые точки — см. память
+  // проекта, отдельная нерешённая задача на будущее).
+  const totals = { ok: 0, miss: 0, off: 0 };
+  pointCards.forEach(p => (p.i || []).forEach(([, code]) => {
+    const type = TYPE_NAME[code] || 'miss';
+    totals[type]++;
+  }));
+
+  const legendRow = (bg, icon, label, count) => `<div style="display:flex;align-items:center;gap:6px;">
+    <span style="width:20px;height:20px;border-radius:6px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;">${icon}</span>
+    <span style="display:flex;flex-direction:column;">
+      <span style="font-size:10.5px;color:var(--muted);line-height:1.3;">${label}</span>
+      <span style="font-size:11px;color:var(--text);line-height:1.3;">${count}</span>
+    </span>
+  </div>`;
+
   return `<div class="stt-card c-teal">
     <details>
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
         <span class="stt-card-head" style="margin:0"><span>🔍</span><span class="stt-card-title">Анализ системности по точкам</span></span>
-        <span style="font-size:13px;color:var(--muted);">▶</span>
+        <span style="display:flex;align-items:center;gap:8px;">
+          <span style="text-align:right;">
+            <span style="display:block;font-size:20px;font-weight:700;color:#0F6E56;line-height:1;">${pointCards.length}</span>
+            <span style="display:block;font-size:9px;color:var(--muted);margin-top:2px;">точек</span>
+          </span>
+          <span style="font-size:13px;color:var(--muted);">▶</span>
+        </span>
       </summary>
       <div style="border:0.5px solid var(--border);border-radius:10px;padding:10px 12px;margin:12px 0;">
         <div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Обозначения</div>
-        <div style="display:flex;gap:14px;flex-wrap:wrap;">
-          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);"><span style="width:20px;height:20px;border-radius:6px;background:#22C55E;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;">✓</span>заказ есть</div>
-          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);"><span style="width:20px;height:20px;border-radius:6px;background:#EF4444;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;">✗</span>заказа нет</div>
-          <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);"><span style="width:20px;height:20px;border-radius:6px;background:#378ADD;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;">📍</span>вне маршрута</div>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;">
+          ${legendRow('#22C55E', '✓', 'заказ есть', totals.ok)}
+          ${legendRow('#EF4444', '✗', 'заказа нет', totals.miss)}
+          ${legendRow('#378ADD', '📍', 'вне маршрута', totals.off)}
         </div>
       </div>
       <div style="display:flex;gap:3px;background:var(--bg);border-radius:11px;padding:3px;margin-bottom:12px;">${tabsHtml}</div>
