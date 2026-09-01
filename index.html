@@ -634,12 +634,17 @@ function buildSttScreen(data) {
 function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
   if (!pointCards.length) return '';
 
-  const byLevel = { red: [], amber: [], green: [] };
+  const byLevel = { red: [], amber: [], green: [], ghost: [] };
   pointCards.forEach(p => { (byLevel[p.l] || byLevel.red).push(p); });
   const levelMeta = {
-    red:   { label: 'Не АКБ', border: '#8B1A1A', bg: '#FCEBEB', tabBg: '#F7C1C1', text: '#791F1F' },
-    amber: { label: 'АКБ',    border: '#8B6914', bg: '#FAEEDA', tabBg: '#FAC775', text: '#633806' },
-    green: { label: 'СТТ',    border: '#2D5A1B', bg: '#EAF3DE', tabBg: '#C0DD97', text: '#27500A' },
+    red:   { label: 'Не АКБ',  border: '#8B1A1A', bg: '#FCEBEB', tabBg: '#F7C1C1', text: '#791F1F' },
+    amber: { label: 'АКБ',     border: '#8B6914', bg: '#FAEEDA', tabBg: '#FAC775', text: '#633806' },
+    green: { label: 'СТТ',     border: '#2D5A1B', bg: '#EAF3DE', tabBg: '#C0DD97', text: '#27500A' },
+    // 01.09.2026: "Призрак" — точки, которых нет в плане агента вообще,
+    // но заказы по ним реально были (см. calc_all_agents_month_summary,
+    // ghost_orders). Раньше эти заказы были видны только числом в общем
+    // "вне" на карточке "Система", саму точку нигде не было видно.
+    ghost: { label: '👻 Призрак', border: '#5B4B8A', bg: '#EDE9F7', tabBg: '#C9BEEB', text: '#3D2E66' },
   };
   const TYPE_NAME = ['ok', 'miss', 'off'];
   const ICON = { ok: '✓', miss: '✗', off: '📍' };
@@ -659,10 +664,13 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
         <span style="font-size:9px;color:var(--muted);">${dayToWd(day)}</span>
       </div>`;
     }).join('');
+    // 01.09.2026: у "призрака" нет планового графика — s это КОЛИЧЕСТВО
+    // заказов, не %, показываем иначе (без значка процента).
+    const badge = lvl === 'ghost' ? `${p.s} ${p.s === 1 ? 'заказ' : 'заказов'}` : `${p.s}%`;
     return `<details open style="border-left:3px solid ${m.border};border-radius:0 10px 10px 0;background:var(--bg);">
       <summary style="cursor:pointer;list-style:none;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.n}</div>
-        <div style="display:flex;align-items:center;gap:6px;font-size:15px;font-weight:700;color:${m.text};flex-shrink:0;">${p.s}%<span style="font-size:13px;color:var(--muted);">▶</span></div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:15px;font-weight:700;color:${m.text};flex-shrink:0;">${badge}<span style="font-size:13px;color:var(--muted);">▶</span></div>
       </summary>
       <div style="padding:0 12px 12px;">
         <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">${p.a}</div>
@@ -671,12 +679,12 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
     </details>`;
   }
 
-  const tabsHtml = ['red', 'amber', 'green'].map((lvl, i) => {
+  const tabsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => {
     const m = levelMeta[lvl];
     return `<button data-pa-level="${lvl}" data-active="${i===0}" style="flex:1;border:none;font-family:inherit;font-size:12px;font-weight:700;padding:8px 0;border-radius:8px;cursor:pointer;background:${i===0?m.tabBg:m.bg};color:${m.text};" onclick="_switchPointAnalysisTab(this)">${m.label} (${byLevel[lvl].length})</button>`;
   }).join('');
 
-  const listsHtml = ['red', 'amber', 'green'].map((lvl, i) => `
+  const listsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => `
     <div data-pa-list="${lvl}" style="${i===0?'':'display:none'};display:flex;flex-direction:column;gap:8px;">
       ${byLevel[lvl].length ? byLevel[lvl].map(p => cardHtml(p, lvl)).join('') : '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Точек этого уровня нет</div>'}
     </div>`).join('');
@@ -735,8 +743,8 @@ function _switchPointAnalysisTab(btn) {
   const parent = btn.parentElement;
   parent.querySelectorAll('button').forEach(b => {
     const lvl = b.dataset.paLevel;
-    const colors = { red: ['#FCEBEB','#791F1F'], amber: ['#FAEEDA','#633806'], green: ['#EAF3DE','#27500A'] };
-    const tabColors = { red: ['#F7C1C1','#791F1F'], amber: ['#FAC775','#633806'], green: ['#C0DD97','#27500A'] };
+    const colors = { red: ['#FCEBEB','#791F1F'], amber: ['#FAEEDA','#633806'], green: ['#EAF3DE','#27500A'], ghost: ['#EDE9F7','#3D2E66'] };
+    const tabColors = { red: ['#F7C1C1','#791F1F'], amber: ['#FAC775','#633806'], green: ['#C0DD97','#27500A'], ghost: ['#C9BEEB','#3D2E66'] };
     const isActive = b === btn;
     const [bg, text] = isActive ? tabColors[lvl] : colors[lvl];
     b.style.background = bg;
