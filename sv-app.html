@@ -159,7 +159,7 @@
   #screen-stt .segment button.active { background: var(--card); color: var(--ink); }
   #screen-stt .sub-view { display: none; }
   #screen-stt .sub-view.active { display: block; }
-  #screen-stt .card { background: var(--card); border-radius: 18px; padding: 6px 0; }
+  #screen-stt .card { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 14px; }
   #screen-stt .rating-header { display: flex; align-items: center; gap: 12px; padding: 8px 16px 4px; }
   #screen-stt .rh-name { flex: 1; font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
   #screen-stt .rh-metrics { display: flex; gap: 14px; }
@@ -863,21 +863,7 @@ function renderStt(data) {
 
   const deltaHtml = '';
 
-  // 19.08.2026 (ВРЕМЕННО — диагностика бага дельты, убрать после решения):
-  // показывает вживую содержимое _debug_delta с сервера прямо на экране,
-  // без консоли разработчика — сфотографировать и прислать.
-  const debugHtml = data._debug_delta ? `
-    <div style="background:#fff3cd;border:1px solid #d4a72c;border-radius:10px;padding:10px;margin-bottom:14px;font-size:11px;line-height:1.6;color:#5c4a00;">
-      <b>ВРЕМЕННАЯ ДИАГНОСТИКА (убрать потом)</b><br>
-      Запрошен архив: ${data._debug_delta.prev_month_requested}<br>
-      Всего записей в архиве: ${data._debug_delta.prev_archived_count}<br>
-      Имена в архиве: ${JSON.stringify(data._debug_delta.prev_archived_names)}<br>
-      Имена в команде (сейчас): ${JSON.stringify(data._debug_delta.team_agents_names)}<br>
-      Совпало (прошли фильтр): ${JSON.stringify(data._debug_delta.prev_scores_matched)}
-    </div>` : '';
-
   return `
-    ${debugHtml}
     <div class="segment">
       <button class="${_sttMonthOffset === 0 ? 'active' : ''}" onclick="switchSttMonth(0)">Текущий месяц</button>
       <button class="${_sttMonthOffset === 1 ? 'active' : ''}" onclick="switchSttMonth(1)">Прошлый месяц</button>
