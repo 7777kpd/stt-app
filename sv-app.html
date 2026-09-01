@@ -580,16 +580,14 @@ function renderRoute(data) {
 // только объединение (сделано в api.py::sv_stt) и рендер, ничего не
 // считаем заново.
 // ============================================================
-function _pointAnalysisHtmlSv(pointCards, monthNum, yearNum) {
-  if (!pointCards.length) return '';
+function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yearNum) {
+  if (!agentPointAnalysis.length) return '';
 
-  const byLevel = { red: [], amber: [], green: [], ghost: [] };
-  pointCards.forEach(p => { (byLevel[p.l] || byLevel.red).push(p); });
   const levelMeta = {
     red:   { label: 'Не АКБ',  border: '#A93B30', bg: '#FAE7E4', tabBg: '#F0B4AC', text: '#7A2A22' },
     amber: { label: 'АКБ',     border: '#8B6914', bg: '#FAEEDA', tabBg: '#FAC775', text: '#633806' },
     green: { label: 'СТТ',     border: '#2D6A45', bg: '#E3F3E9', tabBg: '#A9DDBE', text: '#1F4A31' },
-    ghost: { label: '👻 Призрак', border: '#5B4B8A', bg: '#EDE9F7', tabBg: '#C9BEEB', text: '#3D2E66' },
+    ghost: { label: '👻',       border: '#5B4B8A', bg: '#EDE9F7', tabBg: '#C9BEEB', text: '#3D2E66' },
   };
   const TYPE_NAME = ['ok', 'miss', 'off'];
   const ICON = { ok: '✓', miss: '✗', off: '📍' };
@@ -600,10 +598,12 @@ function _pointAnalysisHtmlSv(pointCards, monthNum, yearNum) {
     return shortWd[new Date(yearNum, monthNum - 1, day).getDay()];
   }
 
+  // 01.09.2026: общая сводка (заказ есть/нет/вне маршрута) — по-прежнему
+  // по ВСЕЙ команде разом, отдельно от разреза по агентам ниже.
   const totals = { ok: 0, miss: 0, off: 0 };
-  pointCards.forEach(p => (p.i || []).forEach(([, code]) => {
-    totals[TYPE_NAME[code] || 'miss']++;
-  }));
+  agentPointAnalysis.forEach(a => a.point_cards.forEach(p =>
+    (p.i || []).forEach(([, code]) => { totals[TYPE_NAME[code] || 'miss']++; })
+  ));
 
   const legendRow = (bg, icon, label, count) => `<div style="display:flex;align-items:center;gap:6px;">
     <span style="width:20px;height:20px;border-radius:6px;background:${bg};color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;">${icon}</span>
@@ -635,15 +635,47 @@ function _pointAnalysisHtmlSv(pointCards, monthNum, yearNum) {
     </details>`;
   }
 
-  const tabsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => {
-    const m = levelMeta[lvl];
-    return `<button data-pa-level-sv="${lvl}" data-active="${i===0}" style="flex:1;border:none;font-family:inherit;font-size:12px;font-weight:700;padding:8px 0;border-radius:8px;cursor:pointer;background:${i===0?m.tabBg:m.bg};color:${m.text};" onclick="_switchPointAnalysisTabSv(this)">${m.label} (${byLevel[lvl].length})</button>`;
-  }).join('');
+  // 01.09.2026 (по просьбе — разрез по агентам): раньше все точки команды
+  // шли одним плоским списком, непонятно было, к какому агенту идти
+  // работать. Теперь — свёрнутый список агентов с бейджами (сразу видно,
+  // у кого больше "Не АКБ"/"Призрак", без открытия), уже отсортированный
+  // сервером по проблемности. Тап по агенту раскрывает ЕГО собственные
+  // вкладки/карточки — тот же вид, что у агента на его личном экране.
+  const agentsHtml = agentPointAnalysis.map((a, ai) => {
+    const c = a.counts;
+    const byLevel = { red: [], amber: [], green: [], ghost: [] };
+    a.point_cards.forEach(p => { (byLevel[p.l] || byLevel.red).push(p); });
+    const uid = `pa${ai}`;
 
-  const listsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => `
-    <div data-pa-list-sv="${lvl}" style="${i===0?'':'display:none'};display:flex;flex-direction:column;gap:8px;">
-      ${byLevel[lvl].length ? byLevel[lvl].map(p => cardHtml(p, lvl)).join('') : '<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Точек этого уровня нет</div>'}
-    </div>`).join('');
+    const badgesHtml = ['red', 'amber', 'green', 'ghost'].map(lvl => {
+      const m = levelMeta[lvl];
+      return `<span style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:7px;background:${m.bg};color:${m.text};">${m.label} ${c[lvl]}</span>`;
+    }).join('');
+
+    const tabsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => {
+      const m = levelMeta[lvl];
+      return `<button data-pa-level-sv="${lvl}" data-pa-uid="${uid}" style="flex:1;border:none;font-family:inherit;font-size:11.5px;font-weight:700;padding:7px 0;border-radius:8px;cursor:pointer;background:${i===0?m.tabBg:m.bg};color:${m.text};" onclick="_switchPointAnalysisTabSv(this)">${m.label} (${byLevel[lvl].length})</button>`;
+    }).join('');
+
+    const listsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => `
+      <div data-pa-list-sv="${lvl}" data-pa-uid="${uid}" style="${i===0?'':'display:none'};display:flex;flex-direction:column;gap:8px;">
+        ${byLevel[lvl].length ? byLevel[lvl].map(p => cardHtml(p, lvl)).join('') : '<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Точек этого уровня нет</div>'}
+      </div>`).join('');
+
+    return `<details style="border:0.5px solid var(--line);border-radius:12px;margin-top:8px;">
+      <summary style="cursor:pointer;list-style:none;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">${a.agent}</div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">${badgesHtml}</div>
+        </div>
+        <span style="font-size:13px;color:var(--ink-soft);flex-shrink:0;margin-left:8px;">▶</span>
+      </summary>
+      <div style="padding:0 14px 14px;">
+        <div style="display:flex;gap:3px;background:var(--bg);border-radius:11px;padding:3px;margin:10px 0 10px;">${tabsHtml}</div>
+        ${listsHtml}
+      </div>
+    </details>`;
+  }).join('');
 
   return `<div class="card" style="border-left:3px solid #2D6A82;">
     <details>
@@ -651,7 +683,7 @@ function _pointAnalysisHtmlSv(pointCards, monthNum, yearNum) {
         <span style="display:flex;align-items:center;gap:7px;"><span>🔍</span><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#2D6A82;">Анализ системности по точкам</span></span>
         <span style="display:flex;align-items:center;gap:8px;">
           <span style="text-align:right;">
-            <span style="display:block;font-size:20px;font-weight:700;color:#2D6A82;line-height:1;">${pointCards.length}</span>
+            <span style="display:block;font-size:20px;font-weight:700;color:#2D6A82;line-height:1;">${pointCardsTotal}</span>
             <span style="display:block;font-size:9px;color:var(--ink-soft);margin-top:2px;">точек</span>
           </span>
           <span style="font-size:13px;color:var(--ink-soft);">▶</span>
@@ -665,14 +697,15 @@ function _pointAnalysisHtmlSv(pointCards, monthNum, yearNum) {
           ${legendRow('#378ADD', '📍', 'вне маршрута', totals.off)}
         </div>
       </div>
-      <div style="display:flex;gap:3px;background:var(--bg);border-radius:11px;padding:3px;margin-bottom:12px;">${tabsHtml}</div>
-      ${listsHtml}
+      <div style="font-size:10.5px;color:var(--ink-soft);margin-bottom:4px;">По агентам — сначала самые проблемные</div>
+      ${agentsHtml}
     </details>
   </div>`;
 }
 
 function _switchPointAnalysisTabSv(btn) {
   const level = btn.dataset.paLevelSv;
+  const uid = btn.dataset.paUid;
   const parent = btn.parentElement;
   parent.querySelectorAll('button').forEach(b => {
     const lvl = b.dataset.paLevelSv;
@@ -682,7 +715,7 @@ function _switchPointAnalysisTabSv(btn) {
     b.style.background = bg;
     b.style.color = text;
   });
-  parent.parentElement.querySelectorAll('[data-pa-list-sv]').forEach(el => {
+  parent.parentElement.querySelectorAll(`[data-pa-list-sv][data-pa-uid="${uid}"]`).forEach(el => {
     el.style.display = el.dataset.paListSv === level ? 'flex' : 'none';
   });
 }
@@ -919,7 +952,7 @@ function renderStt(data) {
       </div>`;
     })()}
 
-    ${_pointAnalysisHtmlSv(data.point_cards || [], data.month_num, data.year)}
+    ${_pointAnalysisHtmlSv(data.agent_point_analysis || [], data.point_cards_total || 0, data.month_num, data.year)}
 
     <div class="segment">
       <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг торговых</button>
