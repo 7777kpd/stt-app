@@ -115,6 +115,28 @@ body {
 .stt-card.c-purple .stt-card-title { color: #7c4fbf; }
 .stt-card.c-teal .stt-card-title { color: #0F6E56; }
 
+/* ПРОДАЖИ (01.09.2026) */
+.sale-tiles { display: flex; gap: 8px; margin-top: 14px; }
+.sale-tile { flex: 1; background: var(--bg); border-radius: 12px; padding: 14px; text-align: center; }
+.sale-tile-lbl { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.sale-tile-pct { font-size: 26px; font-weight: 700; }
+.sale-tile-sum { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.sale-tabs { display: flex; gap: 3px; background: var(--bg); border-radius: 11px; padding: 3px; margin: 16px 0 10px; }
+.sale-tab { flex: 1; border: none; font-family: inherit; font-size: 12px; font-weight: 700; padding: 8px 0; border-radius: 8px; cursor: pointer; background: transparent; color: var(--muted); }
+.sale-tab.active { background: var(--card); color: var(--text); }
+.sale-item { padding: 12px 0; border-bottom: 0.5px solid var(--border); }
+.sale-item:last-child { border-bottom: none; }
+.sale-item-lbl { display: flex; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.sale-compare-row { display: flex; align-items: center; gap: 10px; }
+.sale-compare-col { flex: 1; text-align: center; background: var(--bg); border-radius: 10px; padding: 8px 6px; }
+.sale-compare-lbl { font-size: 9.5px; color: var(--muted); margin-bottom: 2px; }
+.sale-compare-pct { font-size: 18px; font-weight: 700; color: var(--text); }
+.sale-diff { flex-shrink: 0; text-align: center; font-weight: 700; font-size: 12px; padding: 6px 8px; border-radius: 8px; }
+.sale-diff-up { background: #E3F3E9; color: #1F4A31; }
+.sale-diff-down { background: #FAE7E4; color: #7A2A22; }
+.sale-diff-zero { background: var(--bg); color: var(--muted); }
+.sale-item-sum { font-size: 10.5px; color: var(--muted); text-align: right; margin-top: 6px; }
+
 .pakb-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
 .pakb-bar { display: flex; height: 8px; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
 .pakb-list-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
@@ -616,6 +638,8 @@ function buildSttScreen(data) {
       </div>
 
       ${_pointAnalysisHtml(data.point_cards || [], data.month_num, data.year)}
+
+      ${_salesCardHtml(data)}
     </div>`;
 
   document.querySelectorAll('#screen-stt [data-cat]').forEach(el => {
@@ -752,6 +776,113 @@ function _switchPointAnalysisTab(btn) {
   });
   parent.parentElement.querySelectorAll('[data-pa-list]').forEach(el => {
     el.style.display = el.dataset.paList === level ? 'flex' : 'none';
+  });
+}
+
+// ============================================================
+// ПРОДАЖИ (01.09.2026) — карточка "Итоги месяца", "Прошлый месяц".
+// 2 плитки сверху (в системе/вне системы) + 2 вкладки одинакового
+// формата: "По уровням" (точек%/продаж% по АКБ/СТТ/Призрак — "Не АКБ"
+// сознательно не показываем, там денег всегда 0; знаменатель — все
+// точки агента) и "По категориям" (тот же формат, знаменатель тот же —
+// все точки, вся сумма продаж, просто группировка по товарной
+// категории вместо уровня точки). "По уровням" считается целиком из
+// уже присланных point_cards, без новых полей с сервера.
+// ============================================================
+function _salesCardHtml(data) {
+  const amountSystem = data.amount_system || 0;
+  const amountNonSystem = data.amount_non_system || 0;
+  const totalMoney = amountSystem + amountNonSystem;
+  const pointCards = data.point_cards || [];
+  const totalPoints = pointCards.length;
+  if (!totalMoney && !totalPoints) return '';
+
+  const fmt = n => Math.round(n).toLocaleString('ru-RU');
+  const sysPct = totalMoney ? Math.round(amountSystem / totalMoney * 100) : 0;
+  const nonSysPct = totalMoney ? 100 - sysPct : 0;
+
+  function itemRow(label, pointsPct, salesPct, sum, dotColor) {
+    const diff = Math.round(salesPct - pointsPct);
+    const diffCls = diff > 0 ? 'sale-diff-up' : diff < 0 ? 'sale-diff-down' : 'sale-diff-zero';
+    const diffText = diff > 0 ? `+${diff}` : `${diff}`;
+    const dot = dotColor ? `<span style="width:8px;height:8px;border-radius:50%;background:${dotColor};display:inline-block;margin-right:8px;"></span>` : '';
+    return `<div class="sale-item">
+      <div class="sale-item-lbl">${dot}${label}</div>
+      <div class="sale-compare-row">
+        <div class="sale-compare-col"><div class="sale-compare-lbl">точек</div><div class="sale-compare-pct">${pointsPct}%</div></div>
+        <div class="sale-diff ${diffCls}">${diffText}</div>
+        <div class="sale-compare-col"><div class="sale-compare-lbl">продаж</div><div class="sale-compare-pct">${salesPct}%</div></div>
+      </div>
+      <div class="sale-item-sum">${fmt(sum)}</div>
+    </div>`;
+  }
+
+  const levelMeta = { red: {label:'Не АКБ', dot:'#DC5B4E'}, amber: {label:'АКБ', dot:'#E2A335'}, green: {label:'СТТ', dot:'#3FAE6A'}, ghost: {label:'👻 Призрак', dot:'#7A5C9E'} };
+  const byLevel = { red: {pts:0,sum:0}, amber: {pts:0,sum:0}, green: {pts:0,sum:0}, ghost: {pts:0,sum:0} };
+  pointCards.forEach(p => {
+    const l = byLevel[p.l] ? p.l : 'red';
+    byLevel[l].pts++;
+    byLevel[l].sum += (p.amt || 0);
+  });
+  const levelRows = ['amber', 'green', 'ghost'].map(lvl => {
+    const d = byLevel[lvl];
+    if (!d.pts && !d.sum) return '';
+    const ptsPct = totalPoints ? Math.round(d.pts / totalPoints * 100) : 0;
+    const salesPct = totalMoney ? Math.round(d.sum / totalMoney * 100) : 0;
+    return itemRow(levelMeta[lvl].label, ptsPct, salesPct, d.sum, levelMeta[lvl].dot);
+  }).join('');
+
+  const amountByCategory = data.amount_by_category || {};
+  const categoryPoints = data.category_points || {};
+  const categoryRows = Object.keys(amountByCategory)
+    .filter(cat => cat)
+    .sort((a, b) => amountByCategory[b] - amountByCategory[a])
+    .map(cat => {
+      const sum = amountByCategory[cat];
+      const pts = categoryPoints[cat] || 0;
+      const ptsPct = totalPoints ? Math.round(pts / totalPoints * 100) : 0;
+      const salesPct = totalMoney ? Math.round(sum / totalMoney * 100) : 0;
+      return itemRow(cat, ptsPct, salesPct, sum, null);
+    }).join('');
+
+  return `<div class="stt-card" style="border-left:3px solid #7A5C1E;">
+    <details>
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span class="stt-card-head" style="margin:0"><span>💰</span><span class="stt-card-title" style="color:#7A5C1E;">Продажи</span></span>
+        <span style="font-size:13px;color:var(--muted);">▶</span>
+      </summary>
+
+      <div class="sale-tiles">
+        <div class="sale-tile">
+          <div class="sale-tile-lbl">Продажи в системе</div>
+          <div class="sale-tile-pct" style="color:#2D5A1B;">${sysPct}%</div>
+          <div class="sale-tile-sum">${fmt(amountSystem)}</div>
+        </div>
+        <div class="sale-tile">
+          <div class="sale-tile-lbl">Продажи вне системы</div>
+          <div class="sale-tile-pct" style="color:#A32D2D;">${nonSysPct}%</div>
+          <div class="sale-tile-sum">${fmt(amountNonSystem)}</div>
+        </div>
+      </div>
+
+      <div class="sale-tabs">
+        <button class="sale-tab active" data-sale-tab="lvl" onclick="_switchSalesTab(this)">По уровням</button>
+        <button class="sale-tab" data-sale-tab="cat" onclick="_switchSalesTab(this)">По категориям</button>
+      </div>
+
+      <div data-sale-pane="lvl">${levelRows || '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Нет данных</div>'}</div>
+      <div data-sale-pane="cat" style="display:none;">${categoryRows || '<div style="font-size:12px;color:var(--muted);padding:8px 0;">Нет данных</div>'}</div>
+    </details>
+  </div>`;
+}
+
+function _switchSalesTab(btn) {
+  const key = btn.dataset.saleTab;
+  const parent = btn.parentElement;
+  parent.querySelectorAll('.sale-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  parent.parentElement.querySelectorAll('[data-sale-pane]').forEach(el => {
+    el.style.display = el.dataset.salePane === key ? 'block' : 'none';
   });
 }
 
