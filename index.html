@@ -790,20 +790,22 @@ function _salesCardHtml(data, catsData) {
   const sysPct = totalMoney ? Math.round(amountSystem / totalMoney * 100) : 0;
   const nonSysPct = totalMoney ? 100 - sysPct : 0;
 
-  function itemRow(label, pointsPct, salesPct, sum, dotColor, ordersInfo) {
+  function itemRow(label, pointsPct, salesPct, sum, dotColor, ordersInfo, pointsInfo) {
     const diff = Math.round(salesPct - pointsPct);
     const diffCls = diff > 0 ? 'sale-diff-up' : diff < 0 ? 'sale-diff-down' : 'sale-diff-zero';
     const diffText = diff > 0 ? `+${diff}` : `${diff}`;
     const dot = dotColor ? `<span style="width:8px;height:8px;border-radius:50%;background:${dotColor};display:inline-block;margin-right:8px;"></span>` : '';
-    // 02.09.2026 (переработано): "заказов X%" теперь отдельная третья
-    // колонка того же вида, что точек/продаж (крупный % + мелкая
-    // подпись "X из Y" под ним) — раньше была мелким текстом отдельной
-    // строкой, смотрелась невыразительно рядом с точек%/продаж%.
-    const ordersCol = ordersInfo ? `<div class="sale-compare-col sale-compare-col-orders"><div class="sale-compare-lbl">заказов</div><div class="sale-compare-pct" style="font-size:15px;">${ordersInfo.pct}%</div><div class="sale-compare-sub">${ordersInfo.count} из ${ordersInfo.total}</div></div>` : '';
+    // 02.09.2026 (переработано): "заказов X%" — округлено до целого (было
+    // с десятичными, напр. 94.7%, не в едином стиле с остальными).
+    // "точек" тоже получила подпись "X из Y" под собой, для симметрии с
+    // "заказов" (у уровней pointsInfo нет — там знаменатель и так виден
+    // из соседних вкладок, не дублируем).
+    const ordersCol = ordersInfo ? `<div class="sale-compare-col sale-compare-col-orders"><div class="sale-compare-lbl">заказов</div><div class="sale-compare-pct" style="font-size:15px;">${Math.round(ordersInfo.pct)}%</div><div class="sale-compare-sub">${ordersInfo.count} из ${ordersInfo.total}</div></div>` : '';
+    const pointsSub = pointsInfo ? `<div class="sale-compare-sub">${pointsInfo.count} из ${pointsInfo.total}</div>` : '';
     return `<div class="sale-item">
       <div class="sale-item-lbl">${dot}${label}</div>
       <div class="sale-compare-row">
-        <div class="sale-compare-col"><div class="sale-compare-lbl">точек</div><div class="sale-compare-pct">${pointsPct}%</div></div>
+        <div class="sale-compare-col"><div class="sale-compare-lbl">точек</div><div class="sale-compare-pct">${pointsPct}%</div>${pointsSub}</div>
         ${ordersCol}
         <div class="sale-diff ${diffCls}">${diffText}</div>
         <div class="sale-compare-col"><div class="sale-compare-lbl">продаж</div><div class="sale-compare-pct">${salesPct}%</div></div>
@@ -819,23 +821,6 @@ function _salesCardHtml(data, catsData) {
     byLevel[l].pts++;
     byLevel[l].sum += (p.amt || 0);
   });
-  // 02.09.2026 (ВРЕМЕННО, диагностика расхождения "продажи" — убрать
-  // после решения): сумма amt по ВСЕМ точкам (все 4 уровня, включая
-  // Не АКБ=0) должна математически совпадать с amountSystem+
-  // amountNonSystem — если расходится, значит расходятся сами данные
-  // в архиве (point_cards vs amount_system/amount_non_system), а не
-  // отображение.
-  const _sumOfAllAmt = pointCards.reduce((s, p) => s + (p.amt || 0), 0);
-  const _pointsWithAmt = pointCards.filter(p => (p.amt || 0) > 0).length;
-  const _sumOfRaw = pointCards.reduce((s, p) => s + (p._dbg_raw || 0), 0);
-  const _debugHtml = `<div style="background:#fff3cd;border:1px solid #d4a72c;border-radius:10px;padding:10px;margin:10px 0;font-size:11px;line-height:1.7;color:#5c4a00;">
-    <b>ВРЕМЕННАЯ ДИАГНОСТИКА (убрать потом)</b><br>
-    amountSystem+amountNonSystem = ${fmt(totalMoney)}<br>
-    сумма amt по всем point_cards (${pointCards.length} точек) = ${fmt(_sumOfAllAmt)}<br>
-    точек с amt > 0: ${_pointsWithAmt} из ${pointCards.length}<br>
-    независимый пересчёт (_dbg_raw) = ${fmt(_sumOfRaw)}<br>
-    разница (верх − amt) = ${fmt(totalMoney - _sumOfAllAmt)}
-  </div>`;
   const levelRows = ['amber', 'green', 'ghost'].map(lvl => {
     const d = byLevel[lvl];
     if (!d.pts && !d.sum) return '';
@@ -863,7 +848,8 @@ function _salesCardHtml(data, catsData) {
       const ptsPct = totalPoints ? Math.round(pts / totalPoints * 100) : 0;
       const salesPct = totalMoney ? Math.round(sum / totalMoney * 100) : 0;
       const oi = ordersByCat[cat] ? { count: ordersByCat[cat].count, total: totalAllOrdersForCats, pct: ordersByCat[cat].pct } : null;
-      return itemRow(cat, ptsPct, salesPct, sum, null, oi);
+      const pi = { count: pts, total: totalPoints };
+      return itemRow(cat, ptsPct, salesPct, sum, null, oi, pi);
     }).join('');
 
   return `<div class="stt-card" style="border-left:3px solid #7A5C1E;">
@@ -891,8 +877,6 @@ function _salesCardHtml(data, catsData) {
           <div class="sale-tile-sum">${fmt(amountNonSystem)}</div>
         </div>
       </div>
-
-      ${_debugHtml}
 
       <div class="sale-tabs">
         <button class="sale-tab active" data-sale-tab="lvl" onclick="_switchSalesTab(this)">По уровням</button>
