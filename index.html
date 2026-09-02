@@ -819,6 +819,19 @@ function _salesCardHtml(data, catsData) {
     byLevel[l].pts++;
     byLevel[l].sum += (p.amt || 0);
   });
+  // 02.09.2026 (ВРЕМЕННО, диагностика расхождения "продажи" — убрать
+  // после решения): сумма amt по ВСЕМ точкам (все 4 уровня, включая
+  // Не АКБ=0) должна математически совпадать с amountSystem+
+  // amountNonSystem — если расходится, значит расходятся сами данные
+  // в архиве (point_cards vs amount_system/amount_non_system), а не
+  // отображение.
+  const _sumOfAllAmt = pointCards.reduce((s, p) => s + (p.amt || 0), 0);
+  const _debugHtml = `<div style="background:#fff3cd;border:1px solid #d4a72c;border-radius:10px;padding:10px;margin:10px 0;font-size:11px;line-height:1.7;color:#5c4a00;">
+    <b>ВРЕМЕННАЯ ДИАГНОСТИКА (убрать потом)</b><br>
+    amountSystem+amountNonSystem = ${fmt(totalMoney)}<br>
+    сумма amt по всем point_cards (${pointCards.length} точек) = ${fmt(_sumOfAllAmt)}<br>
+    разница = ${fmt(totalMoney - _sumOfAllAmt)}
+  </div>`;
   const levelRows = ['amber', 'green', 'ghost'].map(lvl => {
     const d = byLevel[lvl];
     if (!d.pts && !d.sum) return '';
@@ -874,6 +887,8 @@ function _salesCardHtml(data, catsData) {
           <div class="sale-tile-sum">${fmt(amountNonSystem)}</div>
         </div>
       </div>
+
+      ${_debugHtml}
 
       <div class="sale-tabs">
         <button class="sale-tab active" data-sale-tab="lvl" onclick="_switchSalesTab(this)">По уровням</button>
