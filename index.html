@@ -826,10 +826,12 @@ function _salesCardHtml(data, catsData) {
   // в архиве (point_cards vs amount_system/amount_non_system), а не
   // отображение.
   const _sumOfAllAmt = pointCards.reduce((s, p) => s + (p.amt || 0), 0);
+  const _pointsWithAmt = pointCards.filter(p => (p.amt || 0) > 0).length;
   const _debugHtml = `<div style="background:#fff3cd;border:1px solid #d4a72c;border-radius:10px;padding:10px;margin:10px 0;font-size:11px;line-height:1.7;color:#5c4a00;">
     <b>ВРЕМЕННАЯ ДИАГНОСТИКА (убрать потом)</b><br>
     amountSystem+amountNonSystem = ${fmt(totalMoney)}<br>
     сумма amt по всем point_cards (${pointCards.length} точек) = ${fmt(_sumOfAllAmt)}<br>
+    точек с amt > 0: ${_pointsWithAmt} из ${pointCards.length}<br>
     разница = ${fmt(totalMoney - _sumOfAllAmt)}
   </div>`;
   const levelRows = ['amber', 'green', 'ghost'].map(lvl => {
