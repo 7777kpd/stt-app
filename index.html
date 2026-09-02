@@ -127,7 +127,7 @@ body {
 .sale-item { padding: 12px 0; border-bottom: 0.5px solid var(--border); }
 .sale-item:last-child { border-bottom: none; }
 .sale-item-lbl { display: flex; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
-.sale-compare-row { display: flex; align-items: center; gap: 10px; }
+.sale-compare-row { display: flex; align-items: center; gap: 6px; }
 .sale-compare-col { flex: 1; text-align: center; background: var(--bg); border-radius: 10px; padding: 8px 6px; }
 .sale-compare-lbl { font-size: 9.5px; color: var(--muted); margin-bottom: 2px; }
 .sale-compare-pct { font-size: 18px; font-weight: 700; color: var(--text); }
@@ -136,7 +136,8 @@ body {
 .sale-diff-down { background: #FAE7E4; color: #7A2A22; }
 .sale-diff-zero { background: var(--bg); color: var(--muted); }
 .sale-item-sum { font-size: 10.5px; color: var(--muted); text-align: right; margin-top: 6px; }
-.sale-item-orders { font-size: 10.5px; color: var(--muted); margin-top: 4px; }
+.sale-compare-col-orders { background: #F6F1E6; }
+.sale-compare-sub { font-size: 8.5px; color: var(--muted); margin-top: 2px; }
 
 .pakb-row { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; font-size: 12px; color: var(--muted); }
 .pakb-bar { display: flex; height: 8px; border-radius: 5px; overflow: hidden; margin-bottom: 10px; }
@@ -794,18 +795,19 @@ function _salesCardHtml(data, catsData) {
     const diffCls = diff > 0 ? 'sale-diff-up' : diff < 0 ? 'sale-diff-down' : 'sale-diff-zero';
     const diffText = diff > 0 ? `+${diff}` : `${diff}`;
     const dot = dotColor ? `<span style="width:8px;height:8px;border-radius:50%;background:${dotColor};display:inline-block;margin-right:8px;"></span>` : '';
-    // 02.09.2026: ordersInfo — только у категорий (замена убранного
-    // отдельного блока "Категории"): "заказов X из Y (Z%)", тот же
-    // расчёт (cat_shares), что был там, перенесён сюда без изменений.
-    const ordersLine = ordersInfo ? `<div class="sale-item-orders">заказов ${ordersInfo.count} из ${ordersInfo.total} (${ordersInfo.pct}%)</div>` : '';
+    // 02.09.2026 (переработано): "заказов X%" теперь отдельная третья
+    // колонка того же вида, что точек/продаж (крупный % + мелкая
+    // подпись "X из Y" под ним) — раньше была мелким текстом отдельной
+    // строкой, смотрелась невыразительно рядом с точек%/продаж%.
+    const ordersCol = ordersInfo ? `<div class="sale-compare-col sale-compare-col-orders"><div class="sale-compare-lbl">заказов</div><div class="sale-compare-pct" style="font-size:15px;">${ordersInfo.pct}%</div><div class="sale-compare-sub">${ordersInfo.count} из ${ordersInfo.total}</div></div>` : '';
     return `<div class="sale-item">
       <div class="sale-item-lbl">${dot}${label}</div>
       <div class="sale-compare-row">
         <div class="sale-compare-col"><div class="sale-compare-lbl">точек</div><div class="sale-compare-pct">${pointsPct}%</div></div>
         <div class="sale-diff ${diffCls}">${diffText}</div>
         <div class="sale-compare-col"><div class="sale-compare-lbl">продаж</div><div class="sale-compare-pct">${salesPct}%</div></div>
+        ${ordersCol}
       </div>
-      ${ordersLine}
       <div class="sale-item-sum">${fmt(sum)}</div>
     </div>`;
   }
