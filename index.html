@@ -804,9 +804,9 @@ function _salesCardHtml(data, catsData) {
       <div class="sale-item-lbl">${dot}${label}</div>
       <div class="sale-compare-row">
         <div class="sale-compare-col"><div class="sale-compare-lbl">точек</div><div class="sale-compare-pct">${pointsPct}%</div></div>
+        ${ordersCol}
         <div class="sale-diff ${diffCls}">${diffText}</div>
         <div class="sale-compare-col"><div class="sale-compare-lbl">продаж</div><div class="sale-compare-pct">${salesPct}%</div></div>
-        ${ordersCol}
       </div>
       <div class="sale-item-sum">${fmt(sum)}</div>
     </div>`;
