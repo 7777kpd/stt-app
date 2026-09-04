@@ -736,7 +736,7 @@ function renderStt(data) {
   // берётся готовым из c.orders, а не восстанавливается округлением
   // c.pct*total/100 (источник лишней погрешности).
   const catsHtml = (data.categories || []).map(c => {
-    const color = c.pct >= 75 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)';
+    const color = c.pct >= 80 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)';
     return `
     <div class="category-row">
       <span class="category-name">${c.name}</span>
