@@ -860,7 +860,7 @@ function renderMonth(data) {
     </div>
     <div class="day-card">
       <span class="card-label">Продажи по категориям</span>
-      <div style="margin-top:10px">${(data.categories||[]).map(c => `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:var(--green)"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:var(--green)">${c.pct}%</span></div></div>`).join('') || '<div class="empty">Нет данных</div>'}</div>
+      <div style="margin-top:10px">${(data.categories||[]).map(c => { const color = c.pct >= 80 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)'; return `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:${color}"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:${color}">${c.pct}%</span></div></div>`; }).join('') || '<div class="empty">Нет данных</div>'}</div>
     </div>
     <div class="rating-toggle">
       <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
