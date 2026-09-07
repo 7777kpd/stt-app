@@ -602,7 +602,7 @@ function buildSttScreen(data) {
         <span style="font-size:16px;font-weight:800;color:${color}">${r.avg_score}%</span>
       </div>
       <div style="font-size:13.5px;font-weight:700;margin-bottom:6px;">${r.agent}${isMe ? ' <span style="font-size:11px;font-weight:600;color:var(--muted)">(вы)</span>' : ''}</div>
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Системная ${r.sys}% · Чистая ${r.net}%${r.off>0?' · Вне −'+r.off:''}</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:8px;">Системная ${r.sys}% · Чистая ${r.net}%</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;">${chips}${focusChip}</div>
     </div>`;
   }
@@ -837,7 +837,7 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
   </div>`;
 
   return `<div class="stt-card c-teal">
-    <details>
+    <details open>
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
         <span class="stt-card-head" style="margin:0"><span>🔍</span><span class="stt-card-title">Анализ системности по точкам</span></span>
         <span style="display:flex;align-items:center;gap:8px;">
