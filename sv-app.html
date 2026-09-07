@@ -1084,15 +1084,22 @@ function renderStt(data) {
           <div style="text-align:right;margin-bottom:10px;">
             <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
           </div>
-          <div style="display:flex;gap:3px;height:7px;margin-bottom:14px;">
-            <div style="flex:${tGreen};background:var(--green);border-radius:4px;"></div>
-            <div style="flex:${tYellow};background:var(--yellow);border-radius:4px;"></div>
-            <div style="flex:${tRed};background:var(--red);border-radius:4px;"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">СТТ</span><div style="font-size:15px;font-weight:800;color:var(--green)">${tGreen} <span style="font-size:11px;font-weight:600">(${gp}%)</span></div></div>
-            <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">АКБ</span><div style="font-size:15px;font-weight:800;color:var(--yellow)">${tYellow} <span style="font-size:11px;font-weight:600">(${yp}%)</span></div></div>
-            <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">Не АКБ</span><div style="font-size:15px;font-weight:800;color:var(--red)">${tRed} <span style="font-size:11px;font-weight:600">(${rp}%)</span></div></div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:var(--green-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">СТТ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--green);">${tGreen}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);opacity:.85;">${gp}%</div>
+            </div>
+            <div style="flex:1;background:var(--yellow-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">АКБ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--yellow);">${tYellow}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--yellow);opacity:.85;">${yp}%</div>
+            </div>
+            <div style="flex:1;background:var(--red-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">Не АКБ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--red);">${tRed}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--red);opacity:.85;">${rp}%</div>
+            </div>
           </div>
         </div>
       </details>`;
