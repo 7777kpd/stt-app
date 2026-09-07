@@ -628,6 +628,8 @@ function buildSttScreen(data) {
 
       ${_salesCardHtml(data, catsData)}
 
+      ${_focusTasksCardHtml(data)}
+
       ${_pointAnalysisHtml(data.point_cards || [], data.month_num, data.year)}
     </div>`;
 
@@ -897,6 +899,47 @@ function _switchSalesTab(btn) {
   parent.parentElement.querySelectorAll('[data-sale-pane]').forEach(el => {
     el.style.display = el.dataset.salePane === key ? 'block' : 'none';
   });
+}
+
+// ============================================================
+// ЗАДАЧИ СВ (04.09.2026) — только "Прошлый месяц" (архив), для текущего
+// не считается. Сколько раз точки попадали в фокус за месяц (2+
+// пропуска подряд или заказ вне маршрута в этот день) и сколько из этих
+// дней в тот же день пришёл заказ. У агента — без разбивки по агентам
+// (это его же собственный отчёт).
+// ============================================================
+function _focusTasksCardHtml(data) {
+  const total = data.focus_tasks_total || 0;
+  const completed = data.focus_tasks_completed || 0;
+  if (!total) return '';
+  const pct = Math.round(completed / total * 100);
+  // 04.09.2026: цвет — ≥90 зелёный, 80-90 жёлтый, <80 красный.
+  const color = pct >= 90 ? '#3FAE6A' : pct >= 80 ? '#E2A335' : '#DC5B4E';
+  const colorBg = pct >= 90 ? '#EAF3DE' : pct >= 80 ? '#FAEEDA' : '#FCEBEB';
+  return `<div class="stt-card" style="border-left:3px solid #B8862B;">
+    <div class="stt-card-head">
+      <span>🎯</span><span class="stt-card-title" style="color:#B8862B;">Задачи СВ</span>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px;margin-bottom:6px;">
+      <div style="flex:1;background:var(--bg);border-radius:12px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:var(--text);">${total}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.3;">точек в фокусе<br>(суммарно за месяц)</div>
+      </div>
+      <div style="flex:1;background:var(--bg);border-radius:12px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#3B6D11;">${completed}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.3;">с заказом<br>в тот же день</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <span style="font-size:26px;font-weight:700;color:${color};">${pct}%</span>
+        <span style="font-size:12px;color:var(--muted);">выполнено задач</span>
+      </div>
+      <div style="height:9px;background:var(--bg);border-radius:100px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:100px;"></div>
+      </div>
+    </div>
+  </div>`;
 }
 
 function _dayChipsHtml() {
