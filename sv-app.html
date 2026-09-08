@@ -1012,6 +1012,47 @@ function renderStt(data) {
       <button class="${_sttMonthOffset === 1 ? 'active' : ''}" onclick="switchSttMonth(1)">Прошлый месяц</button>
     </div>
 
+    ${(() => {
+      const tGreen = data.green || 0, tYellow = data.yellow || 0, tRed = data.red || 0;
+      const tTotal = tGreen + tYellow + tRed;
+      if (!tTotal) return '';
+      const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
+      return `<details class="card">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">🏢 Клиентская база</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="text-align:right;">
+              <div style="font-size:20px;font-weight:700;color:var(--green);">${gp}%</div>
+              <div style="font-size:9px;color:var(--ink-soft);">СТТ</div>
+            </div>
+            <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+          </div>
+        </summary>
+        <div style="padding-top:14px;">
+          <div style="text-align:right;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:var(--green-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">СТТ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--green);">${tGreen}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);opacity:.85;">${gp}%</div>
+            </div>
+            <div style="flex:1;background:var(--yellow-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">АКБ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--yellow);">${tYellow}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--yellow);opacity:.85;">${yp}%</div>
+            </div>
+            <div style="flex:1;background:var(--red-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">Не АКБ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--red);">${tRed}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--red);opacity:.85;">${rp}%</div>
+            </div>
+          </div>
+        </div>
+      </details>`;
+    })()}
+
     <details class="card">
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">📊 Система</span>
@@ -1063,47 +1104,6 @@ function renderStt(data) {
       </summary>
       <div style="padding-top:14px;">${catsHtml}</div>
     </details>` : ''}
-
-    ${(() => {
-      const tGreen = data.green || 0, tYellow = data.yellow || 0, tRed = data.red || 0;
-      const tTotal = tGreen + tYellow + tRed;
-      if (!tTotal) return '';
-      const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
-      return `<details class="card">
-        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
-          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">🗺️ Территория</span>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <div style="text-align:right;">
-              <div style="font-size:20px;font-weight:700;color:var(--green);">${gp}%</div>
-              <div style="font-size:9px;color:var(--ink-soft);">СТТ</div>
-            </div>
-            <span style="font-size:13px;color:var(--ink-soft);">▶</span>
-          </div>
-        </summary>
-        <div style="padding-top:14px;">
-          <div style="text-align:right;margin-bottom:10px;">
-            <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <div style="flex:1;background:var(--green-bg);border-radius:12px;padding:12px 8px;text-align:center;">
-              <div style="font-size:10.5px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">СТТ</div>
-              <div style="font-size:20px;font-weight:800;color:var(--green);">${tGreen}</div>
-              <div style="font-size:11px;font-weight:600;color:var(--green);opacity:.85;">${gp}%</div>
-            </div>
-            <div style="flex:1;background:var(--yellow-bg);border-radius:12px;padding:12px 8px;text-align:center;">
-              <div style="font-size:10.5px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">АКБ</div>
-              <div style="font-size:20px;font-weight:800;color:var(--yellow);">${tYellow}</div>
-              <div style="font-size:11px;font-weight:600;color:var(--yellow);opacity:.85;">${yp}%</div>
-            </div>
-            <div style="flex:1;background:var(--red-bg);border-radius:12px;padding:12px 8px;text-align:center;">
-              <div style="font-size:10.5px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">Не АКБ</div>
-              <div style="font-size:20px;font-weight:800;color:var(--red);">${tRed}</div>
-              <div style="font-size:11px;font-weight:600;color:var(--red);opacity:.85;">${rp}%</div>
-            </div>
-          </div>
-        </div>
-      </details>`;
-    })()}
 
     ${_focusTasksCardHtmlSv(data)}
 
