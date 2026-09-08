@@ -809,6 +809,9 @@ function renderMonth(data) {
   function ratingCard(r, rank) {
     const isBest = rank === 1;
     const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
+    const focusChip = (r.focus_pct !== null && r.focus_pct !== undefined)
+      ? `<span class="chip" style="background:#EDE0C9;color:#7A5C1E">🎯 Задачи СВ ${r.focus_pct}%</span>`
+      : '';
     let deltaHtml = '';
     if (r.delta !== null && r.delta !== undefined) {
       const up = r.delta >= 0;
@@ -824,7 +827,7 @@ function renderMonth(data) {
         <div style="text-align:right"><span class="best-pct" style="display:block;${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span>${deltaHtml}</div>
       </div>
       <p class="best-sub">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
-      <div class="best-chips">${chips}</div>
+      <div class="best-chips">${chips}${focusChip}</div>
     </div>`;
   }
 
@@ -850,7 +853,7 @@ function renderMonth(data) {
       const tTotal = data.pakb || (tGreen + tYellow + tRed);
       if (!tTotal) return '';
       const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
-      return `<details class="day-card" open>
+      return `<details class="day-card">
         <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
           <span class="card-label">🏢 Клиентская база</span>
           <div style="display:flex;align-items:center;gap:8px;">
@@ -868,23 +871,37 @@ function renderMonth(data) {
         </div>
       </details>`;
     })()}
-    <div class="day-card">
-      <h3>📊 Система</h3>
-      ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
-      <div class="day-grid">
-        <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+    <details class="day-card">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span class="card-label">📊 Система</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:var(--ink);">${data.clean_stt}%</div><div style="font-size:9px;color:var(--ink-soft);">чистая</div></div>
+          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+        </div>
+      </summary>
+      <div style="padding-top:14px;">
+        ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
+        <div class="day-grid">
+          <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
+          <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+        </div>
+        <div class="day-tiles-row">
+          <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
+          <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>
+          <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
+        </div>
       </div>
-      <div class="day-tiles-row">
-        <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
-        <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>
-        <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
-      </div>
-    </div>
-    <div class="day-card">
-      <span class="card-label">Продажи по категориям</span>
-      <div style="margin-top:10px">${(data.categories||[]).map(c => { const color = c.pct >= 80 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)'; return `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:${color}"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:${color}">${c.pct}%</span></div></div>`; }).join('') || '<div class="empty">Нет данных</div>'}</div>
-    </div>
+    </details>
+    ${(data.categories||[]).length ? `<details class="day-card">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span class="card-label">🏷️ Категории</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:${data.avg_category!=null?(data.avg_category>=80?'var(--green)':data.avg_category>=50?'var(--yellow)':'var(--red)'):'var(--ink)'};">${data.avg_category!=null?data.avg_category+'%':'—'}</div><div style="font-size:9px;color:var(--ink-soft);">средняя</div></div>
+          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+        </div>
+      </summary>
+      <div style="padding-top:14px;">${data.categories.map(c => { const color = c.pct >= 80 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)'; return `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:${color}"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:${color}">${c.pct}%</span></div></div>`; }).join('')}</div>
+    </details>` : ''}
     ${data.focus_pct != null ? `<details class="day-card">
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
         <span class="card-label">🎯 Задачи СВ</span>
