@@ -1103,6 +1103,9 @@ function buildDayScreen(data) {
     </div>`;
 
   const myCatEntries = Object.entries(myCatShares);
+  const myCatPcts = myCatEntries.map(([,v]) => v.pct);
+  const myCatAvg = myCatPcts.length ? Math.round(myCatPcts.reduce((s,v)=>s+v,0) / myCatPcts.length) : null;
+  const myCatAvgColor = myCatAvg == null ? 'var(--text)' : colorOf(levelOf(myCatAvg));
   const catsHtml = myCatEntries.length
     ? `<div style="display:flex;flex-wrap:wrap;gap:6px;">${myCatEntries.map(([name, v]) => `
         <div style="flex:1 1 30%;min-width:90px;${tileStyle}text-align:center;">
@@ -1112,6 +1115,7 @@ function buildDayScreen(data) {
     : '<div style="font-size:12px;color:var(--muted);">Категории не заданы</div>';
 
   const focusDoneCount = focusPts.filter(p => p.had_order).length;
+  const focusPct = focusPts.length ? Math.round(focusDoneCount / focusPts.length * 100) : null;
   const focusHtml = focusPts.length > 0
     ? focusPts.map((p, i) => {
         const res = p.had_order
@@ -1183,24 +1187,29 @@ function buildDayScreen(data) {
       ${_dayChipsHtml()}
     </div>
     <div style="padding:0 16px 80px">
-      <div style="${cardStyle}border-left:3px solid var(--green)">
-        <span style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:block;">Мой итог</span>
-        ${myHtml}
-      </div>
+      <details style="${cardStyle}border-left:3px solid var(--green)">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+          <span style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;">📊 Система</span>
+          <div style="display:flex;align-items:center;gap:6px"><span style="font-size:18px;font-weight:700;color:${colorOf(levelOf(my.clean_stt))}">${my.clean_stt}%</span><span style="font-size:10px;color:var(--muted)">▶</span></div>
+        </summary>
+        <div style="padding-top:10px">${myHtml}</div>
+      </details>
 
-      <div style="${cardStyle}border-left:3px solid #7c4fbf">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-          <span>🏷️</span>
-          <span style="font-size:11px;font-weight:700;color:#7c4fbf;text-transform:uppercase;letter-spacing:.06em;">Категории</span>
+      <details style="${cardStyle}border-left:3px solid #7c4fbf">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+          <div style="display:flex;align-items:center;gap:8px;"><span>🏷️</span><span style="font-size:11px;font-weight:700;color:#7c4fbf;text-transform:uppercase;letter-spacing:.06em;">Категории</span></div>
+          <div style="display:flex;align-items:center;gap:6px"><span style="font-size:18px;font-weight:700;color:${myCatAvgColor}">${myCatAvg!=null?myCatAvg+'%':'—'}</span><span style="font-size:10px;color:var(--muted)">▶</span></div>
+        </summary>
+        <div style="padding-top:10px">
+          <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px;">доля заказов с категорией от всех заказов сегодня (${myTotalOrdersToday})</div>
+          ${catsHtml}
         </div>
-        <div style="font-size:10.5px;color:var(--muted);margin-bottom:10px;">доля заказов с категорией от всех заказов сегодня (${myTotalOrdersToday})</div>
-        ${catsHtml}
-      </div>
+      </details>
 
       <div style="background:#fff3cd;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #f59e0b;">
         <details>
           <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
-            <span style="font-size:13px;font-weight:700;color:#7c4f00">⚠️ Точки фокуса СВ · ${focusDoneCount}/${focusPts.length}</span>
+            <span style="font-size:13px;font-weight:700;color:#7c4f00">⚠️ Точки фокуса СВ · ${focusDoneCount}/${focusPts.length}${focusPct!=null?' = '+focusPct+'%':''}</span>
             <span style="font-size:10px;color:#7c4f00">▶</span>
           </summary>
           <div style="padding-top:8px">${focusHtml}</div>
