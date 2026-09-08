@@ -845,8 +845,31 @@ function renderMonth(data) {
       <button class="period-btn ${currentMonthPeriod==='current'?'active':''}" onclick="loadMonth('current')">Текущий месяц</button>
       <button class="period-btn ${currentMonthPeriod==='prev'?'active':''}" onclick="loadMonth('prev')">Прошлый месяц</button>
     </div>
+    ${(() => {
+      const tGreen = data.stt_points || 0, tYellow = data.akb_points || 0, tRed = data.ne_akb_points || 0;
+      const tTotal = data.pakb || (tGreen + tYellow + tRed);
+      if (!tTotal) return '';
+      const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
+      return `<details class="day-card" open>
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+          <span class="card-label">🏢 Клиентская база</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:var(--green);">${gp}%</div><div style="font-size:9px;color:var(--ink-soft);">СТТ</div></div>
+            <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+          </div>
+        </summary>
+        <div style="padding-top:14px;">
+          <div style="text-align:right;margin-bottom:10px;"><span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span></div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:var(--green-bg);border-radius:12px;padding:12px 8px;text-align:center;"><div style="font-size:10.5px;font-weight:700;color:var(--green);text-transform:uppercase;margin-bottom:4px;">СТТ</div><div style="font-size:20px;font-weight:800;color:var(--green);">${tGreen}</div><div style="font-size:11px;font-weight:600;color:var(--green);opacity:.85;">${gp}%</div></div>
+            <div style="flex:1;background:var(--yellow-bg);border-radius:12px;padding:12px 8px;text-align:center;"><div style="font-size:10.5px;font-weight:700;color:var(--yellow);text-transform:uppercase;margin-bottom:4px;">АКБ</div><div style="font-size:20px;font-weight:800;color:var(--yellow);">${tYellow}</div><div style="font-size:11px;font-weight:600;color:var(--yellow);opacity:.85;">${yp}%</div></div>
+            <div style="flex:1;background:var(--red-bg);border-radius:12px;padding:12px 8px;text-align:center;"><div style="font-size:10.5px;font-weight:700;color:var(--red);text-transform:uppercase;margin-bottom:4px;">Не АКБ</div><div style="font-size:20px;font-weight:800;color:var(--red);">${tRed}</div><div style="font-size:11px;font-weight:600;color:var(--red);opacity:.85;">${rp}%</div></div>
+          </div>
+        </div>
+      </details>`;
+    })()}
     <div class="day-card">
-      <h3>Итог по территории</h3>
+      <h3>📊 Система</h3>
       ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
       <div class="day-grid">
         <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
@@ -862,6 +885,16 @@ function renderMonth(data) {
       <span class="card-label">Продажи по категориям</span>
       <div style="margin-top:10px">${(data.categories||[]).map(c => { const color = c.pct >= 80 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)'; return `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:${color}"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:${color}">${c.pct}%</span></div></div>`; }).join('') || '<div class="empty">Нет данных</div>'}</div>
     </div>
+    ${data.focus_pct != null ? `<details class="day-card">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span class="card-label">🎯 Задачи СВ</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:${data.focus_pct>=90?'var(--green)':data.focus_pct>=80?'var(--yellow)':'var(--red)'};">${data.focus_pct}%</div><div style="font-size:9px;color:var(--ink-soft);">выполнено</div></div>
+          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+        </div>
+      </summary>
+      <div style="padding-top:14px;font-size:13px;color:var(--ink-soft);">Задач в фокусе: ${data.focus_tasks_total} · выполнено: ${data.focus_tasks_completed}</div>
+    </details>` : ''}
     <div class="rating-toggle">
       <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
       <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
