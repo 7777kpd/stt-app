@@ -621,6 +621,24 @@ function buildSttScreen(data) {
         <div class="month-toggle-btn ${_sttMonthOffset===1?'active':''}" onclick="fetchAndBuildStt(1)">Прошлый месяц</div>
       </div>
 
+      <details class="stt-card c-green">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+          <span class="stt-card-head" style="margin:0"><span>🏬</span><span class="stt-card-title">Клиентская база</span></span>
+          <span style="display:flex;align-items:center;gap:8px;">
+            <span style="text-align:right;">
+              <span style="display:block;font-size:20px;font-weight:700;color:var(--green-bright);line-height:1;">${pctOfPakb(green)}%</span>
+              <span style="display:block;font-size:9px;color:var(--muted);margin-top:2px;">СТТ</span>
+            </span>
+            <span style="font-size:13px;color:var(--muted);">▶</span>
+          </span>
+        </summary>
+        <div style="padding-top:14px;">
+          <div class="pakb-row"><span>База точек</span><span style="font-weight:700;color:var(--text)">${pakbTotal} · ПАКБ</span></div>
+          <div style="display:flex;gap:8px;margin-top:8px;">${pakbTilesHtml}</div>
+          ${pakbOpenHtml}
+        </div>
+      </details>
+
       <details class="stt-card c-blue">
         <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
           <span class="stt-card-head" style="margin:0"><span>📊</span><span class="stt-card-title">Система</span></span>
@@ -681,24 +699,6 @@ function buildSttScreen(data) {
           }).join('')}</div>
         </div>
       </details>` : ''}
-
-      <details class="stt-card c-green">
-        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
-          <span class="stt-card-head" style="margin:0"><span>🏬</span><span class="stt-card-title">Клиентская база</span></span>
-          <span style="display:flex;align-items:center;gap:8px;">
-            <span style="text-align:right;">
-              <span style="display:block;font-size:20px;font-weight:700;color:var(--green-bright);line-height:1;">${pctOfPakb(green)}%</span>
-              <span style="display:block;font-size:9px;color:var(--muted);margin-top:2px;">СТТ</span>
-            </span>
-            <span style="font-size:13px;color:var(--muted);">▶</span>
-          </span>
-        </summary>
-        <div style="padding-top:14px;">
-          <div class="pakb-row"><span>База точек</span><span style="font-weight:700;color:var(--text)">${pakbTotal} · ПАКБ</span></div>
-          <div style="display:flex;gap:8px;margin-top:8px;">${pakbTilesHtml}</div>
-          ${pakbOpenHtml}
-        </div>
-      </details>
 
       ${_focusTasksCardHtml(data)}
 
