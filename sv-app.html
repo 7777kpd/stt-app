@@ -1635,11 +1635,45 @@ function renderDay(data) {
       <span style="width:34px;text-align:right;font-size:12.5px;font-weight:700;">${v.pct}%</span>
     </div>`;
   }).join('');
+  const catPcts = Object.values(catShares).map(v => v.pct);
+  const catAvg = catPcts.length ? Math.round(catPcts.reduce((s,v)=>s+v,0) / catPcts.length) : null;
+  const catAvgColor = catAvg == null ? 'var(--ink)' : catAvg >= 75 ? 'var(--green)' : catAvg >= 50 ? 'var(--yellow)' : 'var(--red)';
   const categoriesHtml = Object.keys(catShares).length
-    ? `<div style="${cardStyle}"><div style="${labelStyle}">🏷️ Категории</div><div style="font-size:10.5px;color:var(--ink-soft);margin:-6px 0 8px;">доля заказов с категорией от всех заказов команды сегодня (${totalOrdersToday})</div>${catRows}</div>`
+    ? `<details style="${cardStyle}">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+          <span style="${labelStyle}margin-bottom:0;">🏷️ Категории</span>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:20px;font-weight:700;color:${catAvgColor}">${catAvg!=null?catAvg+'%':'—'}</span><span style="font-size:13px;color:var(--ink-soft)">▶</span></div>
+        </summary>
+        <div style="padding-top:10px;">
+          <div style="font-size:10.5px;color:var(--ink-soft);margin:-2px 0 8px;">доля заказов с категорией от всех заказов команды сегодня (${totalOrdersToday})</div>
+          ${catRows}
+        </div>
+      </details>`
     : '';
 
-  return `${navHtml}<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div>${categoriesHtml}<div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
+  const teamClean = team.clean_pct != null ? team.clean_pct : (team.clean_stt != null ? team.clean_stt : 0);
+  const teamCleanColor = teamClean >= 75 ? 'var(--green)' : teamClean >= 50 ? 'var(--yellow)' : 'var(--red)';
+  const systemHtml = `<details style="${cardStyle}">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+      <span style="${labelStyle}margin-bottom:0;">📊 Система</span>
+      <div style="display:flex;align-items:center;gap:6px;"><div style="text-align:right;"><span style="font-size:20px;font-weight:700;color:${teamCleanColor}">${teamClean}%</span><div style="font-size:9px;color:var(--ink-soft);">чистая дистрибуция</div></div><span style="font-size:13px;color:var(--ink-soft)">▶</span></div>
+    </summary>
+    <div style="padding-top:10px;">${statsHtml}</div>
+  </details>`;
+
+  const bestAgentClean = agents.length
+    ? Math.max(...agents.map(a => a.clean_pct != null ? a.clean_pct : (a.planned > 0 ? Math.round(Math.max(0, a.orders - (a.off_route || a.off || 0)) / a.planned * 100) : 0)))
+    : null;
+  const bestAgentColor = bestAgentClean == null ? 'var(--ink)' : bestAgentClean >= 75 ? 'var(--green)' : bestAgentClean >= 50 ? 'var(--yellow)' : 'var(--red)';
+  const byAgentHtml = `<details style="${cardStyle}">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+      <span style="${labelStyle}margin-bottom:0;">По торговым</span>
+      <div style="display:flex;align-items:center;gap:6px;"><div style="text-align:right;"><span style="font-size:20px;font-weight:700;color:${bestAgentColor}">${bestAgentClean!=null?bestAgentClean+'%':'—'}</span><div style="font-size:9px;color:var(--ink-soft);">лучший результат</div></div><span style="font-size:13px;color:var(--ink-soft)">▶</span></div>
+    </summary>
+    <div style="padding-top:6px;">${agentsHtml}</div>
+  </details>`;
+
+  return `${navHtml}${systemHtml}${categoriesHtml}${byAgentHtml}`;
 }
 
 // ============================================================
