@@ -160,6 +160,8 @@
   #screen-stt .sub-view { display: none; }
   #screen-stt .sub-view.active { display: block; }
   #screen-stt .card { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 14px; }
+  #screen-stt details.card summary { list-style: none; cursor: pointer; }
+  #screen-stt details.card summary::-webkit-details-marker { display: none; }
   #screen-stt .rating-header { display: flex; align-items: center; gap: 12px; padding: 8px 16px 4px; }
   #screen-stt .rh-name { flex: 1; font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 0.04em; }
   #screen-stt .rh-metrics { display: flex; gap: 14px; }
@@ -320,6 +322,7 @@
       <button class="tab active" data-screen="route" onclick="switchTab('route')"><span class="icon">🗺️</span>Маршрут</button>
       <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итоги дня</button>
       <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>Итоги месяца</button>
+      <button class="tab" data-screen="att" onclick="switchTab('att')"><span class="icon">🔍</span>Анализ ТТ</button>
       <button class="tab" data-screen="training" onclick="switchTab('training')"><span class="icon">🧠</span>ИИ-коуч</button>
     </div>
   </div>
@@ -333,12 +336,14 @@ const API = new URLSearchParams(window.location.search).get('dev') === '1'
 const screenMeta = {
   route:    { title: 'Улучшить систему', pill: () => formatDate() },
   stt:      { title: 'Итоги месяца',               pill: () => _sttMonth || '' },
+  att:      { title: 'Анализ ТТ',                  pill: () => _attMonth || '' },
   training: { title: 'ИИ-коуч',                   pill: () => _coachPeriod || '7 дней' },
   day:      { title: 'Итоги дня',                     pill: () => formatDate() },
 };
 
 let _telegramId = null;
 let _sttMonth = '';
+let _attMonth = '';   // 04.09.2026: подпись месяца на "Анализ ТТ" — всегда прошлый, своего переключателя нет
 let _sttMonthOffset = 0;   // 0 = текущий месяц, 1 = прошлый — переключатель на "Итоги месяца"
 let _coachPeriod = '';
 let _coachPatterns = [];
@@ -580,6 +585,20 @@ function renderRoute(data) {
 // только объединение (сделано в api.py::sv_stt) и рендер, ничего не
 // считаем заново.
 // ============================================================
+// ============================================================
+// АНАЛИЗ ТТ (04.09.2026) — отдельная вкладка, вынесена из "Итоги месяца"
+// (была там карточкой "Анализ системности по точкам"). Всегда прошлый
+// месяц, своего переключателя периода нет — данные приходят отдельным
+// запросом при старте (см. loadAll), month/year уже зашиты в сам запрос.
+// ============================================================
+function renderAtt(data) {
+  const analysis = _pointAnalysisHtmlSv(data.agent_point_analysis || [], data.point_cards_total || 0, data.month_num, data.year);
+  if (!analysis) {
+    return `<div class="empty">Нет данных за прошлый месяц — архив ещё не закрыт (/close_month).</div>`;
+  }
+  return `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Прошлый месяц: ${data.month || ''}</div>${analysis}`;
+}
+
 function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yearNum) {
   if (!agentPointAnalysis.length) return '';
 
@@ -721,6 +740,81 @@ function _switchPointAnalysisTabSv(btn) {
 }
 
 // ============================================================
+// ЗАДАЧИ СВ (04.09.2026) — только "Прошлый месяц" (архив). Сумма по
+// всей команде + свёрнутый список "По агентам" (разворачивается по
+// клику), отсортирован от худшего % выполнения к лучшему.
+// ============================================================
+function _focusTasksCardHtmlSv(data) {
+  const total = data.focus_tasks_total || 0;
+  const completed = data.focus_tasks_completed || 0;
+  if (!total) return '';
+  const pct = Math.round(completed / total * 100);
+  // 04.09.2026: цвет — ≥90 зелёный, 80-90 жёлтый, <80 красный.
+  const color = pct >= 90 ? '#3FAE6A' : pct >= 80 ? '#E2A335' : '#DC5B4E';
+
+  const byAgent = data.focus_by_agent || [];
+  const agentsHtml = byAgent.map(a => {
+    const aColor = a.pct >= 90 ? '#3FAE6A' : a.pct >= 80 ? '#E2A335' : '#DC5B4E';
+    return `<div style="padding:12px 18px;border-top:0.5px solid var(--line);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:13px;font-weight:700;color:var(--ink);">${a.agent}</span>
+        <span style="font-size:15px;font-weight:700;color:${aColor};">${a.pct}%</span>
+      </div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">${a.total} точек в фокусе · ${a.completed} выполнено</div>
+      <div style="height:6px;background:var(--bg);border-radius:100px;overflow:hidden;">
+        <div style="width:${a.pct}%;height:100%;background:${aColor};border-radius:100px;"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  return `<details class="card" style="border-left:3px solid #B8862B;">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:7px;">
+        <span>🎯</span><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#B8862B;">Задачи СВ</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="text-align:right;">
+          <div style="font-size:20px;font-weight:700;color:${color};">${pct}%</div>
+          <div style="font-size:9px;color:var(--ink-soft);">выполнено</div>
+        </div>
+        <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+      </div>
+    </summary>
+    <div style="padding-top:14px;">
+    <div style="display:flex;gap:8px;margin-bottom:6px;">
+      <div style="flex:1;background:var(--bg);border-radius:12px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:var(--ink);">${total}</div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;line-height:1.3;">точек в фокусе<br>(суммарно за месяц)</div>
+      </div>
+      <div style="flex:1;background:var(--bg);border-radius:12px;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:700;color:#3B6D11;">${completed}</div>
+        <div style="font-size:11px;color:var(--ink-soft);margin-top:4px;line-height:1.3;">с заказом<br>в тот же день</div>
+      </div>
+    </div>
+    <div style="margin:12px 0 16px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <span style="font-size:26px;font-weight:700;color:${color};">${pct}%</span>
+        <span style="font-size:12px;color:var(--ink-soft);">выполнено задач</span>
+      </div>
+      <div style="height:9px;background:var(--bg);border-radius:100px;overflow:hidden;">
+        <div style="width:${pct}%;height:100%;background:${color};border-radius:100px;"></div>
+      </div>
+    </div>
+    ${byAgent.length ? `<details style="border:0.5px solid var(--line);border-radius:14px;overflow:hidden;margin:0 -2px;">
+      <summary style="cursor:pointer;list-style:none;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">По агентам</div>
+          <div style="font-size:11px;color:var(--ink-soft);margin-top:2px;">${byAgent.length} агент(ов) · сначала худшие</div>
+        </div>
+        <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+      </summary>
+      ${agentsHtml}
+    </details>` : ''}
+    </div>
+  </details>`;
+}
+
+// ============================================================
 // РЕНДЕР: СТТ
 // ============================================================
 function renderStt(data) {
@@ -780,6 +874,11 @@ function renderStt(data) {
       const bg = v >= 75 ? 'var(--green-bg)' : 'var(--yellow-bg)';
       return `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${bg};color:${c}">${name} ${v}%</span>`;
     }).join('');
+    // 04.09.2026: "Задачи СВ" — отдельный чип, тем же принципом, что и
+    // категории, если есть данные за этот период (только прошлый месяц).
+    const focusChip = (r.focus_pct !== null && r.focus_pct !== undefined)
+      ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:#EDE0C9;color:#7A5C1E">🎯 Задачи СВ ${r.focus_pct}%</span>`
+      : '';
     let deltaHtml = '';
     if (r.delta !== null && r.delta !== undefined) {
       const up = r.delta >= 0;
@@ -793,8 +892,8 @@ function renderStt(data) {
         <span style="font-size:${isBest?16:15}px;font-weight:800">${r.agent}</span>
         <div style="text-align:right"><span style="display:block;font-size:${isBest?22:18}px;font-weight:800;color:${isBest?'var(--green)':'var(--ink)'}">${r.avg_score}%</span>${deltaHtml}</div>
       </div>
-      <p style="font-size:13px;color:var(--ink-soft);margin:8px 0">Системная ${r.sys}% · Чистая ${r.net}% · Вне ${r.off > 0 ? '−' + r.off : '—'}</p>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+      <p style="font-size:13px;color:var(--ink-soft);margin:8px 0">Системная ${r.sys}% · Чистая ${r.net}%</p>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}${focusChip}</div>
       ${tmFocusBlock(r.tm_focus)}
       ${pakbMiniBar(r.pakb)}
     </div>`;
@@ -896,37 +995,21 @@ function renderStt(data) {
 
   const deltaHtml = '';
 
+  // 04.09.2026: средняя по всем категориям списка — для шапки свёрнутой
+  // карточки "Категории".
+  const catPctList = (data.categories || []).map(c => c.pct);
+  const catAvg = catPctList.length ? Math.round(catPctList.reduce((a, b) => a + b, 0) / catPctList.length) : null;
+  const catAvgColor = catAvg == null ? 'var(--ink-soft)' : catAvg >= 80 ? 'var(--green)' : catAvg >= 50 ? 'var(--yellow)' : 'var(--red)';
+
+  // 04.09.2026: лучший балл — для шапки свёрнутой карточки "Рейтинг"
+  // (берём первую строку "Рейтинг торговых", он уже отсортирован по
+  // avg_score по убыванию).
+  const topRatingScore = (data.rating && data.rating[0]) ? data.rating[0].avg_score : null;
+
   return `
     <div class="segment">
       <button class="${_sttMonthOffset === 0 ? 'active' : ''}" onclick="switchSttMonth(0)">Текущий месяц</button>
       <button class="${_sttMonthOffset === 1 ? 'active' : ''}" onclick="switchSttMonth(1)">Прошлый месяц</button>
-    </div>
-
-    <div class="summary-card">
-      <div class="summary-top-row">
-        <p class="summary-label">Итог по команде</p>
-        <span class="period-caption">${data.passed_visits} плановых визитов</span>
-      </div>
-      <div style="font-size:10px;color:var(--ink-soft);margin:-4px 0 8px;line-height:1.3">
-        За период с начала месяца по вчера включительно (без сегодняшнего дня — по нему заказы ещё не закрыты)
-      </div>
-      <div class="dist-row">
-        <div class="dist-tile">
-          <div class="dist-tile-label">Системная</div>
-          <div class="dist-tile-pct ${lvSys}">${data.system_stt}%</div>
-          <div class="dist-tile-count">${data.system_orders} заказов</div>
-        </div>
-        <div class="dist-minus-chip">
-          <div class="val">−${data.off_route}</div>
-          <div class="cap">вне</div>
-        </div>
-        <div class="dist-tile">
-          <div class="dist-tile-label">Чистая</div>
-          <div class="dist-tile-pct ${lv}">${data.clean_stt}%</div>
-          <div class="dist-tile-count">${data.clean_orders} заказов</div>
-        </div>
-      </div>
-      ${catsHtml ? `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);margin:4px 0 8px;">Продажи по категориям</div>${catsHtml}` : ''}
     </div>
 
     ${(() => {
@@ -934,40 +1017,124 @@ function renderStt(data) {
       const tTotal = tGreen + tYellow + tRed;
       if (!tTotal) return '';
       const gp = Math.round(tGreen / tTotal * 100), yp = Math.round(tYellow / tTotal * 100), rp = Math.round(tRed / tTotal * 100);
-      return `<div class="card">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;">
-          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">Территория</span>
-          <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
+      return `<details class="card">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">🏢 Клиентская база</span>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <div style="text-align:right;">
+              <div style="font-size:20px;font-weight:700;color:var(--green);">${gp}%</div>
+              <div style="font-size:9px;color:var(--ink-soft);">СТТ</div>
+            </div>
+            <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+          </div>
+        </summary>
+        <div style="padding-top:14px;">
+          <div style="text-align:right;margin-bottom:10px;">
+            <span style="font-size:12px;font-weight:700;color:var(--ink-soft)">ПАКБ: ${tTotal}</span>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <div style="flex:1;background:var(--green-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">СТТ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--green);">${tGreen}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--green);opacity:.85;">${gp}%</div>
+            </div>
+            <div style="flex:1;background:var(--yellow-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">АКБ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--yellow);">${tYellow}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--yellow);opacity:.85;">${yp}%</div>
+            </div>
+            <div style="flex:1;background:var(--red-bg);border-radius:12px;padding:12px 8px;text-align:center;">
+              <div style="font-size:10.5px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px;">Не АКБ</div>
+              <div style="font-size:20px;font-weight:800;color:var(--red);">${tRed}</div>
+              <div style="font-size:11px;font-weight:600;color:var(--red);opacity:.85;">${rp}%</div>
+            </div>
+          </div>
         </div>
-        <div style="display:flex;gap:3px;height:7px;margin-bottom:14px;">
-          <div style="flex:${tGreen};background:var(--green);border-radius:4px;"></div>
-          <div style="flex:${tYellow};background:var(--yellow);border-radius:4px;"></div>
-          <div style="flex:${tRed};background:var(--red);border-radius:4px;"></div>
-        </div>
-        <div style="display:flex;justify-content:space-between;">
-          <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">СТТ</span><div style="font-size:15px;font-weight:800;color:var(--green)">${tGreen} <span style="font-size:11px;font-weight:600">(${gp}%)</span></div></div>
-          <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">АКБ</span><div style="font-size:15px;font-weight:800;color:var(--yellow)">${tYellow} <span style="font-size:11px;font-weight:600">(${yp}%)</span></div></div>
-          <div style="text-align:center;flex:1"><span style="font-size:11px;color:var(--ink-soft);font-weight:600">Не АКБ</span><div style="font-size:15px;font-weight:800;color:var(--red)">${tRed} <span style="font-size:11px;font-weight:600">(${rp}%)</span></div></div>
-        </div>
-      </div>`;
+      </details>`;
     })()}
 
-    ${_pointAnalysisHtmlSv(data.agent_point_analysis || [], data.point_cards_total || 0, data.month_num, data.year)}
-
-    <div class="segment">
-      <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг торговых</button>
-      <button id="btn-trend" onclick="sttView('trend')">Рейтинг СВ</button>
-    </div>
-
-    <div id="view-rating" class="sub-view active">
-      ${renderSvRatingCards()}
-    </div>
-
-    <div id="view-trend" class="sub-view">
-      <div id="sv-rating-area">
-        <div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Загрузка...</div>
+    <details class="card">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">📊 Система</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;">
+            <div style="font-size:20px;font-weight:700;" class="${lv}">${data.clean_stt}%</div>
+            <div style="font-size:9px;color:var(--ink-soft);">чистая</div>
+          </div>
+          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+        </div>
+      </summary>
+      <div style="padding-top:14px;">
+        <div class="summary-top-row">
+          <span></span>
+          <span class="period-caption">${data.passed_visits} плановых визитов</span>
+        </div>
+        <div style="font-size:10px;color:var(--ink-soft);margin:4px 0 12px;line-height:1.3">
+          За период с начала месяца по вчера включительно (без сегодняшнего дня — по нему заказы ещё не закрыты)
+        </div>
+        <div class="dist-row">
+          <div class="dist-tile">
+            <div class="dist-tile-label">Системная</div>
+            <div class="dist-tile-pct ${lvSys}">${data.system_stt}%</div>
+            <div class="dist-tile-count">${data.system_orders} заказов</div>
+          </div>
+          <div class="dist-minus-chip">
+            <div class="val">−${data.off_route}</div>
+            <div class="cap">вне</div>
+          </div>
+          <div class="dist-tile">
+            <div class="dist-tile-label">Чистая</div>
+            <div class="dist-tile-pct ${lv}">${data.clean_stt}%</div>
+            <div class="dist-tile-count">${data.clean_orders} заказов</div>
+          </div>
+        </div>
       </div>
-    </div>`;
+    </details>
+
+    ${catsHtml ? `<details class="card">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">🏷️ Категории</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;">
+            <div style="font-size:20px;font-weight:700;color:${catAvgColor};">${catAvg}%</div>
+            <div style="font-size:9px;color:var(--ink-soft);">средняя</div>
+          </div>
+          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+        </div>
+      </summary>
+      <div style="padding-top:14px;">${catsHtml}</div>
+    </details>` : ''}
+
+    ${_focusTasksCardHtmlSv(data)}
+
+    <details class="card">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">🏆 Рейтинг</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;">
+            <div style="font-size:20px;font-weight:700;color:var(--green);">${topRatingScore != null ? topRatingScore + '%' : '—'}</div>
+            <div style="font-size:9px;color:var(--ink-soft);">лучший</div>
+          </div>
+          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+        </div>
+      </summary>
+      <div style="padding-top:14px;">
+        <div class="segment">
+          <button id="btn-rating" class="active" onclick="sttView('rating')">Рейтинг торговых</button>
+          <button id="btn-trend" onclick="sttView('trend')">Рейтинг СВ</button>
+        </div>
+
+        <div id="view-rating" class="sub-view active">
+          ${renderSvRatingCards()}
+        </div>
+
+        <div id="view-trend" class="sub-view">
+          <div id="sv-rating-area">
+            <div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Загрузка...</div>
+          </div>
+        </div>
+      </div>
+    </details>`;
 }
 
 function showMoreSvRating() {
@@ -1059,9 +1226,9 @@ async function loadSvRating() {
             <span style="font-size:20px;font-weight:700;color:var(--green);">${r.avg.toFixed(1)}%</span>
           </div>
           <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
-            Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
+            Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%
           </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false)}</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false)}${r.focus_pct != null ? `<span style="font-size:11px;background:#EDE0C9;color:#7A5C1E;padding:4px 9px;border-radius:8px;font-weight:600;">🎯 Задачи СВ ${r.focus_pct}%</span>` : ''}</div>
           ${pakbMiniBar(r.pakb)}
         </div>`;
     }).join('');
@@ -1087,9 +1254,9 @@ async function loadSvRating() {
                 <span style="font-size:15px;font-weight:700;color:var(--ink-soft);">${r.avg.toFixed(1)}%</span>
               </div>
               <div style="font-size:12px;color:var(--ink-soft);margin-bottom:9px;">
-                Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%${offText}
+                Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%
               </div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}${r.focus_pct != null ? `<span style="font-size:11px;background:#F5F0E6;color:var(--ink-soft);padding:4px 9px;border-radius:8px;font-weight:600;">🎯 Задачи СВ ${r.focus_pct}%</span>` : ''}</div>
               ${pakbMiniBar(r.pakb)}
             </div>`;
         }).join('')}
@@ -1468,11 +1635,45 @@ function renderDay(data) {
       <span style="width:34px;text-align:right;font-size:12.5px;font-weight:700;">${v.pct}%</span>
     </div>`;
   }).join('');
+  const catPcts = Object.values(catShares).map(v => v.pct);
+  const catAvg = catPcts.length ? Math.round(catPcts.reduce((s,v)=>s+v,0) / catPcts.length) : null;
+  const catAvgColor = catAvg == null ? 'var(--ink)' : catAvg >= 75 ? 'var(--green)' : catAvg >= 50 ? 'var(--yellow)' : 'var(--red)';
   const categoriesHtml = Object.keys(catShares).length
-    ? `<div style="${cardStyle}"><div style="${labelStyle}">🏷️ Категории</div><div style="font-size:10.5px;color:var(--ink-soft);margin:-6px 0 8px;">доля заказов с категорией от всех заказов команды сегодня (${totalOrdersToday})</div>${catRows}</div>`
+    ? `<details style="${cardStyle}">
+        <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+          <span style="${labelStyle}margin-bottom:0;">🏷️ Категории</span>
+          <div style="display:flex;align-items:center;gap:6px;"><span style="font-size:20px;font-weight:700;color:${catAvgColor}">${catAvg!=null?catAvg+'%':'—'}</span><span style="font-size:13px;color:var(--ink-soft)">▶</span></div>
+        </summary>
+        <div style="padding-top:10px;">
+          <div style="font-size:10.5px;color:var(--ink-soft);margin:-2px 0 8px;">доля заказов с категорией от всех заказов команды сегодня (${totalOrdersToday})</div>
+          ${catRows}
+        </div>
+      </details>`
     : '';
 
-  return `${navHtml}<div style="${cardStyle}"><div style="${labelStyle}">Команда за день</div>${statsHtml}</div>${categoriesHtml}<div style="${cardStyle}"><div style="${labelStyle}">По торговым</div>${agentsHtml}</div>`;
+  const teamClean = team.clean_pct != null ? team.clean_pct : (team.clean_stt != null ? team.clean_stt : 0);
+  const teamCleanColor = teamClean >= 75 ? 'var(--green)' : teamClean >= 50 ? 'var(--yellow)' : 'var(--red)';
+  const systemHtml = `<details style="${cardStyle}">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+      <span style="${labelStyle}margin-bottom:0;">📊 Система</span>
+      <div style="display:flex;align-items:center;gap:6px;"><div style="text-align:right;"><span style="font-size:20px;font-weight:700;color:${teamCleanColor}">${teamClean}%</span><div style="font-size:9px;color:var(--ink-soft);">чистая дистрибуция</div></div><span style="font-size:13px;color:var(--ink-soft)">▶</span></div>
+    </summary>
+    <div style="padding-top:10px;">${statsHtml}</div>
+  </details>`;
+
+  const bestAgentClean = agents.length
+    ? Math.max(...agents.map(a => a.clean_pct != null ? a.clean_pct : (a.planned > 0 ? Math.round(Math.max(0, a.orders - (a.off_route || a.off || 0)) / a.planned * 100) : 0)))
+    : null;
+  const bestAgentColor = bestAgentClean == null ? 'var(--ink)' : bestAgentClean >= 75 ? 'var(--green)' : bestAgentClean >= 50 ? 'var(--yellow)' : 'var(--red)';
+  const byAgentHtml = `<details style="${cardStyle}">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+      <span style="${labelStyle}margin-bottom:0;">По торговым</span>
+      <div style="display:flex;align-items:center;gap:6px;"><div style="text-align:right;"><span style="font-size:20px;font-weight:700;color:${bestAgentColor}">${bestAgentClean!=null?bestAgentClean+'%':'—'}</span><div style="font-size:9px;color:var(--ink-soft);">лучший результат</div></div><span style="font-size:13px;color:var(--ink-soft)">▶</span></div>
+    </summary>
+    <div style="padding-top:6px;">${agentsHtml}</div>
+  </details>`;
+
+  return `${navHtml}${systemHtml}${categoriesHtml}${byAgentHtml}`;
 }
 
 // ============================================================
@@ -1491,6 +1692,7 @@ async function main() {
   document.getElementById('mainContent').innerHTML = `
     <div id="screen-route" class="screen-panel active"></div>
     <div id="screen-stt"   class="screen-panel"></div>
+    <div id="screen-att"   class="screen-panel"></div>
     <div id="screen-training" class="screen-panel"></div>
     <div id="screen-day" class="screen-panel"></div>`;
   document.getElementById('tabbar').style.display = 'flex';
@@ -1500,12 +1702,17 @@ async function main() {
     if (el) el.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
   };
 
-  // Загружаем все 4 вкладки параллельно ("История" убрана 01.08.2026)
-  const [routeRes, sttRes, coachRes, dayRes] = await Promise.allSettled([
+  // Загружаем все 5 вкладок параллельно ("История" убрана 01.08.2026,
+  // "Анализ ТТ" добавлена 04.09.2026 — всегда прошлый месяц, отдельным
+  // запросом с явным month/year, без своего переключателя периода).
+  const _now = new Date();
+  const _prev = new Date(_now.getFullYear(), _now.getMonth() - 1, 1);
+  const [routeRes, sttRes, coachRes, dayRes, attRes] = await Promise.allSettled([
     fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/coach/week?week=current`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
+    fetch(`${API}/api/sv/${_telegramId}/stt?month=${_prev.getMonth() + 1}&year=${_prev.getFullYear()}`).then(r => r.ok ? r.json() : Promise.reject()),
   ]);
 
   if (routeRes.status === 'fulfilled') {
@@ -1530,6 +1737,13 @@ async function main() {
     document.getElementById('screen-day').innerHTML = renderDay(dayRes.value);
   } else {
     err('screen-day', 'Ошибка загрузки итога дня');
+  }
+
+  if (attRes.status === 'fulfilled') {
+    _attMonth = attRes.value.month || '';
+    document.getElementById('screen-att').innerHTML = renderAtt(attRes.value);
+  } else {
+    err('screen-att', 'Ошибка загрузки Анализа ТТ');
   }
 
   const tabParam = new URLSearchParams(window.location.search).get('tab');
