@@ -1155,7 +1155,6 @@ function buildDayScreen(data) {
       <div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">Сист</div>
       <div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">Чист</div>
       ${teamCatNames.map(n => `<div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#3730A3;text-transform:uppercase;">${n}</div>`).join('')}
-      <div style="flex:1;text-align:center;font-size:10px;font-weight:700;color:#7c4f00;text-transform:uppercase;">Фокус</div>
       <div style="flex:1;text-align:center;font-size:10px;font-weight:800;color:#3730A3;text-transform:uppercase;">Итог</div>
     </div>` : '';
 
@@ -1170,7 +1169,7 @@ function buildDayScreen(data) {
         <span style="color:#6366F1;margin-right:4px;">${i+1}.</span>${short}${a.is_me ? ' <span style="color:#6366F1;">(вы)</span>' : ''}
       </div>
       <div style="display:flex;">
-        ${dayCell(a.sys_stt)}${dayCell(a.clean_stt)}${catCells}${a.focus_pct != null ? dayCell(a.focus_pct) : '<div style="flex:1;background:var(--bg);border-radius:6px;padding:5px 2px;text-align:center;margin:0 2px;"><span style="font-size:12px;color:var(--muted);">—</span></div>'}${dayCell(a.average, true)}
+        ${dayCell(a.sys_stt)}${dayCell(a.clean_stt)}${catCells}${dayCell(a.average, true)}
       </div>
     </div>`;
   }).join('') || '<div style="font-size:13px;color:var(--muted);padding:8px 0">Нет данных по команде</div>';
