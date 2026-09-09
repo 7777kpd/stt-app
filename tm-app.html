@@ -747,6 +747,7 @@ async function loadDay(period) {
 
 let currentMonthPeriod = 'current';
 let currentRatingTab = 'agents';
+let ratingCardOpen = false;
 let ratingVisibleCount = 5;
 
 function showMoreRating() {
@@ -919,12 +920,23 @@ function renderMonth(data) {
       </summary>
       <div style="padding-top:14px;font-size:13px;color:var(--ink-soft);">Задач в фокусе: ${data.focus_tasks_total} · выполнено: ${data.focus_tasks_completed}</div>
     </details>` : ''}
-    <div class="rating-toggle">
-      <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
-      <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
-    </div>
-    ${ratingCards}
-    ${showMoreBtn}
+    <details class="day-card" ${ratingCardOpen?'open':''} ontoggle="ratingCardOpen=this.open">
+      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
+        <span class="card-label">🏆 Рейтинг</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:var(--green);">${rows[0]?rows[0].avg_score.toFixed(1)+'%':'—'}</div><div style="font-size:9px;color:var(--ink-soft);">лучший</div></div>
+          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
+        </div>
+      </summary>
+      <div style="padding-top:10px;">
+        <div class="rating-toggle">
+          <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
+          <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
+        </div>
+        ${ratingCards}
+        ${showMoreBtn}
+      </div>
+    </details>
   `;
 }
 
