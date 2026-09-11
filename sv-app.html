@@ -114,7 +114,7 @@
   #screen-route .survey-unfilled { padding: 10px 16px; background: #F8F3E5; border-bottom: 1px solid #ECE3CD; font-size: 11.5px; font-style: italic; color: var(--ink-soft); opacity: 0.7; }
 
   #screen-route .grid-head, #screen-route .grid-row {
-    display: grid; grid-template-columns: 1fr 44px 44px 60px; align-items: stretch;
+    display: grid; grid-template-columns: 1fr 44px 44px; align-items: stretch;
   }
   #screen-route .grid-head { background: #F8F3E5; border-bottom: 1.5px solid #E2D9C2; }
   #screen-route .grid-head span {
@@ -323,7 +323,6 @@
       <button class="tab" data-screen="day" onclick="switchTab('day')"><span class="icon">📋</span>Итоги дня</button>
       <button class="tab" data-screen="stt" onclick="switchTab('stt')"><span class="icon">📊</span>Итоги месяца</button>
       <button class="tab" data-screen="att" onclick="switchTab('att')"><span class="icon">🔍</span>Анализ ТТ</button>
-      <button class="tab" data-screen="training" onclick="switchTab('training')"><span class="icon">🧠</span>ИИ-коуч</button>
     </div>
   </div>
 </div>
@@ -509,7 +508,7 @@ function renderRoute(data) {
       </div>
       <div class="ss-divider"></div>
       <div class="ss-explainer">
-        Точки с 2+ пропусками заказов подряд и/или заказы вне маршрута
+        Точки с 2+ пропусками заказов подряд
         <span class="ss-explainer-sub">Месяц ни при чём — считаем последние визиты подряд</span>
       </div>
     </div>`;
@@ -519,56 +518,23 @@ function renderRoute(data) {
   }
 
   agents.forEach(agent => {
-    const survey = agent.survey || {};
     const points = agent.points || [];
-    const hasSurvey = survey.filled;
-    const badgeHtml = !hasSurvey
-      ? `<span class="unfilled-badge">опросник не заполнен</span>` : '';
 
     html += `
       <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}">
         <summary>
           <span class="name">${agent.name}</span>
-          <span class="meta">${badgeHtml}<span class="count">${points.length} точки</span><span class="chevron">▶</span></span>
+          <span class="meta"><span class="count">${points.length} точки</span><span class="chevron">▶</span></span>
         </summary>`;
 
-    // Блок коуч-контекста
-    if (hasSurvey) {
-      const scoreClass = survey.ai_score === 3 ? 'green' : survey.ai_score === 2 ? 'yellow' : 'red';
-      const scoreLabel = survey.ai_status || '—';
-      html += `
-        <div class="coach-context">
-          <div class="coach-context-label">🧠 Вчера про ${survey.hard_point || '—'}</div>
-          <div class="coach-context-row">
-            <span class="coach-context-key">Что помешало:</span>
-            <span class="coach-context-val">«${survey.reason || '—'}»</span>
-          </div>
-          <div class="coach-context-row">
-            <span class="coach-context-key">Действие:</span>
-            <span class="coach-context-val">«${survey.action || '—'}»</span>
-          </div>
-          <div class="coach-context-row">
-            <span class="coach-context-key">Помощь коллеге:</span>
-            <span class="coach-context-val">«${survey.seed || '—'}»</span>
-          </div>
-          <div class="coach-context-divider"></div>
-          <div class="coach-context-score ${scoreClass}">${scoreLabel}</div>
-        </div>`;
-    } else if (survey.date === null) {
-      // Нет ответа вообще — ничего не показываем
-    } else {
-      html += `<div class="survey-unfilled">Опросник за вчера не заполнен</div>`;
-    }
-
     // Таблица точек
-    html += `<div class="grid-head"><span>Точка</span><span>2</span><span>3+</span><span>Вне м.</span></div>`;
+    html += `<div class="grid-head"><span>Точка</span><span>2</span><span>3+</span></div>`;
     points.forEach(pt => {
       html += `
         <div class="grid-row">
           <span class="point-name">${pt.client ? `<span style="font-weight:700">${pt.client}</span><br><span style="font-size:11px;font-weight:400;color:var(--ink-soft)">${pt.name}</span>` : pt.name}</span>
           <span class="mark">${pt.missed_2 ? '<span class="mark-dot two"></span>' : ''}</span>
           <span class="mark">${pt.missed_3plus ? '<span class="mark-dot three"></span>' : ''}</span>
-          <span class="offroute-num ${pt.off_route === 0 ? 'empty' : ''}">${pt.off_route > 0 ? pt.off_route : '—'}</span>
         </div>`;
     });
 
@@ -681,7 +647,7 @@ function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yea
         ${byLevel[lvl].length ? byLevel[lvl].map(p => cardHtml(p, lvl)).join('') : '<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Точек этого уровня нет</div>'}
       </div>`).join('');
 
-    return `<details style="border:0.5px solid var(--line);border-radius:12px;margin-top:8px;">
+    return `<details style="background:var(--card);border-radius:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(60,50,20,0.06);overflow:hidden;">
       <summary style="cursor:pointer;list-style:none;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
         <div>
           <div style="font-size:13px;font-weight:700;color:var(--ink);">${a.agent}</div>
@@ -1707,10 +1673,9 @@ async function main() {
   // запросом с явным month/year, без своего переключателя периода).
   const _now = new Date();
   const _prev = new Date(_now.getFullYear(), _now.getMonth() - 1, 1);
-  const [routeRes, sttRes, coachRes, dayRes, attRes] = await Promise.allSettled([
+  const [routeRes, sttRes, dayRes, attRes] = await Promise.allSettled([
     fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/coach/week?week=current`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
     fetch(`${API}/api/sv/${_telegramId}/stt?month=${_prev.getMonth() + 1}&year=${_prev.getFullYear()}`).then(r => r.ok ? r.json() : Promise.reject()),
   ]);
@@ -1725,12 +1690,6 @@ async function main() {
     document.getElementById('screen-stt').innerHTML = renderStt(sttRes.value);
   } else {
     err('screen-stt', 'Ошибка загрузки СТТ');
-  }
-
-  if (coachRes.status === 'fulfilled') {
-    document.getElementById('screen-training').innerHTML = renderCoach(coachRes.value);
-  } else {
-    err('screen-training', 'Ошибка загрузки ИИ-коуча');
   }
 
   if (dayRes.status === 'fulfilled') {

@@ -791,7 +791,7 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
     // 01.09.2026: у "призрака" нет планового графика — s это КОЛИЧЕСТВО
     // заказов, не %, показываем иначе (без значка процента).
     const badge = lvl === 'ghost' ? `${p.s} ${p.s === 1 ? 'заказ' : 'заказов'}` : `${p.s}%`;
-    return `<details open style="border-left:3px solid ${m.border};border-radius:0 10px 10px 0;background:var(--bg);">
+    return `<details style="border-left:3px solid ${m.border};border-radius:0 10px 10px 0;background:var(--card);box-shadow:0 2px 6px rgba(60,50,20,0.06);margin-bottom:8px;">
       <summary style="cursor:pointer;list-style:none;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;">
         <div style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.n}</div>
         <div style="display:flex;align-items:center;gap:6px;font-size:15px;font-weight:700;color:${m.text};flex-shrink:0;">${badge}<span style="font-size:13px;color:var(--muted);">▶</span></div>
