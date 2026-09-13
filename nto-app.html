@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>СТТ — Руководитель продаж</title>
+<style>
+  summary::marker { display: none; content: ''; }
+  summary::-webkit-details-marker { display: none; }
+  :root {
+    --bg: #F0EADC;
+    --card: #FFFFFF;
+    --ink: #2C2A26;
+    --ink-soft: #8B8578;
+    --line: #ECE6D8;
+    --green: #639922;
+    --green-bg: #EAF3DE;
+    --green-text: #3B6D11;
+    --amber: #EF9F27;
+    --amber-bg: #FAEEDA;
+    --amber-text: #854F0B;
+    --red: #E24B4A;
+    --red-bg: #FCEBEB;
+    --red-text: #A32D2D;
+    --blue: #0C447C;
+    --blue-bg: #E8F0FE;
+    --pending-bg: #F0EADC;
+    --pending-text: #A39C87;
+    --pending-border: #C9C0AA;
+    --best-border: #639922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--ink);
+  }
+  .phone { width: 100%; max-width: 480px; background: var(--bg); height: 100dvh; display: flex; flex-direction: column; }
+  .topbar { padding: 22px 20px 14px; flex-shrink: 0; }
+  .topbar .badge { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .topbar .badge .sq { width: 26px; height: 26px; border-radius: 8px; background: var(--ink-soft); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; }
+  .topbar .badge .txt { font-size: 13px; color: var(--ink-soft); }
+  .topbar-row { display: flex; align-items: baseline; justify-content: space-between; }
+  .topbar h1 { font-size: 20px; font-weight: 500; margin: 0; }
+  .top-pill { font-size: 12px; color: var(--ink-soft); background: var(--card); border-radius: 100px; padding: 6px 12px; font-weight: 600; }
+  .content { padding: 4px 16px 24px; overflow-y: auto; flex: 1; }
+  .tabbar { display: flex; background: var(--card); border-top: 1px solid var(--line); padding: 9px 4px 14px; flex-shrink: 0; }
+  .tab { flex: 1; text-align: center; font-size: 10px; font-weight: 700; color: var(--ink-soft); background: none; border: none; font-family: inherit; cursor: pointer; padding: 6px 2px 0; }
+  .tab.active { color: var(--ink); }
+  .tab .icon { width: 26px; height: 26px; margin: 0 auto 4px; border-radius: 8px; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .tab.active .icon { background: #D9CFAE; }
+  .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 40px 16px; color: var(--ink-soft); font-size: 14px; }
+
+  .month-toggle { display: flex; background: #E4DCCB; border-radius: 12px; padding: 3px; margin-bottom: 14px; }
+  .month-toggle button { flex: 1; border: none; border-radius: 9px; padding: 8px 0; font-size: 13px; font-weight: 500; cursor: pointer; background: transparent; color: var(--ink-soft); font-family: inherit; }
+  .month-toggle button.active { background: #fff; color: var(--ink); }
+
+  details.card { background: var(--card); border-radius: 16px; margin-bottom: 10px; box-shadow: 0 2px 6px rgba(60,50,20,.06); overflow: hidden; }
+  details.card > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .card-title { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .card-head-val { text-align: right; }
+  .card-head-val .num { font-size: 18px; font-weight: 500; }
+  .card-head-val .lbl { font-size: 10.5px; color: var(--ink-soft); }
+  .chevron { font-size: 14px; color: var(--ink-soft); margin-left: 8px; }
+  .delta { font-size: 11px; margin-right: 8px; }
+  .delta.up { color: var(--green); }
+  .delta.down { color: var(--red-text); }
+
+  .cat-bar-row { margin-bottom: 8px; }
+  .cat-bar-row .top { display: flex; justify-content: space-between; align-items: baseline; font-size: 11.5px; color: var(--ink); margin-bottom: 3px; }
+  .cat-bar-row .count { font-weight: 400; color: var(--ink-soft); font-size: 10px; }
+  .cat-bar-row .pct { font-weight: 600; }
+  .cat-bar-row .track { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+  .cat-bar-row .fill { height: 100%; }
+  .cat-footnote { font-size: 10px; color: var(--ink-soft); margin-top: 4px; }
+
+  .sys-tiles-row { display: flex; gap: 8px; margin-bottom: 8px; }
+  .sys-tile { flex: 1; background: #F7F4EE; border-radius: 10px; padding: 8px; text-align: center; }
+  .sys-tile .val { font-size: 15px; font-weight: 500; color: var(--ink); }
+  .sys-tile .lbl { font-size: 10px; color: var(--ink-soft); }
+  .sys-mid-row { display: flex; align-items: center; gap: 6px; }
+  .sys-off { text-align: center; padding: 0 2px; }
+  .sys-off .val { font-size: 13px; font-weight: 500; color: var(--red-text); }
+  .sys-off .lbl { font-size: 9px; color: var(--ink-soft); }
+
+  .akb-bigbar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; gap: 2px; }
+  .akb-legend { display: flex; margin-top: 10px; }
+  .akb-legend .col { flex: 1; text-align: left; }
+  .akb-legend .dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; }
+  .akb-legend .lbl { font-size: 11px; font-weight: 600; }
+  .akb-legend .val { font-size: 13px; font-weight: 500; color: var(--ink); margin-top: 2px; white-space: nowrap; }
+  .akb-legend .sub { color: var(--ink-soft); font-weight: 400; font-size: 11px; }
+
+  .territory-header { font-size: 11px; color: var(--ink-soft); padding: 0 4px 8px; }
+  details.mini-row { border: 0.5px solid var(--line); border-radius: 12px; margin-bottom: 6px; }
+  details.mini-row > summary { list-style: none; cursor: pointer; padding: 9px 10px; display: flex; align-items: center; justify-content: space-between; }
+  details.mini-row .mini-bar { display: flex; height: 6px; border-radius: 3px; overflow: hidden; }
+  details.mini-row .mini-legend { display: flex; justify-content: space-between; margin-top: 4px; font-size: 9.5px; color: var(--ink-soft); }
+
+  details.rating-row { border: 0.5px solid var(--line); border-radius: 12px; margin-bottom: 6px; }
+  details.rating-row.best { border: 1.5px solid var(--best-border); }
+  details.rating-row > summary { list-style: none; cursor: pointer; padding: 9px 10px; display: flex; align-items: center; justify-content: space-between; }
+  .rating-name { display: flex; align-items: center; gap: 8px; }
+  .rating-rank { font-size: 12.5px; color: var(--ink-soft); width: 16px; }
+  .rating-nm { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+  .rating-score { text-align: right; }
+  .rating-score .num { font-size: 13px; font-weight: 500; color: var(--green); }
+  .rating-score .lbl { font-size: 9px; color: var(--ink-soft); }
+  .rating-detail { padding: 0 10px 10px; }
+  .rating-formula { font-size: 11.5px; color: #5F5E5A; margin-bottom: 6px; }
+  .chip-row { display: flex; gap: 4px; flex-wrap: wrap; }
+  .chip { font-size: 10.5px; border-radius: 8px; padding: 3px 8px; }
+  .chip.green { background: var(--green-bg); color: var(--green-text); }
+  .chip.amber { background: var(--amber-bg); color: var(--amber-text); }
+  .chip.red { background: var(--red-bg); color: var(--red-text); }
+  .chip.focus { background: var(--blue-bg); color: var(--blue); font-weight: 500; }
+  .chip.focus-pending { background: var(--pending-bg); color: var(--pending-text); border: 0.5px dashed var(--pending-border); }
+
+  .more-btn { width: 100%; margin-top: 6px; border: 0.5px dashed var(--pending-border); border-radius: 12px; background: transparent; padding: 9px 0; font-size: 12px; font-weight: 500; color: #5F5E5A; cursor: pointer; font-family: inherit; }
+
+  .territory-card { border-left: 3px solid; border-radius: 0 12px 12px 0; padding: 10px 12px; margin-bottom: 8px; }
+  .territory-card .nm { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+  .territory-card .deficit { font-size: 11px; margin-top: 2px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="topbar">
+    <div class="badge"><div class="sq">Р</div><div class="txt">Руководитель продаж</div></div>
+    <div class="topbar-row">
+      <h1 id="topTitle">Загрузка...</h1>
+      <div class="top-pill" id="topPill" style="display:none"></div>
+    </div>
+  </div>
+  <div class="content" id="mainContent">
+    <div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>
+  </div>
+  <div class="tabbar" id="tabbar">
+    <button class="tab active" data-screen="route" onclick="switchScreen('route')"><span class="icon">🗺️</span>Маршруты</button>
+    <button class="tab" data-screen="day" onclick="switchScreen('day')"><span class="icon">📋</span>Итоги дня</button>
+    <button class="tab" data-screen="month" onclick="switchScreen('month')"><span class="icon">📊</span>Итоги месяца</button>
+  </div>
+</div>
+
+<script>
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
+
+function getTelegramId() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('id')) return p.get('id');
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id)
+    return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  return null;
+}
+
+let currentTelegramId = null;
+let currentMonthPeriod = 'cur';
+const monthCache = {};
+
+// ============ Общие мелкие рендеры ============
+
+function catColor(pct) {
+  if (pct >= 90) return { fill: 'var(--green)', chip: 'green' };
+  if (pct >= 80) return { fill: 'var(--amber)', chip: 'amber' };
+  return { fill: 'var(--red)', chip: 'red' };
+}
+
+function categoriesBarsHtml(categories, totalAllOrders) {
+  if (!categories || !categories.length) return '<div class="empty" style="padding:8px 0">Нет данных по категориям</div>';
+  const rows = categories.map(c => {
+    const col = catColor(c.pct);
+    return `<div class="cat-bar-row">
+      <div class="top"><span>${c.name}</span><span><span class="count">${c.orders} из ${c.total} · </span><span class="pct">${c.pct}%</span></span></div>
+      <div class="track"><div class="fill" style="width:${c.pct}%;background:${col.fill}"></div></div>
+    </div>`;
+  }).join('');
+  return rows + `<div class="cat-footnote">Знаменатель — все заказы месяца: по маршруту и вне маршрута</div>`;
+}
+
+function categoryChipsHtml(categories) {
+  if (!categories || !categories.length) return '';
+  return categories.map(c => {
+    const col = catColor(c.pct);
+    return `<span class="chip ${col.chip}">${c.name} ${c.pct}%</span>`;
+  }).join('');
+}
+
+function focusChipHtml(focusPct) {
+  if (focusPct === null || focusPct === undefined) {
+    return `<span class="chip focus-pending">🎯 Задачи СВ — по итогам месяца</span>`;
+  }
+  return `<span class="chip focus">🎯 Задачи СВ ${focusPct}%</span>`;
+}
+
+function deltaHtml(delta) {
+  if (delta === null || delta === undefined) return `<span class="delta" style="color:var(--ink-soft)">0</span>`;
+  if (delta === 0) return `<span class="delta" style="color:var(--ink-soft)">0</span>`;
+  const sign = delta > 0 ? '+' : '';
+  return `<span class="delta ${delta > 0 ? 'up' : 'down'}">${sign}${delta}</span>`;
+}
+
+// name — поле-ключ строки рейтинга (agent/sv/tm), label — что показывать
+function ratingRowHtml(r, idx, nameKey, openFirst) {
+  const name = r[nameKey];
+  const isBest = idx === 0;
+  const rankMark = isBest ? '🏅' : `<span class="rating-rank">${idx + 1}</span>`;
+  return `<details class="rating-row ${isBest ? 'best' : ''}" ${openFirst && isBest ? 'open' : ''}>
+    <summary>
+      <div class="rating-name">${rankMark}<span class="rating-nm">${name}</span></div>
+      <div style="display:flex;align-items:center;gap:6px;">
+        <div class="rating-score"><div class="num">${r.avg_score}%</div><div class="lbl">средний</div></div>
+        ${deltaHtml(r.delta)}
+      </div>
+    </summary>
+    <div class="rating-detail">
+      <div class="rating-formula">Системная ${r.system_pct}% · Чистая ${r.clean_pct}%</div>
+      <div class="chip-row">${categoryChipsHtml(r.categories)}${focusChipHtml(r.focus_pct)}</div>
+    </div>
+  </details>`;
+}
+
+function ratingSectionHtml(id, icon, title, rows, nameKey, mode) {
+  // mode: 'full' (территориальных — весь список), 'best-plus5' (СВ — только
+  // лучший + кнопка), 'best-visible-plus5' (торговых — лучший + ещё
+  // несколько + кнопка)
+  if (!rows || !rows.length) {
+    return `<details class="card"><summary><span class="card-title">${icon} ${title}</span><span class="chevron">⌄</span></summary>
+      <div class="empty" style="padding:8px 0">Нет данных</div></details>`;
+  }
+  const best = rows[0].avg_score;
+  let bodyHtml = '';
+  if (mode === 'full') {
+    bodyHtml = rows.map((r, i) => ratingRowHtml(r, i, nameKey, true)).join('');
+  } else if (mode === 'best-plus5') {
+    bodyHtml = ratingRowHtml(rows[0], 0, nameKey, true);
+    if (rows.length > 1) {
+      const restHtml = rows.slice(1).map((r, i) => ratingRowHtml(r, i + 1, nameKey, false)).join('');
+      bodyHtml += `<div id="${id}-more" style="display:none">${restHtml}</div>
+        <button class="more-btn" onclick="document.getElementById('${id}-more').style.display='block';this.style.display='none';">Показать ещё +5</button>`;
+    }
+  } else {
+    const visible = rows.slice(0, 5);
+    const rest = rows.slice(5);
+    bodyHtml = visible.map((r, i) => ratingRowHtml(r, i, nameKey, true)).join('');
+    if (rest.length) {
+      const restHtml = rest.map((r, i) => ratingRowHtml(r, i + 5, nameKey, false)).join('');
+      bodyHtml += `<div id="${id}-more" style="display:none">${restHtml}</div>
+        <button class="more-btn" onclick="document.getElementById('${id}-more').style.display='block';this.style.display='none';">Показать ещё +5</button>`;
+    }
+  }
+  return `<details class="card">
+    <summary><span class="card-title">${icon} ${title}</span>
+      <div style="display:flex;align-items:center;">
+        <div class="card-head-val"><div class="num" style="color:var(--green);font-size:13px">${best}%</div><div class="lbl">лучший</div></div>
+        <span class="chevron">⌄</span>
+      </div>
+    </summary>
+    <div style="padding:0 12px 12px">${bodyHtml}</div>
+  </details>`;
+}
+
+// ============ Экран "Маршруты" — топ-5 проблемных территорий ============
+
+function territoryCardHtml(t, idx) {
+  let color, bg, text;
+  if (idx === 0 && t.deficit_orders > 0) { color = 'var(--red)'; bg = 'var(--red-bg)'; text = 'var(--red-text)'; }
+  else if (t.deficit_orders > 0) { color = 'var(--amber)'; bg = 'var(--amber-bg)'; text = 'var(--amber-text)'; }
+  else { color = 'var(--green)'; bg = 'var(--green-bg)'; text = 'var(--green-text)'; }
+  return `<div class="territory-card" style="border-color:${color};background:${bg}">
+    <div class="nm">${idx + 1}. ${t.tm}</div>
+    <div class="deficit" style="color:${text}">Дефицит заказов ${t.deficit_orders}</div>
+  </div>`;
+}
+
+function renderRoute(data) {
+  if (!data.archive_ready) {
+    return `<div class="empty">Нет данных за прошлый месяц — архив ещё не закрыт</div>`;
+  }
+  const all = [...data.top5, ...data.rest];
+  if (!all.length) return `<div class="empty">Нет территорий с данными</div>`;
+  const header = `<div class="territory-header">Ранжировано по дефициту заказов относительно среднего плана по компании (${data.company_average_plan})</div>`;
+  return header + all.map((t, i) => territoryCardHtml(t, i)).join('');
+}
+
+async function loadRoute() {
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const res = await fetch(`${API}/api/nto/${currentTelegramId}/route`);
+    if (!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    document.getElementById('mainContent').innerHTML = renderRoute(data);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршруты</div>';
+  }
+}
+
+// ============ Экран "Итоги дня" — пока упрощённый набросок ============
+// 13.09.2026: по ТЗ (см. память nto-kd-dashboard) этот экран не
+// прорабатывался так же глубоко, как "Итоги месяца" — бэкенд-эндпоинт
+// /api/nto/{id}/day ещё не написан. Показываем заглушку, а не ломаем
+// приложение попыткой fetch на несуществующий адрес.
+
+function renderDay() {
+  return `<div class="empty">Экран "Итоги дня" в разработке — скоро будет доступен</div>`;
+}
+
+// ============ Экран "Итоги месяца" ============
+
+function renderMonth(data) {
+  if (!data.archive_ready) {
+    return `<div class="empty">Нет данных за прошлый месяц — архив ещё не закрыт</div>`;
+  }
+
+  const toggle = `<div class="month-toggle">
+    <button class="${currentMonthPeriod === 'cur' ? 'active' : ''}" onclick="loadMonth('cur')">Текущий месяц</button>
+    <button class="${currentMonthPeriod === 'prev' ? 'active' : ''}" onclick="loadMonth('prev')">Прошлый месяц</button>
+  </div>`;
+
+  // 1. Клиентская база
+  const totalPakb = data.pakb || 1;
+  const sttPct = Math.round(data.stt_points / totalPakb * 100);
+  const akbPct = Math.round(data.akb_points / totalPakb * 100);
+  const neAkbPct = Math.max(0, 100 - sttPct - akbPct);
+  const territoryRows = (data.by_territory || []).map(t => {
+    const tTotal = t.pakb || 1;
+    const tStt = Math.round(t.stt_points / tTotal * 100);
+    const tAkb = Math.round(t.akb_points / tTotal * 100);
+    const tNe = Math.max(0, 100 - tStt - tAkb);
+    return `<details class="mini-row">
+      <summary><span class="rating-nm">${t.tm}</span><span style="font-size:13px;font-weight:500;color:var(--green)">${t.stt_pct}%</span></summary>
+      <div style="padding:0 10px 10px">
+        <div class="mini-bar"><div style="width:${tStt}%;background:var(--green)"></div><div style="width:${tAkb}%;background:var(--amber)"></div><div style="width:${tNe}%;background:var(--red)"></div></div>
+        <div class="mini-legend"><span>СТТ ${tStt}%</span><span>АКБ ${tAkb}%</span><span>Не АКБ ${tNe}%</span></div>
+      </div>
+    </details>`;
+  }).join('');
+
+  const clientBaseCard = `<details class="card">
+    <summary><span class="card-title">🏢 Клиентская база</span>
+      <div style="display:flex;align-items:center;"><div class="card-head-val"><div class="num" style="color:var(--green)">${sttPct}%</div><div class="lbl">СТТ</div></div><span class="chevron">⌄</span></div>
+    </summary>
+    <div style="padding:2px 16px 16px">
+      <div class="akb-bigbar">
+        <div style="width:${sttPct}%;background:var(--green)"></div>
+        <div style="width:${akbPct}%;background:var(--amber)"></div>
+        <div style="width:${neAkbPct}%;background:var(--red)"></div>
+      </div>
+      <div class="akb-legend">
+        <div class="col"><span class="dot" style="background:var(--green)"></span><span class="lbl" style="color:var(--green-text)">СТТ</span><div class="val">${data.stt_points} <span class="sub">· ${sttPct}%</span></div></div>
+        <div class="col"><span class="dot" style="background:var(--amber)"></span><span class="lbl" style="color:var(--amber-text)">АКБ</span><div class="val">${data.akb_points} <span class="sub">· ${akbPct}%</span></div></div>
+        <div class="col"><span class="dot" style="background:var(--red)"></span><span class="lbl" style="color:var(--red-text)">Не АКБ</span><div class="val">${data.ne_akb_points} <span class="sub">· ${neAkbPct}%</span></div></div>
+      </div>
+    </div>
+    <div style="margin:0 16px 6px;border-top:0.5px solid var(--line)"></div>
+    <div style="padding:8px 12px 12px">
+      <div class="territory-header">По территориям</div>
+      ${territoryRows || '<div class="empty" style="padding:8px 0">Нет территорий</div>'}
+    </div>
+  </details>`;
+
+  // 2. Система
+  const systemCard = `<details class="card">
+    <summary><span class="card-title">📊 Система</span>
+      <div style="display:flex;align-items:center;"><div class="card-head-val"><div class="num" style="color:var(--blue)">${data.clean_stt}%</div><div class="lbl">чистая</div></div><span class="chevron">⌄</span></div>
+    </summary>
+    <div style="padding:0 16px 14px">
+      <div class="sys-tiles-row">
+        <div class="sys-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
+        <div class="sys-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+      </div>
+      <div class="sys-mid-row">
+        <div class="sys-tile"><div class="val" style="color:var(--amber-text)">${data.system_stt}%</div><div class="lbl">системная</div></div>
+        <div class="sys-off"><div class="val">−${data.off_route_orders}</div><div class="lbl">вне</div></div>
+        <div class="sys-tile"><div class="val" style="color:var(--green-text)">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
+      </div>
+    </div>
+  </details>`;
+
+  // 3. Категории
+  const catCard = `<details class="card">
+    <summary><span class="card-title">🏷️ Категории</span>
+      <div style="display:flex;align-items:center;"><div class="card-head-val"><div class="num" style="color:var(--amber-text)">${data.avg_category ?? 0}%</div><div class="lbl">средняя</div></div><span class="chevron">⌄</span></div>
+    </summary>
+    <div style="padding:4px 16px 14px">${categoriesBarsHtml(data.categories, data.categories?.[0]?.total)}</div>
+  </details>`;
+
+  // 4-6. Рейтинги
+  const rating = data.rating || { tms: [], svs: [], agents: [] };
+  const tmRatingCard = ratingSectionHtml('nto-tm', '🏆', 'Рейтинг территориальных', rating.tms, 'tm', 'full');
+  const svRatingCard = ratingSectionHtml('nto-sv', '👥', 'Рейтинг СВ', rating.svs, 'sv', 'best-plus5');
+  const agentRatingCard = ratingSectionHtml('nto-agents', '🚶', 'Рейтинг торговых', rating.agents, 'agent', 'best-visible-plus5');
+
+  return toggle + clientBaseCard + systemCard + catCard + tmRatingCard + svRatingCard + agentRatingCard;
+}
+
+async function loadMonth(period) {
+  currentMonthPeriod = period;
+  if (monthCache[period]) {
+    document.getElementById('mainContent').innerHTML = renderMonth(monthCache[period]);
+    return;
+  }
+  document.getElementById('mainContent').innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div>';
+  try {
+    const today = new Date();
+    let m = today.getMonth() + 1, y = today.getFullYear();
+    if (period === 'prev') {
+      m = m > 1 ? m - 1 : 12;
+      y = m === 12 ? y - 1 : y;
+    }
+    const [summaryRes, ratingRes] = await Promise.all([
+      fetch(`${API}/api/nto/${currentTelegramId}/month?month=${m}&year=${y}`),
+      fetch(`${API}/api/nto/${currentTelegramId}/month-rating?month=${m}&year=${y}`),
+    ]);
+    if (!summaryRes.ok || !ratingRes.ok) throw new Error('bad response');
+    const summary = await summaryRes.json();
+    const ratingData = await ratingRes.json();
+    const merged = { ...summary, rating: { tms: ratingData.tms, svs: ratingData.svs, agents: ratingData.agents } };
+    monthCache[period] = merged;
+    document.getElementById('mainContent').innerHTML = renderMonth(merged);
+  } catch (e) {
+    document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить итоги месяца</div>';
+  }
+}
+
+// ============ Переключение экранов ============
+
+function switchScreen(screen) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === screen));
+  const titles = { route: 'Маршруты', day: 'Итоги дня', month: 'Итоги месяца' };
+  document.getElementById('topTitle').textContent = titles[screen];
+  if (screen === 'route') loadRoute();
+  else if (screen === 'day') document.getElementById('mainContent').innerHTML = renderDay();
+  else loadMonth(currentMonthPeriod);
+}
+
+async function main() {
+  const telegramId = getTelegramId();
+  currentTelegramId = telegramId;
+  if (!telegramId) {
+    document.getElementById('topTitle').textContent = 'Нет доступа';
+    document.getElementById('mainContent').innerHTML = '<div class="empty">Откройте через Telegram</div>';
+    return;
+  }
+  document.getElementById('topTitle').textContent = 'Маршруты';
+  await loadRoute();
+}
+
+main();
+</script>
+</body>
+</html>
