@@ -164,6 +164,10 @@ const monthCache = {};
 
 // ============ Общие мелкие рендеры ============
 
+function fmt(n) {
+  return (n ?? 0).toLocaleString('ru-RU');
+}
+
 function catColor(pct) {
   if (pct >= 90) return { fill: 'var(--green)', chip: 'green' };
   if (pct >= 80) return { fill: 'var(--amber)', chip: 'amber' };
@@ -175,7 +179,7 @@ function categoriesBarsHtml(categories, totalAllOrders) {
   const rows = categories.map(c => {
     const col = catColor(c.pct);
     return `<div class="cat-bar-row">
-      <div class="top"><span>${c.name}</span><span><span class="count">${c.orders} из ${c.total} · </span><span class="pct">${c.pct}%</span></span></div>
+      <div class="top"><span>${c.name}</span><span><span class="count">${fmt(c.orders)} из ${fmt(c.total)} · </span><span class="pct">${c.pct}%</span></span></div>
       <div class="track"><div class="fill" style="width:${c.pct}%;background:${col.fill}"></div></div>
     </div>`;
   }).join('');
@@ -273,7 +277,7 @@ function territoryCardHtml(t, idx) {
   else { color = 'var(--green)'; bg = 'var(--green-bg)'; text = 'var(--green-text)'; }
   return `<div class="territory-card" style="border-color:${color};background:${bg}">
     <div class="nm">${idx + 1}. ${t.tm}</div>
-    <div class="deficit" style="color:${text}">Дефицит заказов ${t.deficit_orders}</div>
+    <div class="deficit" style="color:${text}">Дефицит заказов ${fmt(t.deficit_orders)}</div>
   </div>`;
 }
 
@@ -283,7 +287,7 @@ function renderRoute(data) {
   }
   const all = [...data.top5, ...data.rest];
   if (!all.length) return `<div class="empty">Нет территорий с данными</div>`;
-  const header = `<div class="territory-header">Ранжировано по дефициту заказов относительно среднего плана по компании (${data.company_average_plan})</div>`;
+  const header = `<div class="territory-header">Ранжировано по дефициту заказов относительно среднего плана по компании (${fmt(data.company_average_plan)})</div>`;
   return header + all.map((t, i) => territoryCardHtml(t, i)).join('');
 }
 
@@ -329,15 +333,16 @@ function renderMonth(data) {
   const ghostPct = Math.max(0, 100 - sttPct - akbPct - neAkbPctBase);
   const neAkbPct = neAkbPctBase;
   const territoryRows = (data.by_territory || []).map(t => {
-    const tTotal = t.pakb || 1;
+    const tTotal = t.pakb + (t.ghost_points || 0) || 1;
     const tStt = Math.round(t.stt_points / tTotal * 100);
     const tAkb = Math.round(t.akb_points / tTotal * 100);
-    const tNe = Math.max(0, 100 - tStt - tAkb);
+    const tNeBase = Math.round(t.ne_akb_points / tTotal * 100);
+    const tGhost = Math.max(0, 100 - tStt - tAkb - tNeBase);
     return `<details class="mini-row">
       <summary><span class="rating-nm">${t.tm}</span><span style="font-size:13px;font-weight:500;color:var(--green)">${t.stt_pct}%</span></summary>
       <div style="padding:0 10px 10px">
-        <div class="mini-bar"><div style="width:${tStt}%;background:var(--green)"></div><div style="width:${tAkb}%;background:var(--amber)"></div><div style="width:${tNe}%;background:var(--red)"></div></div>
-        <div class="mini-legend"><span>СТТ ${tStt}%</span><span>АКБ ${tAkb}%</span><span>Не АКБ ${tNe}%</span></div>
+        <div class="mini-bar"><div style="width:${tStt}%;background:var(--green)"></div><div style="width:${tAkb}%;background:var(--amber)"></div><div style="width:${tNeBase}%;background:var(--red)"></div><div style="width:${tGhost}%;background:#fff;border:1px dashed #B8B2A3;box-sizing:border-box"></div></div>
+        <div class="mini-legend"><span>СТТ ${tStt}%</span><span>АКБ ${tAkb}%</span><span>Не АКБ ${tNeBase}%</span><span>Призрак ${tGhost}%</span></div>
       </div>
     </details>`;
   }).join('');
@@ -354,10 +359,10 @@ function renderMonth(data) {
         <div style="width:${ghostPct}%;background:#fff;border:1px dashed #B8B2A3;box-sizing:border-box;"></div>
       </div>
       <div class="akb-legend">
-        <div class="col"><span class="dot" style="background:var(--green)"></span><span class="lbl" style="color:var(--green-text)">СТТ</span><div class="val">${data.stt_points} <span class="sub">· ${sttPct}%</span></div></div>
-        <div class="col"><span class="dot" style="background:var(--amber)"></span><span class="lbl" style="color:var(--amber-text)">АКБ</span><div class="val">${data.akb_points} <span class="sub">· ${akbPct}%</span></div></div>
-        <div class="col"><span class="dot" style="background:var(--red)"></span><span class="lbl" style="color:var(--red-text)">Не АКБ</span><div class="val">${data.ne_akb_points} <span class="sub">· ${neAkbPct}%</span></div></div>
-        <div class="col"><span class="dot" style="background:#fff;border:1px dashed #B8B2A3;box-sizing:border-box;"></span><span class="lbl" style="color:var(--ink-soft)">Призрак</span><div class="val">${data.ghost_points || 0} <span class="sub">· ${ghostPct}%</span></div></div>
+        <div class="col"><span class="dot" style="background:var(--green)"></span><span class="lbl" style="color:var(--green-text)">СТТ</span><div class="val">${fmt(data.stt_points)} <span class="sub">· ${sttPct}%</span></div></div>
+        <div class="col"><span class="dot" style="background:var(--amber)"></span><span class="lbl" style="color:var(--amber-text)">АКБ</span><div class="val">${fmt(data.akb_points)} <span class="sub">· ${akbPct}%</span></div></div>
+        <div class="col"><span class="dot" style="background:var(--red)"></span><span class="lbl" style="color:var(--red-text)">Не АКБ</span><div class="val">${fmt(data.ne_akb_points)} <span class="sub">· ${neAkbPct}%</span></div></div>
+        <div class="col"><span class="dot" style="background:#fff;border:1px dashed #B8B2A3;box-sizing:border-box;"></span><span class="lbl" style="color:var(--ink-soft)">Призрак</span><div class="val">${fmt(data.ghost_points)} <span class="sub">· ${ghostPct}%</span></div></div>
       </div>
     </div>
     <div style="margin:0 16px 6px;border-top:0.5px solid var(--line)"></div>
@@ -368,32 +373,54 @@ function renderMonth(data) {
   </details>`;
 
   // 2. Система
+  const systemTerritoryRows = (data.by_territory_system || []).map(t => `<details class="mini-row">
+      <summary><span class="rating-nm">${t.tm}</span><span style="font-size:13px;font-weight:500;color:var(--blue)">${t.clean_stt}%</span></summary>
+      <div style="padding:0 10px 10px;font-size:11px;color:#5F5E5A">Системная ${t.system_stt}% · Чистая ${t.clean_stt}% · визиты ${fmt(t.planned_visits)} · по маршруту ${fmt(t.system_orders)} · −${fmt(t.off_schedule_orders)} вне · −${fmt(t.ghost_orders)} призрак</div>
+    </details>`).join('');
+
   const systemCard = `<details class="card">
     <summary><span class="card-title">📊 Система</span>
       <div style="display:flex;align-items:center;"><div class="card-head-val"><div class="num" style="color:var(--blue)">${data.clean_stt}%</div><div class="lbl">чистая</div></div><span class="chevron">⌄</span></div>
     </summary>
     <div style="padding:0 16px 14px">
       <div class="sys-tiles-row">
-        <div class="sys-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-        <div class="sys-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+        <div class="sys-tile"><div class="val">${fmt(data.planned_visits)}</div><div class="lbl">визиты</div></div>
+        <div class="sys-tile"><div class="val">${fmt(data.system_orders)}</div><div class="lbl">заказы по маршруту</div></div>
       </div>
-      <div class="sys-tiles-row">
-        <div class="sys-tile"><div class="val" style="color:var(--red-text)">−${data.off_schedule_orders ?? data.off_route_orders}</div><div class="lbl">вне маршрута</div></div>
-        <div class="sys-tile"><div class="val" style="color:var(--ink-soft)">${data.ghost_orders ?? 0}</div><div class="lbl">заказов-призраков</div></div>
-      </div>
-      <div class="sys-tiles-row">
+      <div class="sys-mid-row">
         <div class="sys-tile"><div class="val" style="color:var(--amber-text)">${data.system_stt}%</div><div class="lbl">системная</div></div>
+        <div class="sys-off" style="line-height:1.3">
+          <div class="val" style="font-size:12px">−${fmt(data.off_schedule_orders ?? data.off_route_orders)}</div>
+          <div class="lbl" style="font-size:8px;margin-bottom:3px">вне</div>
+          <div class="val" style="font-size:12px">−${fmt(data.ghost_orders)}</div>
+          <div class="lbl" style="font-size:8px">призрак</div>
+        </div>
         <div class="sys-tile"><div class="val" style="color:var(--green-text)">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
       </div>
+    </div>
+    <div style="margin:0 16px 6px;border-top:0.5px solid var(--line)"></div>
+    <div style="padding:8px 12px 12px">
+      <div class="territory-header">По территориям</div>
+      ${systemTerritoryRows || '<div class="empty" style="padding:8px 0">Нет территорий</div>'}
     </div>
   </details>`;
 
   // 3. Категории
+  const catTerritoryRows = (data.by_territory_categories || []).map(t => `<details class="mini-row">
+      <summary><span class="rating-nm">${t.tm}</span><span style="font-size:13px;font-weight:500;color:var(--amber-text)">${t.avg_category ?? 0}%</span></summary>
+      <div style="padding:0 10px 10px" class="chip-row">${categoryChipsHtml(t.categories)}</div>
+    </details>`).join('');
+
   const catCard = `<details class="card">
     <summary><span class="card-title">🏷️ Категории</span>
       <div style="display:flex;align-items:center;"><div class="card-head-val"><div class="num" style="color:var(--amber-text)">${data.avg_category ?? 0}%</div><div class="lbl">средняя</div></div><span class="chevron">⌄</span></div>
     </summary>
     <div style="padding:4px 16px 14px">${categoriesBarsHtml(data.categories, data.categories?.[0]?.total)}</div>
+    <div style="margin:0 16px 6px;border-top:0.5px solid var(--line)"></div>
+    <div style="padding:8px 12px 12px">
+      <div class="territory-header">По территориям</div>
+      ${catTerritoryRows || '<div class="empty" style="padding:8px 0">Нет территорий</div>'}
+    </div>
   </details>`;
 
   // 4-6. Рейтинги
