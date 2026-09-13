@@ -322,10 +322,12 @@ function renderMonth(data) {
   </div>`;
 
   // 1. Клиентская база
-  const totalPakb = data.pakb || 1;
+  const totalPakb = (data.pakb || 0) + (data.ghost_points || 0) || 1;
   const sttPct = Math.round(data.stt_points / totalPakb * 100);
   const akbPct = Math.round(data.akb_points / totalPakb * 100);
-  const neAkbPct = Math.max(0, 100 - sttPct - akbPct);
+  const neAkbPctBase = Math.round(data.ne_akb_points / totalPakb * 100);
+  const ghostPct = Math.max(0, 100 - sttPct - akbPct - neAkbPctBase);
+  const neAkbPct = neAkbPctBase;
   const territoryRows = (data.by_territory || []).map(t => {
     const tTotal = t.pakb || 1;
     const tStt = Math.round(t.stt_points / tTotal * 100);
@@ -349,11 +351,13 @@ function renderMonth(data) {
         <div style="width:${sttPct}%;background:var(--green)"></div>
         <div style="width:${akbPct}%;background:var(--amber)"></div>
         <div style="width:${neAkbPct}%;background:var(--red)"></div>
+        <div style="width:${ghostPct}%;background:#fff;border:1px dashed #B8B2A3;box-sizing:border-box;"></div>
       </div>
       <div class="akb-legend">
         <div class="col"><span class="dot" style="background:var(--green)"></span><span class="lbl" style="color:var(--green-text)">СТТ</span><div class="val">${data.stt_points} <span class="sub">· ${sttPct}%</span></div></div>
         <div class="col"><span class="dot" style="background:var(--amber)"></span><span class="lbl" style="color:var(--amber-text)">АКБ</span><div class="val">${data.akb_points} <span class="sub">· ${akbPct}%</span></div></div>
         <div class="col"><span class="dot" style="background:var(--red)"></span><span class="lbl" style="color:var(--red-text)">Не АКБ</span><div class="val">${data.ne_akb_points} <span class="sub">· ${neAkbPct}%</span></div></div>
+        <div class="col"><span class="dot" style="background:#fff;border:1px dashed #B8B2A3;box-sizing:border-box;"></span><span class="lbl" style="color:var(--ink-soft)">Призрак</span><div class="val">${data.ghost_points || 0} <span class="sub">· ${ghostPct}%</span></div></div>
       </div>
     </div>
     <div style="margin:0 16px 6px;border-top:0.5px solid var(--line)"></div>
@@ -373,9 +377,12 @@ function renderMonth(data) {
         <div class="sys-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
         <div class="sys-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
       </div>
-      <div class="sys-mid-row">
+      <div class="sys-tiles-row">
+        <div class="sys-tile"><div class="val" style="color:var(--red-text)">−${data.off_schedule_orders ?? data.off_route_orders}</div><div class="lbl">вне маршрута</div></div>
+        <div class="sys-tile"><div class="val" style="color:var(--ink-soft)">${data.ghost_orders ?? 0}</div><div class="lbl">заказов-призраков</div></div>
+      </div>
+      <div class="sys-tiles-row">
         <div class="sys-tile"><div class="val" style="color:var(--amber-text)">${data.system_stt}%</div><div class="lbl">системная</div></div>
-        <div class="sys-off"><div class="val">−${data.off_route_orders}</div><div class="lbl">вне</div></div>
         <div class="sys-tile"><div class="val" style="color:var(--green-text)">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
       </div>
     </div>
