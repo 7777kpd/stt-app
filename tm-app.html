@@ -416,9 +416,23 @@ function renderRouteCard(a, rank, monthLabel, monthNum, yearNum) {
     const m = levelMeta[lvl];
     return `<button class="pp-tab${i===0?' active':''}" data-pp-level="${lvl}" data-pp-card="${cardId}" data-bg-active="${m.tabBg}" data-bg-inactive="${m.bg}" data-text-active="${m.tabText}" data-text-inactive="${m.text}" style="background:${i===0?m.tabBg:m.bg};color:${i===0?m.tabText:m.text}" onclick="switchPointTab(this, event)">${m.label} (${byLevel[lvl].length})</button>`;
   }).join('');
+  // 13.09.2026: 'i' теперь строка фиксированной длины (1 символ на
+  // календарный день, '.'=нет данных), не список пар — см. _pack_items в
+  // stt.py. Разворачиваем обратно в [день,код] для рендера.
+  function expandItems(compact) {
+    if (Array.isArray(compact)) return compact;
+    if (!compact) return [];
+    const out = [];
+    for (let i = 0; i < compact.length; i++) {
+      const ch = compact[i];
+      if (ch !== '.') out.push([i + 1, Number(ch)]);
+    }
+    return out;
+  }
+
   function pointCardHtml(p, lvl) {
     const m = levelMeta[lvl];
-    const cells = (p.i || []).map(([day, code]) => {
+    const cells = expandItems(p.i).map(([day, code]) => {
       const type = TYPE_NAME[code] || 'miss';
       const s = itemStyle[type];
       return `<div class="pp-cell"><div class="pp-cell-icon" style="background:${s.bg};color:${s.fg}">${s.icon}</div><span class="pp-cell-day">${dayToWd(day)}</span></div>`;

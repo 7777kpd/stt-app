@@ -583,11 +583,25 @@ function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yea
     return shortWd[new Date(yearNum, monthNum - 1, day).getDay()];
   }
 
+  // 13.09.2026: 'i' теперь строка фиксированной длины (1 символ на
+  // календарный день, '.'=нет данных), не список пар — см. _pack_items в
+  // stt.py. Разворачиваем обратно в [день,код] для рендера.
+  function expandItems(compact) {
+    if (Array.isArray(compact)) return compact;
+    if (!compact) return [];
+    const out = [];
+    for (let i = 0; i < compact.length; i++) {
+      const ch = compact[i];
+      if (ch !== '.') out.push([i + 1, Number(ch)]);
+    }
+    return out;
+  }
+
   // 01.09.2026: общая сводка (заказ есть/нет/вне маршрута) — по-прежнему
   // по ВСЕЙ команде разом, отдельно от разреза по агентам ниже.
   const totals = { ok: 0, miss: 0, off: 0 };
   agentPointAnalysis.forEach(a => a.point_cards.forEach(p =>
-    (p.i || []).forEach(([, code]) => { totals[TYPE_NAME[code] || 'miss']++; })
+    expandItems(p.i).forEach(([, code]) => { totals[TYPE_NAME[code] || 'miss']++; })
   ));
 
   const legendRow = (bg, icon, label, count) => `<div style="display:flex;align-items:center;gap:6px;">
@@ -600,7 +614,7 @@ function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yea
 
   function cardHtml(p, lvl) {
     const m = levelMeta[lvl];
-    const cells = (p.i || []).map(([day, code]) => {
+    const cells = expandItems(p.i).map(([day, code]) => {
       const type = TYPE_NAME[code] || 'miss';
       return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:30px;">
         <div style="width:24px;height:24px;border-radius:6px;background:${COLOR[type]};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;">${ICON[type]}</div>
