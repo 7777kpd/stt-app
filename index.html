@@ -779,9 +779,23 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
     return shortWd[new Date(yearNum, monthNum - 1, day).getDay()];
   }
 
+  // 13.09.2026: 'i' теперь строка фиксированной длины (1 символ на
+  // календарный день, '.'=нет данных), не список пар — см. _pack_items в
+  // stt.py. Разворачиваем обратно в [день,код] для рендера.
+  function expandItems(compact) {
+    if (Array.isArray(compact)) return compact; // на случай старых кэшей
+    if (!compact) return [];
+    const out = [];
+    for (let i = 0; i < compact.length; i++) {
+      const ch = compact[i];
+      if (ch !== '.') out.push([i + 1, Number(ch)]);
+    }
+    return out;
+  }
+
   function cardHtml(p, lvl) {
     const m = levelMeta[lvl];
-    const cells = (p.i || []).map(([day, code]) => {
+    const cells = expandItems(p.i).map(([day, code]) => {
       const type = TYPE_NAME[code] || 'miss';
       return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:30px;">
         <div style="width:24px;height:24px;border-radius:6px;background:${COLOR[type]};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;">${ICON[type]}</div>
@@ -823,7 +837,7 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
   // цифра честная, включает и полностью неучтённые точки — см. память
   // проекта, отдельная нерешённая задача на будущее).
   const totals = { ok: 0, miss: 0, off: 0 };
-  pointCards.forEach(p => (p.i || []).forEach(([, code]) => {
+  pointCards.forEach(p => expandItems(p.i).forEach(([, code]) => {
     const type = TYPE_NAME[code] || 'miss';
     totals[type]++;
   }));
