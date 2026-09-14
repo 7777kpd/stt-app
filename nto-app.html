@@ -129,7 +129,7 @@
 <body>
 <div class="phone">
   <div class="topbar">
-    <div class="badge"><div class="sq">Р</div><div class="txt">Руководитель продаж</div></div>
+    <div class="badge"><div class="sq">Р</div><div class="txt">Руководитель продаж <span id="ntoName" style="font-weight:600;color:var(--ink)"></span></div></div>
     <div class="topbar-row">
       <h1 id="topTitle">Загрузка...</h1>
       <div class="top-pill" id="topPill" style="display:none"></div>
@@ -166,6 +166,11 @@ const monthCache = {};
 
 function fmt(n) {
   return (n ?? 0).toLocaleString('ru-RU');
+}
+
+function setNtoName(name) {
+  const el = document.getElementById('ntoName');
+  if (el && name) el.textContent = name;
 }
 
 function catColor(pct) {
@@ -297,6 +302,7 @@ async function loadRoute() {
     const res = await fetch(`${API}/api/nto/${currentTelegramId}/route`);
     if (!res.ok) throw new Error('bad response');
     const data = await res.json();
+    setNtoName(data.nto_name);
     document.getElementById('mainContent').innerHTML = renderRoute(data);
   } catch (e) {
     document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршруты</div>';
