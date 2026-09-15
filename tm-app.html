@@ -690,16 +690,39 @@ function renderDay(data) {
           </div>`;
         }
 
+        // 15.09.2026 (по просьбе): заказы показывают "% выполнения" (есть/
+        // нужно), не абсолютную разницу — используем готовое поле с
+        // бэкенда orders_completion_pct (добавлено в /day и route-history),
+        // с фолбэком на случай старого кэша без этого поля. Визиты (выше)
+        // остаются с абсолютной разницей, без изменений.
+        function ordersFactorTile(actual, target, pct) {
+          const p = pct != null ? pct : (target ? Math.round(actual / target * 100) : 0);
+          const color = p >= 100 ? 'var(--green)' : 'var(--red-dark)';
+          return `<div class="adc-metric">
+            <div style="display:flex;align-items:baseline;justify-content:center;gap:5px">
+              <span class="val">${actual}/${target}</span>
+              <span style="font-size:11px;font-weight:800;color:${color}">${p}%</span>
+            </div>
+            <div class="lbl">заказы сегодня · % выполнения</div>
+          </div>`;
+        }
+
+        const ordersPct = a.orders_completion_pct != null
+          ? a.orders_completion_pct
+          : (a.orders_target ? Math.round(a.orders_today / a.orders_target * 100) : 0);
+        const ordersPctColor = ordersPct >= 100 ? 'var(--green)' : 'var(--red-dark)';
+
         return `<details class="agent-day-card">
           <summary>
             ${badge(ok)}
             <div style="flex:1;min-width:0"><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
+            <span style="font-size:13px;font-weight:800;color:${ordersPctColor};margin-right:6px">${ordersPct}%</span>
             <span class="rc-chevron">▶</span>
           </summary>
           <div class="adc-body">
             <div class="adc-metrics">
               ${factorTile(a.visits_today, a.visits_target, 'визиты')}
-              ${factorTile(a.orders_today, a.orders_target, 'заказы сегодня')}
+              ${ordersFactorTile(a.orders_today, a.orders_target, a.orders_completion_pct)}
             </div>
             ${focusSvHtml}
           </div>
