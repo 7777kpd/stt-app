@@ -690,16 +690,35 @@ function renderDay(data) {
           </div>`;
         }
 
+        // 15.09.2026 (по просьбе, п.3 — было слишком много инфо в одной
+        // плитке): % — единственное крупное число, "N из M" — мелкая
+        // подпись под ним, без второй строки текста и без рядом стоящей
+        // разницы вперемешку с дробью.
+        function ordersFactorTile(actual, target, pct) {
+          const p = pct != null ? pct : (target ? Math.round(actual / target * 100) : 0);
+          const color = p >= 100 ? 'var(--green)' : 'var(--red-dark)';
+          return `<div class="adc-metric">
+            <div style="font-size:20px;font-weight:700;color:${color};line-height:1.1">${p}%</div>
+            <div class="lbl" style="margin-top:2px">заказы · ${actual} из ${target}</div>
+          </div>`;
+        }
+
+        const ordersPct = a.orders_completion_pct != null
+          ? a.orders_completion_pct
+          : (a.orders_target ? Math.round(a.orders_today / a.orders_target * 100) : 0);
+        const ordersPctColor = ordersPct >= 100 ? 'var(--green)' : 'var(--red-dark)';
+
         return `<details class="agent-day-card">
           <summary>
             ${badge(ok)}
             <div style="flex:1;min-width:0"><span class="adc-name">${a.agent}</span><span class="adc-sub">${a.sv || ''}</span></div>
+            <span style="font-size:13px;font-weight:800;color:${ordersPctColor};margin-right:6px">${ordersPct}%</span>
             <span class="rc-chevron">▶</span>
           </summary>
           <div class="adc-body">
             <div class="adc-metrics">
               ${factorTile(a.visits_today, a.visits_target, 'визиты')}
-              ${factorTile(a.orders_today, a.orders_target, 'заказы сегодня')}
+              ${ordersFactorTile(a.orders_today, a.orders_target, a.orders_completion_pct)}
             </div>
             ${focusSvHtml}
           </div>
@@ -709,6 +728,15 @@ function renderDay(data) {
 
   const top5GreenCount = data.top5_focus_ready ? (data.top5_today || []).filter(a => a.orders_today >= a.orders_target).length : 0;
   const top5RedCount = data.top5_focus_ready ? (data.top5_today || []).length - top5GreenCount : 0;
+
+  // 15.09.2026 (по просьбе): одна общая цифра над списком ТОП-5 — не
+  // среднее процентов по агентам, а честная сумма "есть"/"нужно" по ВСЕМ
+  // пятерым, потом уже % от сумм (тот же принцип агрегации, что и везде
+  // в проекте — сначала сырые числа, потом процент от них).
+  const top5SumOrders = (data.top5_today || []).reduce((s, a) => s + (a.orders_today || 0), 0);
+  const top5SumTarget = (data.top5_today || []).reduce((s, a) => s + (a.orders_target || 0), 0);
+  const top5SumPct = top5SumTarget ? Math.round(top5SumOrders / top5SumTarget * 100) : 0;
+  const top5SumColor = top5SumPct >= 100 ? 'var(--green)' : 'var(--red-dark)';
 
   return `${periodSwitch}
     <div class="day-card">
@@ -736,6 +764,10 @@ function renderDay(data) {
         <h3 style="display:inline">ТОП-5 сегодня</h3>
         <div class="top5-summary-badges">${badge(true)}<span class="top5-count ok">${top5GreenCount}</span>${badge(false)}<span class="top5-count bad">${top5RedCount}</span></div>
       </summary>
+      ${data.top5_focus_ready ? `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg);border-radius:12px;padding:10px 14px;margin-top:10px">
+        <div style="font-size:11px;color:var(--ink-soft)">заказы: ${top5SumOrders} из ${top5SumTarget} нужно</div>
+        <div style="font-size:22px;font-weight:700;color:${top5SumColor}">${top5SumPct}%</div>
+      </div>` : ''}
       <div style="margin-top:12px">${top5Html}</div>
     </details>`;
 }
@@ -824,8 +856,11 @@ function renderMonth(data) {
   function ratingCard(r, rank) {
     const isBest = rank === 1;
     const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
-    const focusChip = (r.focus_pct !== null && r.focus_pct !== undefined)
-      ? `<span class="chip" style="background:#EDE0C9;color:#7A5C1E">🎯 Задачи СВ ${r.focus_pct}%</span>`
+    // 15.09.2026: "Задачи СВ" заменена на "Дефицит заказов" (та же цифра
+    // top5_deficit_pct, одна на всю территорию ТМ, приходит с бэкенда на
+    // каждой строке рейтинга — см. get_tm_month_rating).
+    const deficitChip = (r.deficit_pct !== null && r.deficit_pct !== undefined)
+      ? `<span class="chip" style="background:#FCEBEB;color:#A32D2D">📉 Дефицит заказов ${r.deficit_pct}%</span>`
       : '';
     let deltaHtml = '';
     if (r.delta !== null && r.delta !== undefined) {
@@ -848,7 +883,7 @@ function renderMonth(data) {
       </summary>
       <div style="padding-top:10px">
         <p class="best-sub">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
-        <div class="best-chips">${chips}${focusChip}</div>
+        <div class="best-chips">${chips}${deficitChip}</div>
       </div>
     </details>`;
   }
@@ -924,15 +959,16 @@ function renderMonth(data) {
       </summary>
       <div style="padding-top:14px;">${data.categories.map(c => { const color = c.pct >= 80 ? 'var(--green)' : c.pct >= 50 ? 'var(--yellow)' : 'var(--red)'; return `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:${color}"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:${color}">${c.pct}%</span></div></div>`; }).join('')}</div>
     </details>` : ''}
-    ${data.focus_pct != null ? `<details class="day-card">
+    ${data.top5_deficit_pct != null ? `<details class="day-card">
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
-        <span class="card-label">🎯 Задачи СВ</span>
+        <div><span class="card-label">📉 ТОП-5 дефицит заказов</span><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${data.top5_orders} из ${data.top5_need_orders} нужно</div></div>
         <div style="display:flex;align-items:center;gap:8px;">
-          <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:${data.focus_pct>=90?'var(--green)':data.focus_pct>=80?'var(--yellow)':'var(--red)'};">${data.focus_pct}%</div><div style="font-size:9px;color:var(--ink-soft);">выполнено</div></div>
+          <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:${data.top5_deficit_pct>=100?'var(--green)':data.top5_deficit_pct>=80?'var(--yellow)':'var(--red)'};">${data.top5_deficit_pct}%</div></div>
           <span style="font-size:13px;color:var(--ink-soft);">▶</span>
         </div>
       </summary>
-      <div style="padding-top:14px;font-size:13px;color:var(--ink-soft);">Задач в фокусе: ${data.focus_tasks_total} · выполнено: ${data.focus_tasks_completed}</div>
+      <div style="padding-top:10px;font-size:10.5px;color:var(--ink-soft);">Те же 5 маршрутов, что на экране «Маршрут» — самые проблемные по дефициту</div>
+      <div style="padding-top:6px;">${(data.top5_detail || []).map((t, i) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-top:0.5px solid var(--line);"><span style="font-size:12.5px;font-weight:600;color:var(--ink);">${i+1}. ${t.agent}</span><span style="font-size:12px;color:var(--ink-soft);">${t.orders} из ${t.need_orders} · <b style="color:${t.pct!=null&&t.pct>=100?'var(--green)':'var(--red)'}">${t.pct!=null?t.pct+'%':'—'}</b></span></div>`).join('')}</div>
     </details>` : ''}
     <details class="day-card" ${ratingCardOpen?'open':''} ontoggle="ratingCardOpen=this.open">
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">

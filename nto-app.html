@@ -206,6 +206,14 @@ function focusChipHtml(focusPct) {
   return `<span class="chip focus">🎯 Задачи СВ ${focusPct}%</span>`;
 }
 
+// 15.09.2026: "Дефицит заказов" заменяет "Задачи СВ" ТОЛЬКО в "Рейтинг
+// территориальных" (nameKey='tm') — по прямому запросу. "Рейтинг СВ"/
+// "торговых" продолжают показывать "Задачи СВ" (focusChipHtml), см. ниже.
+function deficitChipHtml(deficitPct) {
+  if (deficitPct === null || deficitPct === undefined) return '';
+  return `<span class="chip" style="background:var(--red-bg);color:var(--red-text);font-weight:500;">📉 Дефицит заказов ${deficitPct}%</span>`;
+}
+
 function deltaHtml(delta) {
   if (delta === null || delta === undefined) return `<span class="delta" style="color:var(--ink-soft)">0</span>`;
   if (delta === 0) return `<span class="delta" style="color:var(--ink-soft)">0</span>`;
@@ -218,6 +226,7 @@ function ratingRowHtml(r, idx, nameKey, openFirst) {
   const name = r[nameKey];
   const isBest = idx === 0;
   const rankMark = isBest ? '🏅' : `<span class="rating-rank">${idx + 1}</span>`;
+  const lastChip = nameKey === 'tm' ? deficitChipHtml(r.deficit_pct) : focusChipHtml(r.focus_pct);
   return `<details class="rating-row ${isBest ? 'best' : ''}" ${openFirst && isBest ? 'open' : ''}>
     <summary>
       <div class="rating-name">${rankMark}<span class="rating-nm">${name}</span></div>
@@ -228,7 +237,7 @@ function ratingRowHtml(r, idx, nameKey, openFirst) {
     </summary>
     <div class="rating-detail">
       <div class="rating-formula">Системная ${r.system_pct}% · Чистая ${r.clean_pct}%</div>
-      <div class="chip-row">${categoryChipsHtml(r.categories)}${focusChipHtml(r.focus_pct)}</div>
+      <div class="chip-row">${categoryChipsHtml(r.categories)}${lastChip}</div>
     </div>
   </details>`;
 }
