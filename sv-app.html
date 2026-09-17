@@ -312,6 +312,10 @@
 <div id="app">
   <div class="phone">
     <div class="topbar">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="width:26px;height:26px;border-radius:8px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;">С</div>
+        <div style="font-size:13px;color:var(--ink-soft);">Супервайзер <span id="svName" style="font-weight:600;color:var(--ink);"></span></div>
+      </div>
       <h1 id="topTitle">Загрузка...</h1>
       <div class="top-pill" id="topPill" style="display:none"></div>
     </div>
@@ -1682,6 +1686,11 @@ async function main() {
     if (el) el.innerHTML = `<div class="empty">⚠️ ${msg}</div>`;
   };
 
+  function setSvName(name) {
+    const el = document.getElementById('svName');
+    if (el && name) el.textContent = name;
+  }
+
   // Загружаем все 5 вкладок параллельно ("История" убрана 01.08.2026,
   // "Анализ ТТ" добавлена 04.09.2026 — всегда прошлый месяц, отдельным
   // запросом с явным month/year, без своего переключателя периода).
@@ -1695,6 +1704,7 @@ async function main() {
   ]);
 
   if (routeRes.status === 'fulfilled') {
+    setSvName(routeRes.value.sv_name);
     document.getElementById('screen-route').innerHTML = renderRoute(routeRes.value);
   } else {
     err('screen-route', 'Ошибка загрузки маршрута');
