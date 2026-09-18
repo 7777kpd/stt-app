@@ -168,8 +168,8 @@
   .month-pill { background: var(--card); border-radius: 100px; padding: 6px 14px; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
   .card-label { font-size: 11px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; }
   .card-note { font-size: 11px; color: var(--ink-soft); margin: 4px 0 0; }
-  .rating-toggle { display: flex; gap: 6px; margin: 14px 0 10px; }
-  .rating-toggle button { flex: 1; font-size: 13px; font-weight: 700; padding: 10px; border-radius: 9px; border: none; font-family: inherit; cursor: pointer; background: transparent; color: var(--ink-soft); }
+  .rating-toggle { display: flex; gap: 4px; margin: 14px 0 10px; }
+  .rating-toggle button { flex: 1; font-size: 11.5px; font-weight: 700; padding: 9px 4px; border-radius: 9px; border: none; font-family: inherit; cursor: pointer; background: transparent; color: var(--ink-soft); }
   .rating-toggle button.active { background: var(--card); color: var(--ink); }
   .show-more-btn { display: block; width: 100%; font-size: 13px; font-weight: 700; padding: 12px; border-radius: 12px; border: 1px dashed var(--ink-soft); background: transparent; color: var(--ink-soft); cursor: pointer; font-family: inherit; margin-top: 4px; }
   .best-card { background: var(--green-bg); border-radius: 16px; padding: 16px; margin-bottom: 10px; }
@@ -267,11 +267,13 @@
 <div id="app">
   <div class="phone">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <div style="width:26px;height:26px;border-radius:8px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;">Т</div>
-        <div style="font-size:13px;color:var(--ink-soft);">Территориальный менеджер <span id="tmName" style="font-weight:600;color:var(--ink);"></span></div>
+      <div style="display:flex;flex-direction:column;">
+        <h1 id="topTitle" style="margin:0 0 6px;">Загрузка...</h1>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:22px;height:22px;border-radius:7px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;">Т</div>
+          <div style="font-size:12px;color:var(--ink-soft);">Территориальный менеджер <span id="tmName" style="font-weight:600;color:var(--ink);"></span></div>
+        </div>
       </div>
-      <h1 id="topTitle">Загрузка...</h1>
       <div class="top-pill" id="topPill" style="display:none"></div>
     </div>
     <div class="content" id="mainContent">
@@ -855,18 +857,30 @@ function switchRatingTab(tab) {
 }
 
 function renderMonth(data) {
-  const rows = currentRatingTab === 'agents' ? (data.rating.agents || []) : (data.rating.svs || []);
+  const rows = currentRatingTab === 'agents' ? (data.rating.agents || [])
+    : currentRatingTab === 'svs' ? (data.rating.svs || [])
+    : (data.rating.tms || []);
   const isAgent = currentRatingTab === 'agents';
+  const isTm = currentRatingTab === 'tms';
+
+  function rowName(r) { return isAgent ? r.agent : isTm ? r.tm : r.sv; }
 
   function ratingCard(r, rank) {
     const isBest = rank === 1;
     const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
-    // 15.09.2026: "Задачи СВ" заменена на "Дефицит заказов" (та же цифра
-    // top5_deficit_pct, одна на всю территорию ТМ, приходит с бэкенда на
-    // каждой строке рейтинга — см. get_tm_month_rating).
-    const deficitChip = (r.deficit_pct !== null && r.deficit_pct !== undefined)
-      ? `<span class="chip" style="background:#FCEBEB;color:#A32D2D">📉 Дефицит заказов ${r.deficit_pct}%</span>`
-      : '';
+    // 17.09.2026 (возвращено — "Дефицит заказов" остался только в
+    // отдельной карточке "ТОП-5 дефицит заказов" и в "Рейтинг ТМ" (там
+    // это и есть основной критерий — единообразно с "Рейтинг
+    // территориальных" у nto): на текущем месяце "Задачи СВ" не
+    // считается (дорого), чип приглушённый "по итогам месяца"; на
+    // прошлом — обычный % (и входит в средний балл).
+    const lastChip = isTm
+      ? ((r.deficit_pct !== null && r.deficit_pct !== undefined)
+          ? `<span class="chip" style="background:#FCEBEB;color:#A32D2D;font-weight:600;">📉 Дефицит заказов ${r.deficit_pct}%</span>`
+          : '')
+      : ((r.focus_pct !== null && r.focus_pct !== undefined)
+          ? `<span class="chip" style="background:#E8F0FE;color:#0C447C;font-weight:600;">🎯 Задачи СВ ${r.focus_pct}%</span>`
+          : `<span class="chip" style="background:#F0EADC;color:#A39C87;border:0.5px dashed #C9C0AA;">🎯 Задачи СВ — по итогам месяца</span>`);
     let deltaHtml = '';
     if (r.delta !== null && r.delta !== undefined) {
       const up = r.delta >= 0;
@@ -875,11 +889,12 @@ function renderMonth(data) {
     } else if (data.is_current_month) {
       deltaHtml = `<span class="rating-delta neutral">впервые в рейтинге</span>`;
     }
-    return `<details class="${isBest ? 'best-card' : 'day-card'}">
+    const meBadge = (isTm && r.is_me) ? ` <span style="font-size:10px;font-weight:700;color:var(--ink-soft);">(вы)</span>` : '';
+    return `<details class="${isBest ? 'best-card' : 'day-card'}" ${isTm && r.is_me ? 'style="border:1.5px solid var(--green);"' : ''}>
       <summary style="cursor:pointer;list-style:none;">
         ${isBest ? `<p class="best-label">Лучший результат — ${data.month}</p>` : `<p class="card-label" style="margin-bottom:8px">#${rank}</p>`}
         <div class="best-head">
-          <span class="best-name">${isAgent ? r.agent : r.sv}</span>
+          <span class="best-name">${rowName(r)}${meBadge}</span>
           <div style="text-align:right;display:flex;align-items:center;gap:6px">
             <div><span class="best-pct" style="display:block;${isBest?'':'color:var(--ink);font-size:18px'}">${r.avg_score.toFixed(1)}%</span>${deltaHtml}</div>
             <span style="font-size:13px;color:var(--ink-soft)">▶</span>
@@ -888,14 +903,14 @@ function renderMonth(data) {
       </summary>
       <div style="padding-top:10px">
         <p class="best-sub">Системная ${r.system_pct.toFixed(1)}% · Чистая ${r.clean_pct.toFixed(1)}%</p>
-        <div class="best-chips">${chips}${deficitChip}</div>
+        <div class="best-chips">${chips}${lastChip}</div>
       </div>
     </details>`;
   }
 
   // 13.08.2026: "Рейтинг торговых" может быть длинным (десятки агентов) —
   // показываем по 5 с кнопкой "+5" вместо всего списка разом. "Рейтинг
-  // СВ" короткий (несколько человек) — показывается целиком.
+  // СВ"/"Рейтинг ТМ" короткие (несколько человек) — показываются целиком.
   const visibleCount = isAgent ? Math.min(ratingVisibleCount, rows.length) : rows.length;
   const ratingCards = rows.length
     ? rows.slice(0, visibleCount).map((r, i) => ratingCard(r, i + 1)).join('')
@@ -986,7 +1001,8 @@ function renderMonth(data) {
       <div style="padding-top:10px;">
         <div class="rating-toggle">
           <button class="${isAgent?'active':''}" onclick="switchRatingTab('agents')">Рейтинг торговых</button>
-          <button class="${!isAgent?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
+          <button class="${currentRatingTab==='svs'?'active':''}" onclick="switchRatingTab('svs')">Рейтинг СВ</button>
+          <button class="${isTm?'active':''}" onclick="switchRatingTab('tms')">Рейтинг ТМ</button>
         </div>
         ${ratingCards}
         ${showMoreBtn}
