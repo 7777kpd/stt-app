@@ -312,11 +312,13 @@
 <div id="app">
   <div class="phone">
     <div class="topbar">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
-        <div style="width:26px;height:26px;border-radius:8px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;">С</div>
-        <div style="font-size:13px;color:var(--ink-soft);">Супервайзер <span id="svName" style="font-weight:600;color:var(--ink);"></span></div>
+      <div style="display:flex;flex-direction:column;">
+        <h1 id="topTitle" style="margin:0 0 6px;">Загрузка...</h1>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div style="width:22px;height:22px;border-radius:7px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;">С</div>
+          <div style="font-size:12px;color:var(--ink-soft);">Супервайзер <span id="svName" style="font-weight:600;color:var(--ink);"></span></div>
+        </div>
       </div>
-      <h1 id="topTitle">Загрузка...</h1>
       <div class="top-pill" id="topPill" style="display:none"></div>
     </div>
     <div class="content" id="mainContent">
