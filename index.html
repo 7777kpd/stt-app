@@ -241,7 +241,9 @@ details.focus-details[open] .focus-chevron { transform: rotate(90deg); }
 </div>
 
 <script>
-const API = 'https://develop-production-0a2d.up.railway.app';
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
 const MONTHS = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
 function getTelegramId() {
