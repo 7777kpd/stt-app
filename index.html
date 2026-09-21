@@ -241,7 +241,9 @@ details.focus-details[open] .focus-chevron { transform: rotate(90deg); }
 </div>
 
 <script>
-const API = 'https://develop-production-0a2d.up.railway.app';
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
 const MONTHS = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
 function getTelegramId() {
@@ -463,6 +465,8 @@ function buildRouteScreen(data) {
 
   let tab = grouped.red.length ? 'red' : grouped.yellow.length ? 'yellow' : 'green';
   const agentName = data.agent || data.agent_name || '';
+  const _badgeNameEl = document.getElementById('agentBadgeName');
+  if (_badgeNameEl && agentName) _badgeNameEl.textContent = agentName;
 
   // Строим блок фокуса СВ
   // Use cross-month focus points from /day endpoint
@@ -1310,6 +1314,10 @@ async function main() {
   const startScreen = urlParams.get('screen') || 'route';
 
   document.getElementById('app').innerHTML = `
+    <div style="padding:14px 16px 0;display:flex;align-items:center;gap:8px;">
+      <div style="width:26px;height:26px;border-radius:8px;background:#8B8578;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:500;flex-shrink:0;">А</div>
+      <div style="font-size:13px;color:#8B8578;">Агент <span id="agentBadgeName" style="font-weight:600;color:#2C2A26;"></span></div>
+    </div>
     <div id="screen-route" class="screen ${startScreen==='route'?'active':''}"></div>
     <div id="screen-day" class="screen ${startScreen==='day'?'active':''}"></div>
     <div id="screen-stt"   class="screen ${startScreen==='stt'?'active':''}"></div>
