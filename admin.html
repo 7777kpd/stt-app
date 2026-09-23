@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>СТТ — админ-панель</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+/* admin.html — админ-панель stt-app, этап 1 (23.09.2026).
+   Открывается только командой /admin в боте (Telegram Mini App). Все данные —
+   через /api/admin/... (admin_api.py), права проверяются на сервере. */
+:root{
+  --bg:#EDF0EF;--surface:#FFFFFF;--surface-2:#F6F8F7;--ink:#16212B;--ink-2:#4A5763;--ink-3:#7C8792;--line:#D5DBDA;
+  --accent:#0F6468;--accent-ink:#0B4C4F;--accent-bg:#DDEEEE;--on-accent:#FFFFFF;
+  --ok:#2E7A4E;--ok-bg:#E0F0E6;--warn:#9A6212;--warn-bg:#F7ECD8;--bad:#A8342F;--bad-bg:#F6E0DE;--mute:#6B7680;--mute-bg:#E7EAEA;
+  --sans:-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,Menlo,Consolas,monospace;
+  box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#10171C;--surface:#172027;--surface-2:#1C262E;--ink:#E6ECEF;--ink-2:#A9B5BE;--ink-3:#7D8A93;--line:#2A3640;
+  --accent:#5FB8B8;--accent-ink:#9ED8D6;--accent-bg:#173536;--on-accent:#0B1A1B;
+  --ok:#6CC08E;--ok-bg:#173323;--warn:#E0AE5A;--warn-bg:#3A2C14;--bad:#EC8A83;--bad-bg:#3C1D1B;--mute:#95A1AA;--mute-bg:#222C33}}
+*,*::before,*::after{box-sizing:inherit}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--sans);font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 12px;font-size:14px}
+button:hover{border-color:var(--ink-3)}
+button:disabled{opacity:.5;cursor:default}
+button.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+input,select{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:7px 10px;font-size:14px;width:100%}
+input:disabled,select:disabled{background:var(--surface-2);color:var(--ink-2)}
+.app{display:grid;grid-template-columns:210px minmax(0,1fr);min-height:100vh}
+.nav{background:var(--surface);border-right:1px solid var(--line);padding:18px 12px;display:flex;flex-direction:column;gap:4px}
+.brand{font-weight:600;font-size:17px;padding:0 8px 14px}
+.brand small{display:block;font-weight:400;font-size:12px;color:var(--ink-3)}
+.navb{border:0;background:transparent;text-align:left;padding:9px 10px;border-radius:6px;width:100%}
+.navb:hover{background:var(--surface-2)}
+.navb.on{background:var(--accent-bg);color:var(--accent-ink);font-weight:500}
+.who{margin-top:auto;border-top:1px solid var(--line);padding:12px 8px 0;font-size:13px;color:var(--ink-2)}
+.main{padding:22px 26px;min-width:0}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+.sub{color:var(--ink-2);margin:0 0 18px;font-size:14px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.split{display:grid;grid-template-columns:minmax(0,330px) minmax(0,1fr);gap:18px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.row{display:grid;grid-template-columns:12px minmax(0,1fr);gap:10px;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--surface-2)}
+.row.on{background:var(--accent-bg)}
+.nm{font-weight:500}
+.meta{font-size:12px;color:var(--ink-3)}
+.dot{width:10px;height:10px;border-radius:50%;background:currentColor}
+.filters{display:flex;gap:6px;padding:12px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.chip{font-size:12px;padding:3px 10px;border-radius:12px;border:1px solid var(--line);background:var(--surface);cursor:pointer}
+.chip.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.tag{display:inline-block;font-size:12px;padding:2px 9px;border-radius:12px;font-weight:500;white-space:nowrap}
+.s-test{background:var(--warn-bg);color:var(--warn)}.s-conn{background:var(--accent-bg);color:var(--accent-ink)}
+.s-work{background:var(--ok-bg);color:var(--ok)}.s-pause{background:var(--bad-bg);color:var(--bad)}.s-off{background:var(--mute-bg);color:var(--mute)}
+.c-test{color:var(--warn)}.c-conn{color:var(--accent)}.c-work{color:var(--ok)}.c-pause{color:var(--bad)}.c-off{color:var(--mute)}
+.det{padding:20px 22px}
+.dhead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.dhead h2{margin:0;font-size:20px;font-weight:600}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:18px 0 16px;overflow-x:auto}
+.tab{border:0;background:transparent;border-radius:0;padding:9px 14px;border-bottom:2px solid transparent;color:var(--ink-2);white-space:nowrap}
+.tab.on{border-bottom-color:var(--accent);color:var(--ink);font-weight:500}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.box{background:var(--surface-2);border-radius:8px;padding:12px 14px}
+.lbl{font-size:12px;color:var(--ink-3);margin:0 0 3px}
+.val{margin:0;font-weight:500}
+.sec{margin-top:22px}
+.sec h3{font-size:15px;font-weight:600;margin:0 0 10px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.note{font-size:13px;color:var(--ink-2);background:var(--surface-2);border-left:3px solid var(--accent);padding:10px 12px;margin:12px 0 0}
+.note.warn{border-left-color:var(--warn)}.note.bad{border-left-color:var(--bad)}
+.small{font-size:13px;color:var(--ink-2);margin:4px 0 0}
+.mono{font-family:var(--mono);font-size:13px}
+.err{color:var(--bad);font-size:13px;margin:6px 0 0;min-height:1em}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;margin-top:10px}
+.check input{width:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-weight:500;color:var(--ink-3);font-size:12px;padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.tw{overflow-x:auto}
+.src{display:grid;grid-template-columns:170px minmax(0,1fr);gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
+.src:last-child{border-bottom:0}
+.back{display:none;margin-bottom:14px}
+.center{padding:60px 20px;text-align:center;color:var(--ink-2)}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:11px 18px;border-radius:8px;font-size:14px;max-width:min(560px,92vw);opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:50}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.modal{position:fixed;inset:0;background:rgba(10,16,20,.5);display:flex;align-items:center;justify-content:center;padding:20px;z-index:40}
+.modal .card{background:var(--surface);border-radius:10px;padding:22px;max-width:440px;width:100%}
+.modal h3{margin:0 0 8px;font-size:17px}
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}.nav{border-right:0;border-bottom:1px solid var(--line);flex-direction:row;flex-wrap:wrap;align-items:center}
+  .brand{padding:0 8px;width:100%}.navb{width:auto}.who{margin:0;border:0;padding:0 8px;width:100%}
+  .split{grid-template-columns:1fr}.main{padding:16px 12px}.grid3{grid-template-columns:1fr 1fr}
+  .back{display:inline-block}.split.show-det>.list{display:none}.split:not(.show-det)>.det{display:none}
+}
+@media (max-width:520px){.grid3,.grid2{grid-template-columns:1fr}.src{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="nav" id="nav"></nav>
+  <main class="main" id="main"><div class="center">Загрузка…</div></main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="modal"></div>
+<script>
+const API = new URLSearchParams(location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
+const TG = window.Telegram && window.Telegram.WebApp;
+const INIT = TG ? TG.initData : '';
+
+const ROLES = {owner:'Владелец', manager:'Менеджер СТТ', tech:'Техспециалист'};
+const STAGES = {test:'Тест (Excel)', conn:'Подключение', work:'Работает', pause:'Приостановлена', off:'Отключена'};
+const DAYS = ['пн','вт','ср','чт','пт','сб','вс'];
+const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia/Almaty','Asia/Dushanbe','Asia/Ashgabat','Asia/Bishkek'];
+const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
+
+const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false};
+
+const $ = id => document.getElementById(id);
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const hh = h => String(h).padStart(2,'0') + ':00';
+const fdt = iso => { if(!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('ru-RU') + (iso.length > 10 ? ' ' + d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : ''); };
+const role = () => S.me ? S.me.role : '';
+const isOwner = () => role() === 'owner';
+const canMgr = () => ['owner','manager'].includes(role());
+const canTech = () => ['owner','tech'].includes(role());
+
+function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('show'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('show'),3600); }
+
+async function api(path, opts = {}){
+  const res = await fetch(API + '/api/admin' + path, {
+    method: opts.method || 'GET',
+    headers: {'X-Telegram-Init-Data': INIT, 'Content-Type': 'application/json'},
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  let data = null;
+  try { data = await res.json(); } catch(e) {}
+  if(!res.ok) throw new Error((data && data.detail) || ('Ошибка сервера ' + res.status));
+  return data;
+}
+
+function fatal(text){
+  $('nav').innerHTML = '<div class="brand">СТТ · админ-панель</div>';
+  $('main').innerHTML = `<div class="center"><p style="font-weight:500;margin:0 0 6px">${esc(text)}</p><p class="small">Панель открывается командой /admin в Telegram-боте.</p></div>`;
+}
+
+async function boot(){
+  if(TG){ TG.ready(); TG.expand(); }
+  if(!INIT){ fatal('Откройте панель через Telegram'); return; }
+  try {
+    S.me = await api('/me');
+  } catch(e){ fatal(e.message); return; }
+  S.tab = role() === 'tech' ? 'data' : 'overview';
+  await loadCompanies();
+  render();
+}
+
+async function loadCompanies(){
+  S.companies = await api('/companies');
+  if(role() === 'manager') S.free = await api('/companies/free');
+  if(!S.companies.some(c => c.company_id === S.sel)) S.sel = S.companies.length ? S.companies[0].company_id : null;
+}
+
+const co = id => S.companies.find(c => c.company_id === id);
+const VIEWS = () => isOwner() ? [['companies','Компании'],['team','Команда'],['log','Журнал изменений']]
+  : [['companies', role() === 'manager' ? 'Мои компании' : 'Компании'],['log','Журнал изменений']];
+const TABS = () => role() === 'tech' ? [['data','Источники данных'],['cfg','Подключение'],['clog','Журнал']]
+  : [['overview','Обзор'],['cfg','Настройки'],['data','Источники данных'],['clog','Журнал']];
+
+async function go(v){
+  S.view = v; S.newOpen = false; S.addOpen = false;
+  try {
+    if(v === 'team') S.team = await api('/team');
+    if(v === 'log') S.log = await api('/log');
+    if(v === 'companies') await loadCompanies();
+  } catch(e){ toast(e.message); }
+  render();
+}
+async function pick(id){ S.sel = id; S.tab = TABS()[0][0]; S.showDet = true; render(); window.scrollTo(0,0); }
+async function setTab(t){
+  S.tab = t;
+  if(t === 'clog'){ try { S.clog = await api('/log?company_id=' + encodeURIComponent(S.sel)); } catch(e){ toast(e.message); } }
+  render();
+}
+
+function render(){
+  $('nav').innerHTML = `<div class="brand">СТТ · админ-панель${API.includes('develop') ? '<small>develop</small>' : ''}</div>
+    ${VIEWS().map(([k,n]) => `<button class="navb ${S.view===k?'on':''}" onclick="go('${k}')">${n}</button>`).join('')}
+    <div class="who">${esc(S.me.name)}<br><span class="meta">${ROLES[role()]}</span></div>`;
+  const m = $('main');
+  if(S.view === 'team') m.innerHTML = renderTeam();
+  else if(S.view === 'log') m.innerHTML = renderLog();
+  else m.innerHTML = S.newOpen ? renderNew() : renderCompanies();
+  if(S.view === 'companies' && S.tab === 'cfg') cfgPreview();
+}
+
+/* ---------- Компании ---------- */
+function freeBlock(){
+  if(role() !== 'manager' || !S.free.length) return '';
+  return `<div class="sec"><h3>Свободные компании — без менеджера</h3>
+    <p class="small" style="margin:0 0 10px">Видно только название. Закрепите за собой — откроются настройки и журнал компании. Компанию другого менеджера взять нельзя.</p>
+    <div class="panel">${S.free.map(c => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line)">
+      <span>${esc(c.name || c.company_id)} <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></span>
+      <button onclick="claim('${esc(c.company_id)}')">Закрепить за собой</button></div>`).join('')}</div></div>`;
+}
+
+function renderCompanies(){
+  const V = S.companies, fl = S.filter;
+  const list = V.filter(c => fl === 'all' || (fl === 'nomgr' ? !c.manager_telegram_id : c.stage === fl));
+  const cnt = k => V.filter(c => c.stage === k).length;
+  const title = role() === 'manager' ? 'Мои компании' : 'Компании';
+  const newBtn = canMgr() ? '<button class="pri" onclick="S.newOpen=true;render()">Новая компания</button>' : '';
+  if(!V.length) return `<div class="head"><h1>${title}</h1>${newBtn}</div>
+    <div class="panel det" style="margin-top:14px"><p class="val">У вас пока нет компаний</p>
+    <p class="small">${role()==='manager' ? 'Заведите нового клиента или возьмите себе свободную компанию ниже.' : 'Справочник пуст.'}</p></div>${freeBlock()}`;
+  const c = co(S.sel);
+  const chips = [['all','Все',V.length], ...(isOwner() ? [['nomgr','Без менеджера',V.filter(x=>!x.manager_telegram_id).length]] : []),
+    ...Object.entries(STAGES).map(([k,n]) => [k,n,cnt(k)]).filter(x => x[2])];
+  return `<div class="head"><h1>${title}</h1>${newBtn}</div>
+  <p class="sub">${V.length} компаний · справочник: ${S.me.registry_source === 'db' ? 'база' : 'Google-таблица'}</p>
+  <div class="split ${S.showDet ? 'show-det' : ''}">
+    <div class="panel list">
+      <div class="filters">${chips.map(([k,n,x]) => `<span class="chip ${fl===k?'on':''}" onclick="S.filter='${k}';render()">${n} ${x}</span>`).join('')}</div>
+      ${list.map(x => `<div class="row ${x.company_id===S.sel?'on':''}" onclick="pick('${esc(x.company_id)}')">
+        <span class="dot c-${x.stage}"></span>
+        <div><div class="nm">${esc(x.name || x.company_id)}</div>
+        <div class="meta">${esc(x.manager_name || 'без менеджера')} · ${esc(x.stage_name)}</div></div></div>`).join('') || '<div class="row"><span></span><div class="meta">Нет компаний</div></div>'}
+    </div>
+    <div class="panel det">${c ? renderDetail(c) : '<p class="small">Выберите компанию.</p>'}</div>
+  </div>${freeBlock()}`;
+}
+
+function renderDetail(c){
+  const tabs = TABS(); if(!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
+  const body = S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : tabLog();
+  return `<button class="back" onclick="S.showDet=false;render()">← Все компании</button>
+  <div class="dhead"><div><h2>${esc(c.name || c.company_id)}</h2><div class="meta">${esc(c.company_id)} · ${esc(c.timezone)}</div></div>
+  <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></div>
+  <div class="tabs">${tabs.map(([k,n]) => `<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${n}</button>`).join('')}</div>${body}`;
+}
+
+function tabOverview(c){
+  const stageOpts = Object.entries(STAGES).filter(([k]) => isOwner() || ['test','conn','work'].includes(k) || k === c.stage);
+  const team = S.team.filter(t => t.role === 'manager' && t.active);
+  const mgrBlock = isOwner()
+    ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="as_m" style="width:auto"><option value="">не закреплён</option>${team.map(t => `<option value="${esc(t.telegram_id)}" ${t.telegram_id===c.manager_telegram_id?'selected':''}>${esc(t.name)}</option>`).join('')}${c.manager_telegram_id && !team.some(t=>t.telegram_id===c.manager_telegram_id) ? `<option value="${esc(c.manager_telegram_id)}" selected>${esc(c.manager_name)}</option>` : ''}</select><button onclick="assign('${esc(c.company_id)}')">Закрепить</button></div>`
+    : `<p class="val">${esc(c.manager_name || 'не закреплён')}${c.manager_telegram_id === S.me.telegram_id ? ' (вы)' : ''}</p>`;
+  return `<div class="grid2">
+    <div class="box"><p class="lbl">Менеджер СТТ</p>${mgrBlock}</div>
+    <div class="box"><p class="lbl">Этап</p><div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="st_s" style="width:auto" ${canMgr()?'':'disabled'}>${stageOpts.map(([k,n]) => `<option value="${k}" ${k===c.stage?'selected':''}>${n}</option>`).join('')}</select>
+      <input id="st_t" type="date" style="width:auto" value="${esc(c.trial_until || '')}" title="Тест до" ${canMgr()?'':'disabled'}>
+      ${canMgr() ? `<button onclick="saveStage('${esc(c.company_id)}')">Сохранить</button>` : ''}</div>
+      <p class="small">Дата — окончание бесплатного теста.</p></div></div>
+  <div class="grid3" style="margin-top:12px">
+    <div class="box"><p class="lbl">Отчёты</p><p class="val">${hh(c.morning_hour)} / ${hh(c.evening_hour)}</p><p class="small">${esc(c.timezone)}</p></div>
+    <div class="box"><p class="lbl">Выходные</p><p class="val">${esc(c.days_off || 'нет')}</p></div>
+    <div class="box"><p class="lbl">Техконтакт</p><p class="val">${esc(c.tech_contact_id || '—')}</p></div></div>
+  ${!c.tech_contact_id ? '<div class="note warn">Техконтакт не указан — /load и уведомления о сбоях клиенту недоступны, сбои видит только менеджер.</div>' : ''}
+  ${c.stage==='off' ? '<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются).</div>' : ''}`;
+}
+
+function tabCfg(c){
+  const e = canMgr(), t = canTech(), o = isOwner(), dis = x => x ? '' : 'disabled';
+  const opts = (arr, v, lab) => arr.map(a => `<option value="${esc(a)}" ${String(a)===String(v)?'selected':''}>${esc(lab ? lab(a) : a)}</option>`).join('');
+  const hours = Array.from({length:24}, (_, i) => i);
+  const tzs = TZS.includes(c.timezone) ? TZS : [c.timezone, ...TZS];
+  const off = (c.days_off || '').split(',').map(s => s.trim()).filter(Boolean);
+  const cmap = c.bq_column_map || {};
+  const main = `<div class="sec" style="margin-top:0"><h3>Основное</h3>
+    <div class="grid2"><div><p class="lbl">Название</p><input id="f_name" value="${esc(c.name)}" ${dis(e)}></div>
+    <div><p class="lbl">Код компании</p><input value="${esc(c.company_id)}" disabled title="Код не меняется — к нему привязаны данные"></div></div>
+    <div class="grid2" style="margin-top:12px"><div><p class="lbl">Ссылка на таблицу данных</p><input id="f_link" value="${esc(c.data_link)}" ${dis(e)}></div>
+    <div><p class="lbl">Ссылка на форму опроса</p><input id="f_form" value="${esc(c.form_url)}" ${dis(e)}></div></div></div>
+  <div class="sec"><h3>Расписание</h3>
+    <div class="grid3"><div><p class="lbl">Часовой пояс</p><select id="f_tz" ${dis(e)} onchange="cfgPreview()">${opts(tzs, c.timezone)}</select></div>
+    <div><p class="lbl">Утренний отчёт</p><select id="f_m" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.morning_hour, hh)}</select></div>
+    <div><p class="lbl">Вечерний отчёт</p><select id="f_e" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.evening_hour, hh)}</select></div></div>
+    <p class="lbl" style="margin-top:12px">Выходные — отчёты и подгрузка не идут</p>
+    <div class="chips" id="f_off">${DAYS.map(d => `<span class="chip ${off.includes(d)?'on':''}" data-d="${d}" ${e?`onclick="this.classList.toggle('on');cfgPreview()"`:''}>${d}</span>`).join('')}</div>
+    <div class="note" id="f_prev"></div></div>
+  <div class="sec"><h3>Люди и уведомления</h3>
+    <div class="grid2"><div><p class="lbl">Техконтакт клиента — Telegram ID</p><input id="f_ti" value="${esc(c.tech_contact_id)}" inputmode="numeric" ${dis(e)}></div>
+    <div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div></div>
+    <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>`;
+  const where = [['Структура', c.structure_on_db || !c.spreadsheet_id], ['План', c.plan_on_db || !c.spreadsheet_id],
+                 ['Архив «Итоги месяца»', c.archive_on_db]];
+  const tech = `<div class="sec" ${role()==='tech'?'style="margin-top:0"':''}><h3>Подключение данных</h3>
+    <div class="grid2"><div><p class="lbl">Тип подключения Факта</p><select id="f_ct" ${dis(t)} onchange="ctShow()">${opts(['','bigquery','rest_api'], c.connection_type || '', a => a==='' ? 'нет — Google-таблица или Excel' : a==='bigquery' ? 'BigQuery' : 'REST API')}</select></div>
+    <div><p class="lbl">Google-таблица (spreadsheet_id)</p><input id="f_sh" class="mono" value="${esc(c.spreadsheet_id)}" placeholder="пусто — данные в базе" ${dis(t)}></div></div>
+    <div id="w_bq" style="margin-top:12px;${c.connection_type==='bigquery'?'':'display:none'}"><p class="lbl">BigQuery: проект.датасет.представление</p><input id="f_bq" class="mono" value="${esc(c.bq_table_ref)}" ${dis(t)}>
+      <p class="lbl" style="margin-top:12px">Соответствие полей: наше поле → поле клиента</p>
+      <div class="grid3">${MAPF.map(([k,n]) => `<div><p class="lbl">${n}</p><input class="mono" data-mk="${k}" value="${esc(cmap[k] || '')}" placeholder="${k}" ${dis(t)}></div>`).join('')}</div></div>
+    <div id="w_rest" style="margin-top:12px;${c.connection_type==='rest_api'?'':'display:none'}"><p class="lbl">REST API: адрес</p><input id="f_rest" class="mono" value="${esc(c.rest_base_url)}" ${dis(t)}>
+      <p class="small">Токен доступа хранится не здесь, а в переменной Railway ${esc(c.company_id.toUpperCase())}_API_TOKEN.</p></div>
+    <p class="lbl" style="margin-top:14px">Где хранятся данные</p>
+    ${o ? `<label class="check"><input type="checkbox" id="f_sdb" ${c.structure_on_db?'checked':''}> Структура на базе</label>
+           <label class="check"><input type="checkbox" id="f_pdb" ${c.plan_on_db?'checked':''}> План на базе</label>
+           <label class="check"><input type="checkbox" id="f_adb" ${c.archive_on_db?'checked':''}> Архив «Итоги месяца» на базе</label>
+           <p class="small">Переключать, только когда данные компании уже перенесены в базу.</p>`
+        : `<div class="chips">${where.map(([n,v]) => `<span class="tag ${v?'s-work':'s-off'}">${n}: ${v?'база':'Google'}</span>`).join('')}</div>`}</div>`;
+  const showMain = role() !== 'tech';
+  return (showMain ? main : '') + ((t || o) ? tech : '') +
+    `<p class="err" id="f_err"></p><div class="acts"><button class="pri" id="f_save" onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="render()">Отменить изменения</button></div>`;
+}
+function ctShow(){ const v = $('f_ct').value; $('w_bq').style.display = v==='bigquery' ? '' : 'none'; $('w_rest').style.display = v==='rest_api' ? '' : 'none'; }
+function cfgPreview(){
+  const el = $('f_prev'); if(!el) return;
+  const m = +$('f_m').value, e = +$('f_e').value, tz = $('f_tz').value;
+  const off = [...document.querySelectorAll('#f_off .chip.on')].map(x => x.dataset.d);
+  const work = DAYS.filter(d => !off.includes(d));
+  const c = co(S.sel);
+  el.className = 'note' + (e <= m ? ' bad' : '');
+  el.textContent = e <= m ? 'Вечерний отчёт должен быть позже утреннего.'
+    : `Утренний отчёт в ${hh(m)}, вечерний в ${hh(e)} по времени ${tz}.` + (c && c.connection_type ? ` Заказы подгружаются в ${String((e+23)%24).padStart(2,'0')}:45.` : '') + ` Рабочие дни: ${work.join(', ') || 'нет'}.`;
+}
+
+function collectCfg(c){
+  const ch = {};
+  const put = (k, v) => { const old = c[k]; if(JSON.stringify(old ?? '') !== JSON.stringify(v ?? '')) ch[k] = v; };
+  if(canMgr()){
+    put('name', $('f_name').value.trim()); put('data_link', $('f_link').value.trim()); put('form_url', $('f_form').value.trim());
+    put('timezone', $('f_tz').value); put('morning_hour', +$('f_m').value); put('evening_hour', +$('f_e').value);
+    put('days_off', [...document.querySelectorAll('#f_off .chip.on')].map(x => x.dataset.d).join(','));
+    put('tech_contact_id', $('f_ti').value.trim()); put('launch_report', $('f_lr').checked);
+  }
+  if(canTech()){
+    const ct = $('f_ct').value;
+    put('connection_type', ct); put('spreadsheet_id', $('f_sh').value.trim());
+    put('bq_table_ref', $('f_bq').value.trim()); put('rest_base_url', $('f_rest').value.trim());
+    const map = {}; document.querySelectorAll('[data-mk]').forEach(i => { if(i.value.trim()) map[i.dataset.mk] = i.value.trim(); });
+    if(JSON.stringify(map) !== JSON.stringify(c.bq_column_map || {})) ch.bq_column_map = Object.keys(map).length ? map : null;
+    if(ct === 'bigquery' && ('connection_type' in ch || 'bq_table_ref' in ch)) ch.bq_column_map = Object.keys(map).length ? map : null;
+  }
+  if(isOwner()){
+    put('structure_on_db', $('f_sdb').checked); put('plan_on_db', $('f_pdb').checked); put('archive_on_db', $('f_adb').checked);
+  }
+  return ch;
+}
+
+async function saveCfg(id){
+  const c = co(id), ch = collectCfg(c);
+  if(!Object.keys(ch).length){ toast('Изменений нет'); return; }
+  if(ch.evening_hour !== undefined || ch.morning_hour !== undefined){
+    if(+$('f_e').value <= +$('f_m').value){ $('f_err').textContent = 'Вечерний отчёт должен быть позже утреннего'; return; }
+  }
+  $('f_save').disabled = true;
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body: ch});
+    Object.assign(c, r.company);
+    toast(`Сохранено: ${r.changed} изм.` + (('timezone' in ch || 'morning_hour' in ch || 'evening_hour' in ch || 'days_off' in ch) ? ' Бот подхватит расписание в течение 10 минут' : ''));
+    render();
+  } catch(e){ $('f_err').textContent = e.message; $('f_save').disabled = false; }
+}
+
+async function saveStage(id){
+  const c = co(id), body = {};
+  if($('st_s').value !== c.stage) body.stage = $('st_s').value;
+  if(($('st_t').value || null) !== (c.trial_until || null)) body.trial_until = $('st_t').value || null;
+  if(!Object.keys(body).length){ toast('Изменений нет'); return; }
+  if(body.stage === 'off' && !confirm('Отключить компанию? Бот перестанет её обслуживать: отчёты не уйдут, дашборды не откроются. Данные НЕ удаляются.')) return;
+  try { const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body}); Object.assign(c, r.company); toast('Этап сохранён'); render(); }
+  catch(e){ toast(e.message); }
+}
+
+async function assign(id){
+  try { await api('/companies/' + encodeURIComponent(id) + '/assign', {method:'POST', body:{manager_id: $('as_m').value}});
+    await loadCompanies(); toast('Менеджер закреплён'); render(); }
+  catch(e){ toast(e.message); }
+}
+
+async function claim(id){
+  try { await api('/companies/' + encodeURIComponent(id) + '/claim', {method:'POST'});
+    await loadCompanies(); S.sel = id; S.tab = 'overview'; S.showDet = true; toast('Компания закреплена за вами'); render(); }
+  catch(e){ toast(e.message); await loadCompanies(); render(); }
+}
+
+function tabData(c){
+  const fact = c.connection_type === 'bigquery' ? 'база · BigQuery' : c.connection_type === 'rest_api' ? 'база · REST API' : (c.spreadsheet_id ? 'Google-таблица' : 'база · Excel');
+  const rows = [['Структура', (c.structure_on_db || !c.spreadsheet_id) ? (c.spreadsheet_id ? 'база' : 'база · Excel') : 'Google-таблица'],
+    ['План посещений', (c.plan_on_db || !c.spreadsheet_id) ? (c.spreadsheet_id ? 'база' : 'база · Excel') : 'Google-таблица'],
+    ['Факт', fact], ['Архив «Итоги месяца»', c.archive_on_db ? 'база' : 'Google-таблица']];
+  const cls = v => v.startsWith('база') ? (v.includes('Excel') ? 's-test' : 's-work') : 's-off';
+  return `<div class="panel" style="padding:4px 14px">${rows.map(([n,v]) => `<div class="src"><strong style="font-weight:500">${n}</strong><div><span class="tag ${cls(v)}">${v}</span></div></div>`).join('')}</div>
+  ${c.bq_table_ref && c.connection_type==='bigquery' ? `<p class="lbl" style="margin-top:12px">Источник</p><div class="mono">${esc(c.bq_table_ref)}</div>` : ''}
+  ${c.rest_base_url && c.connection_type==='rest_api' ? `<p class="lbl" style="margin-top:12px">Источник</p><div class="mono">${esc(c.rest_base_url)}</div>` : ''}
+  <div class="acts"><button class="pri" id="rl" onclick="reload('${esc(c.company_id)}')">Повторить загрузку</button></div>
+  <p class="small">${c.connection_type ? 'Загрузит заказы из источника клиента прямо сейчас.' + (role()==='manager' ? ' Для менеджера действует суточный лимит на компанию, как у /load.' : '') : 'Сбросит кеш — дашборды перечитают свежие данные при следующем открытии.'}</p>
+  <div class="note">Мастер перехода на автоподключение и загрузка Excel из панели появятся на следующих этапах.</div>`;
+}
+
+async function reload(id){
+  const b = $('rl'); b.disabled = true; b.textContent = 'Загружаю…';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'}); toast(r.message); }
+  catch(e){ toast(e.message); }
+  b.disabled = false; b.textContent = 'Повторить загрузку';
+}
+
+function logTable(rows, withCo){
+  if(!rows.length) return '<p class="small" style="padding:8px">Изменений пока нет.</p>';
+  const names = Object.fromEntries(S.companies.map(c => [c.company_id, c.name]));
+  return `<div class="tw"><table><tr><th>Когда</th><th>Кто</th>${withCo?'<th>Компания</th>':''}<th>Действие</th><th>Подробности</th></tr>
+  ${rows.map(x => `<tr><td style="white-space:nowrap">${fdt(x.at)}</td><td>${esc(x.actor_name)}</td>${withCo?`<td>${esc(x.company_id ? (names[x.company_id] || x.company_id) : '—')}</td>`:''}<td>${esc(x.action)}</td><td>${esc(x.details)}</td></tr>`).join('')}</table></div>`;
+}
+function tabLog(){ return logTable(S.clog, false); }
+function renderLog(){
+  return `<h1>Журнал изменений</h1><p class="sub">Кто, когда и что поменял${role()==='manager' ? ' — по вашим компаниям' : ''}. Записи не редактируются.</p>
+  <div class="panel" style="padding:4px 8px">${logTable(S.log, true)}</div>`;
+}
+
+/* ---------- Новая компания ---------- */
+function renderNew(){
+  const hours = Array.from({length:24}, (_, i) => i);
+  const o = (a, v, l) => a.map(x => `<option value="${esc(x)}" ${String(x)===String(v)?'selected':''}>${esc(l ? l(x) : x)}</option>`).join('');
+  const mgrs = S.team.filter(t => t.role === 'manager' && t.active);
+  return `<h1>Новая компания</h1><p class="sub">Начнёт с бесплатного теста на ${S.me.trial_days} дней через Excel.${role()==='manager' ? ' Сразу закрепится за вами.' : ''}</p>
+  <div class="panel det" style="max-width:720px">
+    <div class="grid2"><div><p class="lbl">Название</p><input id="nn" oninput="nnSlug()"></div>
+    <div><p class="lbl">Код компании (латиница, без пробелов)</p><input id="ni" class="mono" oninput="S.slugTouched=true;$('nerr').textContent=''"></div></div>
+    <div class="grid3" style="margin-top:12px"><div><p class="lbl">Часовой пояс</p><select id="ntz">${o(TZS,'Asia/Tashkent')}</select></div>
+    <div><p class="lbl">Утренний отчёт</p><select id="nm">${o(hours, 8, hh)}</select></div>
+    <div><p class="lbl">Вечерний отчёт</p><select id="ne">${o(hours, 19, hh)}</select></div></div>
+    <p class="lbl" style="margin-top:12px">Выходные дни</p>
+    <div class="chips" id="noff">${DAYS.map(d => `<span class="chip ${d==='вс'?'on':''}" data-d="${d}" onclick="this.classList.toggle('on')">${d}</span>`).join('')}</div>
+    <div class="grid2" style="margin-top:12px"><div><p class="lbl">Техконтакт — Telegram ID (можно позже)</p><input id="nt" inputmode="numeric"></div>
+    ${isOwner() ? `<div><p class="lbl">Менеджер СТТ</p><select id="nmg"><option value="">не закреплён</option>${mgrs.map(t => `<option value="${esc(t.telegram_id)}">${esc(t.name)}</option>`).join('')}</select></div>` : ''}</div>
+    <p class="err" id="nerr"></p>
+    <div class="acts"><button onclick="S.newOpen=false;render()">Отмена</button><button class="pri" id="nsave" onclick="saveNew()">Создать компанию</button></div></div>`;
+}
+function nnSlug(){
+  if(S.slugTouched) return;
+  const t = {а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'e',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'h',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ы:'y',э:'e',ю:'yu',я:'ya'};
+  $('ni').value = $('nn').value.trim().split(/\s+/).filter(Boolean).map(w => {
+    const x = [...w.toLowerCase()].map(ch => t[ch] !== undefined ? t[ch] : (/[a-z0-9]/.test(ch) ? ch : '')).join('');
+    return x.charAt(0).toUpperCase() + x.slice(1);
+  }).join('_');
+}
+async function saveNew(){
+  const err = t => { $('nerr').textContent = t; };
+  const name = $('nn').value.trim(), id = $('ni').value.trim();
+  if(!name) return err('Введите название компании');
+  if(!/^[A-Za-z][A-Za-z0-9_]{2,30}$/.test(id)) return err('Код: латиница, цифры и «_», 3–31 знак, начинается с буквы');
+  const m = +$('nm').value, e = +$('ne').value;
+  if(e <= m) return err('Вечерний отчёт должен быть позже утреннего');
+  const off = [...document.querySelectorAll('#noff .chip.on')].map(x => x.dataset.d);
+  if(off.length === 7) return err('Хотя бы один день должен быть рабочим');
+  const body = {company_id:id, name, timezone:$('ntz').value, morning_hour:m, evening_hour:e, days_off:off.join(','), tech_contact_id:$('nt').value.trim()};
+  if(isOwner()) body.manager_telegram_id = $('nmg').value;
+  $('nsave').disabled = true;
+  try {
+    await api('/companies', {method:'POST', body});
+    S.newOpen = false; S.slugTouched = false; await loadCompanies(); S.sel = id; S.tab = 'overview'; S.showDet = true;
+    toast(name + ' создана. Следующий шаг — загрузить Excel командой /structure ' + id); render();
+  } catch(e){ err(e.message); $('nsave').disabled = false; }
+}
+
+/* ---------- Команда ---------- */
+function renderTeam(){
+  return `<h1>Команда</h1><p class="sub">Кто входит в панель через /admin и с какой ролью. Свой Telegram ID человек узнаёт командой /myid в боте.</p>
+  <div class="panel det" style="max-width:760px">
+    <div class="tw"><table><tr><th>Имя</th><th>Роль</th><th>Telegram ID</th><th>Клиентов</th><th></th></tr>
+    ${S.team.map(t => `<tr style="${t.active?'':'color:var(--ink-3)'}"><td>${esc(t.name)}</td><td>${ROLES[t.role]}</td><td class="mono">${esc(t.telegram_id)}</td><td>${t.role==='manager' ? t.companies : '—'}</td>
+      <td style="text-align:right">${t.role==='owner' ? '' : t.active ? `<button onclick="askOff('${esc(t.telegram_id)}')">Закрыть доступ</button>` : '<span class="tag s-off">доступ закрыт</span>'}</td></tr>`).join('')}</table></div>
+    ${S.addOpen ? `<div class="sec"><h3>Добавить человека</h3>
+      <div class="grid3"><div><p class="lbl">Имя и фамилия</p><input id="tn"></div>
+      <div><p class="lbl">Роль</p><select id="tr"><option value="manager">Менеджер СТТ</option><option value="tech">Техспециалист</option></select></div>
+      <div><p class="lbl">Telegram ID</p><input id="tid" inputmode="numeric"></div></div>
+      <p class="err" id="terr"></p><div class="acts"><button onclick="S.addOpen=false;render()">Отмена</button><button class="pri" onclick="teamAdd()">Добавить</button></div></div>`
+    : '<div class="acts"><button class="pri" onclick="S.addOpen=true;render()">Добавить человека</button></div>'}
+  </div>`;
+}
+async function teamAdd(){
+  const name = $('tn').value.trim(), tid = $('tid').value.trim(), r = $('tr').value;
+  if(!name){ $('terr').textContent = 'Введите имя и фамилию'; return; }
+  if(!/^\d{5,15}$/.test(tid)){ $('terr').textContent = 'Telegram ID — только цифры, 5–15 знаков'; return; }
+  try { await api('/team', {method:'POST', body:{telegram_id:tid, name, role:r}}); S.addOpen = false; S.team = await api('/team');
+    toast(name + ' добавлен(а). Теперь /admin откроет ему панель'); render(); }
+  catch(e){ $('terr').textContent = e.message; }
+}
+function askOff(tid){
+  const t = S.team.find(x => x.telegram_id === tid);
+  $('modal').innerHTML = `<div class="modal" onclick="if(event.target===this)closeM()"><div class="card" role="dialog" aria-modal="true">
+    <h3>Закрыть доступ: ${esc(t.name)}?</h3>
+    <p class="small">/admin перестанет открываться.${t.companies ? ` Закреплённые за ним компании (${t.companies}) станут «без менеджера» — назначьте нового во вкладке «Обзор».` : ''} История в журнале сохранится.</p>
+    <div class="acts"><button onclick="closeM()">Отмена</button><button class="danger" onclick="doOff('${esc(tid)}')">Закрыть доступ</button></div></div></div>`;
+}
+function closeM(){ $('modal').innerHTML = ''; }
+async function doOff(tid){
+  try { const r = await api('/team/' + encodeURIComponent(tid) + '/deactivate', {method:'POST'}); closeM(); S.team = await api('/team');
+    toast('Доступ закрыт' + (r.released_companies.length ? `. Компаний без менеджера: ${r.released_companies.length}` : '')); render(); }
+  catch(e){ closeM(); toast(e.message); }
+}
+
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeM(); });
+(async () => { await boot(); if(isOwner()){ try { S.team = await api('/team'); render(); } catch(e){} } })();
+</script>
+</body>
+</html>
