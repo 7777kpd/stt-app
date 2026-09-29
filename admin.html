@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -377,19 +377,19 @@ async function claim(id){
 }
 
 /* ---------- Данные: источник и действия ---------- */
-function srcKey(c){ return c.connection_type === 'bigquery' ? 'bigquery' : c.connection_type === 'rest_api' ? 'api' : (c.spreadsheet_id ? 'google' : 'excel'); }
-function sourceName(c){ return {excel:'Excel', bigquery:'BigQuery', api:'API', google:'Google (переход)'}[srcKey(c)]; }
+function srcKey(c){ return c.connection_type === 'bigquery' ? 'bigquery' : c.connection_type === 'rest_api' ? 'api' : (c.spreadsheet_id ? 'google' : (c.file_mode ? 'file' : 'excel')); }
+function sourceName(c){ return {excel:'Excel', file:'Файл-выгрузка', bigquery:'BigQuery', api:'API', google:'Google (переход)'}[srcKey(c)]; }
 function tabData(c){
   const cur = S.srcDraft && S.srcDraft.id === c.company_id ? S.srcDraft.key : srcKey(c);
   const canSrc = canTech();
   const segs = [['excel','Excel'],['file','Файл-выгрузка'],['bigquery','BigQuery'],['api','API']];
   const segHtml = segs.map(([k,n]) => {
-    const soon = k === 'file';
     const on = cur === k;
-    return `<span class="chip ${on?'on':''}" style="${soon?'opacity:.55;cursor:default':''}" ${canSrc && !soon ? `onclick="S.srcDraft={id:'${esc(c.company_id)}',key:'${k}'};render()"` : ''}>${n}${soon?' · скоро':''}</span>`;
+    return `<span class="chip ${on?'on':''}" ${canSrc ? `onclick="S.srcDraft={id:'${esc(c.company_id)}',key:'${k}'};render()"` : ''}>${n}</span>`;
   }).join('');
   const hints = {
-    excel: 'Данные загружаются вручную файлом Excel. Подходит для старта и теста. Для постоянной работы переведите на Файл-выгрузку, BigQuery или API.',
+    excel: 'Данные загружаются вручную файлом Excel из панели. Подходит для старта и теста. Для постоянной работы переведите на Файл-выгрузку, BigQuery или API.',
+    file: 'Клиент сам отправляет Excel по секретной ссылке — вручную в браузере или автоматически из 1С. Данные записываются сразу после отправки.',
     bigquery: 'Бот сам забирает заказы из BigQuery клиента перед вечерним отчётом.',
     api: 'Бот сам забирает заказы через API клиента перед вечерним отчётом. Токен доступа хранится в переменной Railway, не здесь.',
     google: 'Компания ещё работает от своей Google-таблицы — это переходный режим. Её перевод на базу — отдельным мастером.',
@@ -400,15 +400,16 @@ function tabData(c){
       <div class="grid3">${MAPF.map(([k,n]) => `<div><p class="lbl">${n}</p><input class="mono" data-mk="${k}" value="${esc(cmap[k] || '')}" placeholder="${k}" ${canSrc?'':'disabled'}></div>`).join('')}</div></div>`
     : cur === 'api' ? `<div style="margin-top:12px"><p class="lbl">Адрес API</p><input id="f_rest" class="mono" value="${esc(c.rest_base_url)}" placeholder="https://…" ${canSrc?'':'disabled'}></div>` : '';
   const changed = cur !== srcKey(c) || cur === 'bigquery' || cur === 'api';
+  const linkBlock = srcKey(c) === 'file' && cur === 'file' ? fileLinkBlock(c) : '';
   const srcBlock = `<div class="panel" style="padding:12px 16px"><p class="lbl">Источник данных</p>
     ${srcKey(c) === 'google' && cur === 'google' ? `<div class="chips"><span class="chip on">Google (переходный режим)</span></div>` : `<div class="chips">${segHtml}</div>`}
     <p class="small" style="margin-top:8px">${hints[cur] || ''}</p>${fields}
-    ${canSrc && changed && cur !== 'google' ? `<p class="err" id="src_err"></p><div class="acts"><button class="pri" onclick="saveSource('${esc(c.company_id)}','${cur}')">Сохранить источник</button>${S.srcDraft ? '<button onclick="S.srcDraft=null;render()">Отмена</button>' : ''}</div>` : ''}</div>`;
+    ${canSrc && changed && cur !== 'google' ? `<p class="err" id="src_err"></p><div class="acts"><button class="pri" onclick="saveSource('${esc(c.company_id)}','${cur}')">${cur === 'file' && srcKey(c) !== 'file' ? 'Создать ссылку' : 'Сохранить источник'}</button>${S.srcDraft ? '<button onclick="S.srcDraft=null;render()">Отмена</button>' : ''}</div>` : ''}</div>${linkBlock}`;
 
   const src = srcKey(c);
   const months = lastMonths(12);
   const card = (btn, text, warn) => `<div class="box">${btn}<p class="small" style="margin-top:8px">${text}</p>${warn ? `<p class="small" style="color:var(--bad);margin-top:6px">${warn}</p>` : ''}</div>`;
-  const excelCard = src === 'excel' ? card(
+  const excelCard = (src === 'excel' || src === 'file') ? card(
     `<label class="pri" style="display:block;text-align:center;padding:8px 12px;border-radius:6px;background:var(--accent);color:var(--on-accent);font-weight:500;cursor:pointer">Загрузить Excel<input type="file" accept=".xlsx" style="display:none" onchange="excelPick(this,'${esc(c.company_id)}')"></label>`,
     'Файл .xlsx с листами «Структура», «План посещений», «Факт посещений» (можно только нужные). Сначала покажем проверку, запишем только после «Записать».',
     'Если «агент не найден» — имя в Факте или Плане отличается от Структуры. Исправьте файл и загрузите снова.') : '';
@@ -430,6 +431,16 @@ function lastMonths(n){ const out = []; const d = new Date(); d.setDate(1); for(
 
 async function saveSource(id, key){
   const c = co(id), body = {};
+  if(key === 'file'){
+    try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'create'}});
+      c.file_mode = true; S.srcDraft = null; delete S.upl[id]; delete S.health[id]; toast('Ссылка создана'); render(); }
+    catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message); }
+    return;
+  }
+  if(c.file_mode){
+    try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'disable'}}); c.file_mode = false; delete S.upl[id]; }
+    catch(e){ toast(e.message); return; }
+  }
   if(key === 'excel'){ body.connection_type = ''; }
   if(key === 'bigquery'){
     body.connection_type = 'bigquery'; body.bq_table_ref = $('f_bq').value.trim();
@@ -442,6 +453,43 @@ async function saveSource(id, key){
     Object.assign(c, r.company); S.srcDraft = null; delete S.health[id];
     toast(r.changed ? 'Источник сохранён' : 'Изменений нет'); render();
   } catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message); }
+}
+
+/* ---------- Секретная ссылка ---------- */
+async function loadUpl(id){
+  S.upl[id] = 'loading';
+  try { S.upl[id] = await api('/companies/' + encodeURIComponent(id) + '/upload-link'); }
+  catch(e){ S.upl[id] = {url:'', last:[], error:e.message}; }
+  if(S.sel === id) render();
+}
+function fileLinkBlock(c){
+  const u = S.upl[c.company_id];
+  if(!u || u === 'loading'){ if(!u) loadUpl(c.company_id); return '<div class="panel" style="padding:12px 16px;margin-top:12px"><p class="small">Загружаю ссылку…</p></div>'; }
+  if(u.error) return `<div class="note bad">${esc(u.error)}</div>`;
+  const last = (u.last || []).map(x => `<div style="padding:6px 0;border-top:1px solid var(--line)"><span class="tag ${x.action.includes('ошибка') ? 's-pause' : 's-work'}">${x.action.includes('ошибка') ? 'не принят' : 'принят'}</span> <span class="small">${fdt(x.at)} · ${esc(x.details)}</span></div>`).join('');
+  const url = u.url || '';
+  return `<div class="panel" style="padding:12px 16px;margin-top:12px">
+    <p class="lbl">Секретная ссылка для загрузки — передайте клиенту</p>
+    <div style="display:flex;gap:8px"><input id="up_url" class="mono" value="${esc(url)}" readonly style="flex:1"><button onclick="copyUrl()">Скопировать</button></div>
+    <div class="acts"><button onclick="window.open($('up_url').value,'_blank')">Открыть страницу загрузки</button>
+      <button onclick="rotateLink('${esc(c.company_id)}')">Перевыпустить ссылку</button></div>
+    <p class="small">Без ссылки загрузить файл нельзя. Если она попала не к тем людям — перевыпустите: старая сразу перестанет работать, новую передайте клиенту.</p>
+    <details style="margin-top:10px"><summary style="cursor:pointer;font-weight:500">Инструкция для программиста 1С клиента</summary>
+      <div class="small" style="margin-top:8px">
+      <p>Раз в день (например, в 19:00) регламентным заданием сформировать один Excel-файл .xlsx с тремя листами и отправить его <b>POST-запросом</b> на ссылку выше: тело запроса — сам файл, заголовок <code>X-Filename</code> — имя файла (необязательно).</p>
+      <p><b>«Структура»</b> — все сотрудники с руководителями и категориями; <b>«План посещений»</b> — агент, код ТТ, ТТ, дни визита; <b>«Факт посещений»</b> — Дата заказа, Агент, Код ТТ, Категория (можно также ТТ, Клиент, Сумма) за вчера или за текущий месяц. Названия листов и колонок — как в шаблоне Excel СТТ.</p>
+      <p>Структура и План каждый раз заменяются целиком, Факт — за дни из файла. Колонку «Telegram ID» 1С заполнять не нужно: бот сохранит ID сотрудников сам.</p>
+      <p>Ответ 200 — файл принят. Ответ 400 — файл не принят, причина в ответе (JSON, поле <code>detail</code>); при этом менеджер СТТ и техконтакт получат сообщение в Telegram.</p>
+      <p>В 1С: <code>HTTPСоединение</code> к серверу из ссылки (HTTPS, порт 443) → <code>HTTPЗапрос</code> с адресом ресурса из ссылки → <code>УстановитьИмяФайлаТела(ПутьКФайлу)</code> → <code>ОтправитьДляОбработки</code>.</p>
+      </div></details>
+    <p class="lbl" style="margin-top:12px">Последние файлы</p>${last || '<p class="small">Пока не было ни одного файла.</p>'}
+  </div>`;
+}
+function copyUrl(){ const el = $('up_url'); el.select(); try { navigator.clipboard.writeText(el.value); } catch(e){ document.execCommand('copy'); } toast('Ссылка скопирована'); }
+async function rotateLink(id){
+  if(!confirm('Перевыпустить ссылку? Старая сразу перестанет работать — новую нужно будет передать клиенту и программисту 1С.')) return;
+  try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'rotate'}}); delete S.upl[id]; toast('Новая ссылка готова'); render(); }
+  catch(e){ toast(e.message); }
 }
 
 function excelPick(input, id){
