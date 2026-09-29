@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -152,7 +152,7 @@ async function api(path, opts = {}){
 
 function fatal(text){
   $('nav').innerHTML = '<div class="brand">СТТ · админ-панель</div>';
-  $('main').innerHTML = `<div class="center"><p style="font-weight:500;margin:0 0 6px">${esc(text)}</p><p class="small">Панель открывается командой /admin в Telegram-боте.</p></div>`;
+  $('main').innerHTML = `<div class="center"><p style="font-weight:500;margin:0 0 6px">${esc(text)}</p><p class="small">Панель открывается по ссылке или командой /admin в Telegram-боте.</p></div>`;
 }
 
 async function boot(){
@@ -175,8 +175,8 @@ async function loadCompanies(){
 const co = id => S.companies.find(c => c.company_id === id);
 const VIEWS = () => isOwner() ? [['companies','Компании'],['team','Команда'],['log','Журнал изменений']]
   : [['companies', role() === 'manager' ? 'Мои компании' : 'Компании'],['log','Журнал изменений']];
-const TABS = () => role() === 'tech' ? [['data','Источники данных'],['cfg','Подключение'],['clog','Журнал']]
-  : [['overview','Обзор'],['cfg','Настройки'],['data','Источники данных'],['clog','Журнал']];
+const TABS = () => role() === 'tech' ? [['data','Данные'],['clog','Журнал']]
+  : [['overview','Обзор'],['cfg','Настройки'],['data','Данные'],['clog','Журнал']];
 
 async function go(v){
   S.view = v; S.newOpen = false; S.addOpen = false;
@@ -187,9 +187,9 @@ async function go(v){
   } catch(e){ toast(e.message); }
   render();
 }
-async function pick(id){ S.sel = id; S.tab = TABS()[0][0]; S.showDet = true; render(); window.scrollTo(0,0); }
+async function pick(id){ S.srcDraft = null; S.sel = id; S.tab = TABS()[0][0]; S.showDet = true; render(); window.scrollTo(0,0); }
 async function setTab(t){
-  S.tab = t;
+  S.tab = t; S.srcDraft = null;
   if(t === 'clog'){ try { S.clog = await api('/log?company_id=' + encodeURIComponent(S.sel)); } catch(e){ toast(e.message); } }
   render();
 }
@@ -256,7 +256,8 @@ function tabOverview(c){
   const mgrBlock = isOwner()
     ? `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><select id="as_m" style="width:auto"><option value="">не закреплён</option>${team.map(t => `<option value="${esc(t.telegram_id)}" ${t.telegram_id===c.manager_telegram_id?'selected':''}>${esc(t.name)}</option>`).join('')}${c.manager_telegram_id && !team.some(t=>t.telegram_id===c.manager_telegram_id) ? `<option value="${esc(c.manager_telegram_id)}" selected>${esc(c.manager_name)}</option>` : ''}</select><button onclick="assign('${esc(c.company_id)}')">Закрепить</button></div>`
     : `<p class="val">${esc(c.manager_name || 'не закреплён')}${c.manager_telegram_id === S.me.telegram_id ? ' (вы)' : ''}</p>`;
-  return `<div class="grid2">
+  return `${healthBlock(c)}
+  <div class="grid2" style="margin-top:14px">
     <div class="box"><p class="lbl">Менеджер СТТ</p>${mgrBlock}</div>
     <div class="box"><p class="lbl">Этап</p><div style="display:flex;gap:8px;flex-wrap:wrap">
       <select id="st_s" style="width:auto" ${canMgr()?'':'disabled'}>${stageOpts.map(([k,n]) => `<option value="${k}" ${k===c.stage?'selected':''}>${n}</option>`).join('')}</select>
@@ -266,23 +267,49 @@ function tabOverview(c){
   <div class="grid3" style="margin-top:12px">
     <div class="box"><p class="lbl">Отчёты</p><p class="val">${hh(c.morning_hour)} / ${hh(c.evening_hour)}</p><p class="small">${esc(c.timezone)}</p></div>
     <div class="box"><p class="lbl">Выходные</p><p class="val">${esc(c.days_off || 'нет')}</p></div>
-    <div class="box"><p class="lbl">Техконтакт</p><p class="val">${esc(c.tech_contact_id || '—')}</p></div></div>
-  ${!c.tech_contact_id ? '<div class="note warn">Техконтакт не указан — /load и уведомления о сбоях клиенту недоступны, сбои видит только менеджер.</div>' : ''}
+    <div class="box"><p class="lbl">Источник данных</p><p class="val">${sourceName(c)}</p></div></div>
   ${c.stage==='off' ? '<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются).</div>' : ''}`;
 }
 
+/* ---------- Состояние компании ---------- */
+const HEALTH_ICON = {ok:['✓','var(--ok)'], warn:['!','var(--warn)'], bad:['✕','var(--bad)'], info:['i','var(--ink-3)']};
+const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть месяц','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data']};
+async function loadHealth(id, force){
+  if(!force && S.health[id]) return;
+  S.health[id] = 'loading';
+  try { S.health[id] = await api('/companies/' + encodeURIComponent(id) + '/health'); }
+  catch(e){ S.health[id] = [{level:'warn', title:'Состояние не проверилось', hint:e.message}]; }
+  if(S.sel === id && S.view === 'companies') render();
+}
+function healthBlock(c){
+  const h = S.health[c.company_id];
+  if(!h || h === 'loading'){ if(!h) loadHealth(c.company_id); return '<div class="box"><p class="lbl">Состояние компании</p><p class="small">Проверяю…</p></div>'; }
+  const order = {bad:0, warn:1, info:2, ok:3};
+  const rows = h.slice().sort((a,b) => order[a.level]-order[b.level]).map(i => {
+    const [ic, col] = HEALTH_ICON[i.level] || HEALTH_ICON.info;
+    const act = i.action && HEALTH_ACTION[i.action] && !(role()==='tech' && i.action==='settings')
+      ? `<button style="white-space:nowrap" onclick="setTab('${HEALTH_ACTION[i.action][1]}')">${HEALTH_ACTION[i.action][0]}</button>` : '';
+    return `<div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)">
+      <span style="width:20px;height:20px;border-radius:50%;border:1.5px solid ${col};color:${col};font-size:12px;display:flex;align-items:center;justify-content:center;flex:none;margin-top:2px">${ic}</span>
+      <div style="flex:1;min-width:0"><div style="font-weight:500">${esc(i.title)}</div>${i.hint ? `<p class="small" style="margin:2px 0 0">${esc(i.hint)}</p>` : ''}</div>${act}</div>`;
+  }).join('');
+  const problems = h.filter(i => i.level === 'bad' || i.level === 'warn').length;
+  return `<div class="panel" style="padding:12px 16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+    <strong style="font-weight:600">Состояние компании</strong>
+    <span style="display:flex;gap:8px;align-items:center"><span class="tag ${problems ? 's-test' : 's-work'}">${problems ? 'Требует внимания: ' + problems : 'Всё в порядке'}</span>
+    <button onclick="loadHealth('${esc(c.company_id)}', true)" title="Проверить заново">↻</button></span></div>${rows}</div>`;
+}
+
+/* ---------- Настройки ---------- */
 function tabCfg(c){
-  const e = canMgr(), t = canTech(), o = isOwner(), dis = x => x ? '' : 'disabled';
+  const e = canMgr(), dis = x => x ? '' : 'disabled';
   const opts = (arr, v, lab) => arr.map(a => `<option value="${esc(a)}" ${String(a)===String(v)?'selected':''}>${esc(lab ? lab(a) : a)}</option>`).join('');
   const hours = Array.from({length:24}, (_, i) => i);
   const tzs = TZS.includes(c.timezone) ? TZS : [c.timezone, ...TZS];
   const off = (c.days_off || '').split(',').map(s => s.trim()).filter(Boolean);
-  const cmap = c.bq_column_map || {};
-  const main = `<div class="sec" style="margin-top:0"><h3>Основное</h3>
+  return `<div class="sec" style="margin-top:0"><h3>Основное</h3>
     <div class="grid2"><div><p class="lbl">Название</p><input id="f_name" value="${esc(c.name)}" ${dis(e)}></div>
-    <div><p class="lbl">Код компании</p><input value="${esc(c.company_id)}" disabled title="Код не меняется — к нему привязаны данные"></div></div>
-    <div class="grid2" style="margin-top:12px"><div><p class="lbl">Ссылка на таблицу данных</p><input id="f_link" value="${esc(c.data_link)}" ${dis(e)}></div>
-    <div><p class="lbl">Ссылка на форму опроса</p><input id="f_form" value="${esc(c.form_url)}" ${dis(e)}></div></div></div>
+    <div><p class="lbl">Код компании</p><input value="${esc(c.company_id)}" disabled title="Код не меняется — к нему привязаны данные"></div></div></div>
   <div class="sec"><h3>Расписание</h3>
     <div class="grid3"><div><p class="lbl">Часовой пояс</p><select id="f_tz" ${dis(e)} onchange="cfgPreview()">${opts(tzs, c.timezone)}</select></div>
     <div><p class="lbl">Утренний отчёт</p><select id="f_m" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.morning_hour, hh)}</select></div>
@@ -291,74 +318,39 @@ function tabCfg(c){
     <div class="chips" id="f_off">${DAYS.map(d => `<span class="chip ${off.includes(d)?'on':''}" data-d="${d}" ${e?`onclick="this.classList.toggle('on');cfgPreview()"`:''}>${d}</span>`).join('')}</div>
     <div class="note" id="f_prev"></div></div>
   <div class="sec"><h3>Люди и уведомления</h3>
-    <div class="grid2"><div><p class="lbl">Техконтакт клиента — Telegram ID</p><input id="f_ti" value="${esc(c.tech_contact_id)}" inputmode="numeric" ${dis(e)}></div>
+    <div class="grid2"><div><p class="lbl">Техконтакт клиента — Telegram ID</p><input id="f_ti" value="${esc(c.tech_contact_id)}" inputmode="numeric" placeholder="302513790" ${dis(e)}>
+      <p class="small">Получает уведомления о сбоях загрузки своей компании.</p></div>
     <div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div></div>
-    <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>`;
-  const where = [['Структура', c.structure_on_db || !c.spreadsheet_id], ['План', c.plan_on_db || !c.spreadsheet_id],
-                 ['Архив «Итоги месяца»', c.archive_on_db]];
-  const tech = `<div class="sec" ${role()==='tech'?'style="margin-top:0"':''}><h3>Подключение данных</h3>
-    <div class="grid2"><div><p class="lbl">Тип подключения Факта</p><select id="f_ct" ${dis(t)} onchange="ctShow()">${opts(['','bigquery','rest_api'], c.connection_type || '', a => a==='' ? 'нет — Google-таблица или Excel' : a==='bigquery' ? 'BigQuery' : 'REST API')}</select></div>
-    <div><p class="lbl">Google-таблица (spreadsheet_id)</p><input id="f_sh" class="mono" value="${esc(c.spreadsheet_id)}" placeholder="пусто — данные в базе" ${dis(t)}></div></div>
-    <div id="w_bq" style="margin-top:12px;${c.connection_type==='bigquery'?'':'display:none'}"><p class="lbl">BigQuery: проект.датасет.представление</p><input id="f_bq" class="mono" value="${esc(c.bq_table_ref)}" ${dis(t)}>
-      <p class="lbl" style="margin-top:12px">Соответствие полей: наше поле → поле клиента</p>
-      <div class="grid3">${MAPF.map(([k,n]) => `<div><p class="lbl">${n}</p><input class="mono" data-mk="${k}" value="${esc(cmap[k] || '')}" placeholder="${k}" ${dis(t)}></div>`).join('')}</div></div>
-    <div id="w_rest" style="margin-top:12px;${c.connection_type==='rest_api'?'':'display:none'}"><p class="lbl">REST API: адрес</p><input id="f_rest" class="mono" value="${esc(c.rest_base_url)}" ${dis(t)}>
-      <p class="small">Токен доступа хранится не здесь, а в переменной Railway ${esc(c.company_id.toUpperCase())}_API_TOKEN.</p></div>
-    <p class="lbl" style="margin-top:14px">Где хранятся данные</p>
-    ${o ? `<label class="check"><input type="checkbox" id="f_sdb" ${c.structure_on_db?'checked':''}> Структура на базе</label>
-           <label class="check"><input type="checkbox" id="f_pdb" ${c.plan_on_db?'checked':''}> План на базе</label>
-           <label class="check"><input type="checkbox" id="f_adb" ${c.archive_on_db?'checked':''}> Архив «Итоги месяца» на базе</label>
-           <p class="small">Переключать, только когда данные компании уже перенесены в базу.</p>`
-        : `<div class="chips">${where.map(([n,v]) => `<span class="tag ${v?'s-work':'s-off'}">${n}: ${v?'база':'Google'}</span>`).join('')}</div>`}</div>`;
-  const showMain = role() !== 'tech';
-  return (showMain ? main : '') + ((t || o) ? tech : '') +
-    `<p class="err" id="f_err"></p><div class="acts"><button class="pri" id="f_save" onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="render()">Отменить изменения</button></div>`;
+    <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>
+  <p class="err" id="f_err"></p>
+  ${e ? `<div class="acts"><button class="pri" id="f_save" onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="render()">Отменить изменения</button></div>` : ''}`;
 }
-function ctShow(){ const v = $('f_ct').value; $('w_bq').style.display = v==='bigquery' ? '' : 'none'; $('w_rest').style.display = v==='rest_api' ? '' : 'none'; }
 function cfgPreview(){
   const el = $('f_prev'); if(!el) return;
   const m = +$('f_m').value, e = +$('f_e').value, tz = $('f_tz').value;
   const off = [...document.querySelectorAll('#f_off .chip.on')].map(x => x.dataset.d);
   const work = DAYS.filter(d => !off.includes(d));
-  const c = co(S.sel);
   el.className = 'note' + (e <= m ? ' bad' : '');
   el.textContent = e <= m ? 'Вечерний отчёт должен быть позже утреннего.'
-    : `Утренний отчёт в ${hh(m)}, вечерний в ${hh(e)} по времени ${tz}.` + (c && c.connection_type ? ` Заказы подгружаются в ${String((e+23)%24).padStart(2,'0')}:45.` : '') + ` Рабочие дни: ${work.join(', ') || 'нет'}.`;
+    : `Утренний отчёт в ${hh(m)}, вечерний в ${hh(e)} по времени ${tz}. Рабочие дни: ${work.join(', ') || 'нет'}.`;
 }
-
 function collectCfg(c){
   const ch = {};
-  const put = (k, v) => { const old = c[k]; if(JSON.stringify(old ?? '') !== JSON.stringify(v ?? '')) ch[k] = v; };
-  if(canMgr()){
-    put('name', $('f_name').value.trim()); put('data_link', $('f_link').value.trim()); put('form_url', $('f_form').value.trim());
-    put('timezone', $('f_tz').value); put('morning_hour', +$('f_m').value); put('evening_hour', +$('f_e').value);
-    put('days_off', [...document.querySelectorAll('#f_off .chip.on')].map(x => x.dataset.d).join(','));
-    put('tech_contact_id', $('f_ti').value.trim()); put('launch_report', $('f_lr').checked);
-  }
-  if(canTech()){
-    const ct = $('f_ct').value;
-    put('connection_type', ct); put('spreadsheet_id', $('f_sh').value.trim());
-    put('bq_table_ref', $('f_bq').value.trim()); put('rest_base_url', $('f_rest').value.trim());
-    const map = {}; document.querySelectorAll('[data-mk]').forEach(i => { if(i.value.trim()) map[i.dataset.mk] = i.value.trim(); });
-    if(JSON.stringify(map) !== JSON.stringify(c.bq_column_map || {})) ch.bq_column_map = Object.keys(map).length ? map : null;
-    if(ct === 'bigquery' && ('connection_type' in ch || 'bq_table_ref' in ch)) ch.bq_column_map = Object.keys(map).length ? map : null;
-  }
-  if(isOwner()){
-    put('structure_on_db', $('f_sdb').checked); put('plan_on_db', $('f_pdb').checked); put('archive_on_db', $('f_adb').checked);
-  }
+  const put = (k, v) => { if(JSON.stringify(c[k] ?? '') !== JSON.stringify(v ?? '')) ch[k] = v; };
+  put('name', $('f_name').value.trim()); put('timezone', $('f_tz').value);
+  put('morning_hour', +$('f_m').value); put('evening_hour', +$('f_e').value);
+  put('days_off', [...document.querySelectorAll('#f_off .chip.on')].map(x => x.dataset.d).join(','));
+  put('tech_contact_id', $('f_ti').value.trim()); put('launch_report', $('f_lr').checked);
   return ch;
 }
-
 async function saveCfg(id){
   const c = co(id), ch = collectCfg(c);
   if(!Object.keys(ch).length){ toast('Изменений нет'); return; }
-  if(ch.evening_hour !== undefined || ch.morning_hour !== undefined){
-    if(+$('f_e').value <= +$('f_m').value){ $('f_err').textContent = 'Вечерний отчёт должен быть позже утреннего'; return; }
-  }
+  if(+$('f_e').value <= +$('f_m').value){ $('f_err').textContent = 'Вечерний отчёт должен быть позже утреннего'; return; }
   $('f_save').disabled = true;
   try {
     const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body: ch});
-    Object.assign(c, r.company);
+    Object.assign(c, r.company); delete S.health[id];
     toast(`Сохранено: ${r.changed} изм.` + (('timezone' in ch || 'morning_hour' in ch || 'evening_hour' in ch || 'days_off' in ch) ? ' Бот подхватит расписание в течение 10 минут' : ''));
     render();
   } catch(e){ $('f_err').textContent = e.message; $('f_save').disabled = false; }
@@ -373,38 +365,127 @@ async function saveStage(id){
   try { const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body}); Object.assign(c, r.company); toast('Этап сохранён'); render(); }
   catch(e){ toast(e.message); }
 }
-
 async function assign(id){
   try { await api('/companies/' + encodeURIComponent(id) + '/assign', {method:'POST', body:{manager_id: $('as_m').value}});
     await loadCompanies(); toast('Менеджер закреплён'); render(); }
   catch(e){ toast(e.message); }
 }
-
 async function claim(id){
   try { await api('/companies/' + encodeURIComponent(id) + '/claim', {method:'POST'});
     await loadCompanies(); S.sel = id; S.tab = 'overview'; S.showDet = true; toast('Компания закреплена за вами'); render(); }
   catch(e){ toast(e.message); await loadCompanies(); render(); }
 }
 
+/* ---------- Данные: источник и действия ---------- */
+function srcKey(c){ return c.connection_type === 'bigquery' ? 'bigquery' : c.connection_type === 'rest_api' ? 'api' : (c.spreadsheet_id ? 'google' : 'excel'); }
+function sourceName(c){ return {excel:'Excel', bigquery:'BigQuery', api:'API', google:'Google (переход)'}[srcKey(c)]; }
 function tabData(c){
-  const fact = c.connection_type === 'bigquery' ? 'база · BigQuery' : c.connection_type === 'rest_api' ? 'база · REST API' : (c.spreadsheet_id ? 'Google-таблица' : 'база · Excel');
-  const rows = [['Структура', (c.structure_on_db || !c.spreadsheet_id) ? (c.spreadsheet_id ? 'база' : 'база · Excel') : 'Google-таблица'],
-    ['План посещений', (c.plan_on_db || !c.spreadsheet_id) ? (c.spreadsheet_id ? 'база' : 'база · Excel') : 'Google-таблица'],
-    ['Факт', fact], ['Архив «Итоги месяца»', c.archive_on_db ? 'база' : 'Google-таблица']];
-  const cls = v => v.startsWith('база') ? (v.includes('Excel') ? 's-test' : 's-work') : 's-off';
-  return `<div class="panel" style="padding:4px 14px">${rows.map(([n,v]) => `<div class="src"><strong style="font-weight:500">${n}</strong><div><span class="tag ${cls(v)}">${v}</span></div></div>`).join('')}</div>
-  ${c.bq_table_ref && c.connection_type==='bigquery' ? `<p class="lbl" style="margin-top:12px">Источник</p><div class="mono">${esc(c.bq_table_ref)}</div>` : ''}
-  ${c.rest_base_url && c.connection_type==='rest_api' ? `<p class="lbl" style="margin-top:12px">Источник</p><div class="mono">${esc(c.rest_base_url)}</div>` : ''}
-  <div class="acts"><button class="pri" id="rl" onclick="reload('${esc(c.company_id)}')">Повторить загрузку</button></div>
-  <p class="small">${c.connection_type ? 'Загрузит заказы из источника клиента прямо сейчас.' + (role()==='manager' ? ' Для менеджера действует суточный лимит на компанию, как у /load.' : '') : 'Сбросит кеш — дашборды перечитают свежие данные при следующем открытии.'}</p>
-  <div class="note">Мастер перехода на автоподключение и загрузка Excel из панели появятся на следующих этапах.</div>`;
+  const cur = S.srcDraft && S.srcDraft.id === c.company_id ? S.srcDraft.key : srcKey(c);
+  const canSrc = canTech();
+  const segs = [['excel','Excel'],['file','Файл-выгрузка'],['bigquery','BigQuery'],['api','API']];
+  const segHtml = segs.map(([k,n]) => {
+    const soon = k === 'file';
+    const on = cur === k;
+    return `<span class="chip ${on?'on':''}" style="${soon?'opacity:.55;cursor:default':''}" ${canSrc && !soon ? `onclick="S.srcDraft={id:'${esc(c.company_id)}',key:'${k}'};render()"` : ''}>${n}${soon?' · скоро':''}</span>`;
+  }).join('');
+  const hints = {
+    excel: 'Данные загружаются вручную файлом Excel. Подходит для старта и теста. Для постоянной работы переведите на Файл-выгрузку, BigQuery или API.',
+    bigquery: 'Бот сам забирает заказы из BigQuery клиента перед вечерним отчётом.',
+    api: 'Бот сам забирает заказы через API клиента перед вечерним отчётом. Токен доступа хранится в переменной Railway, не здесь.',
+    google: 'Компания ещё работает от своей Google-таблицы — это переходный режим. Её перевод на базу — отдельным мастером.',
+  };
+  const cmap = c.bq_column_map || {};
+  const fields = cur === 'bigquery' ? `<div style="margin-top:12px"><p class="lbl">BigQuery: проект.датасет.представление</p><input id="f_bq" class="mono" value="${esc(c.bq_table_ref)}" ${canSrc?'':'disabled'}>
+      <p class="lbl" style="margin-top:12px">Соответствие полей: наше поле → поле клиента</p>
+      <div class="grid3">${MAPF.map(([k,n]) => `<div><p class="lbl">${n}</p><input class="mono" data-mk="${k}" value="${esc(cmap[k] || '')}" placeholder="${k}" ${canSrc?'':'disabled'}></div>`).join('')}</div></div>`
+    : cur === 'api' ? `<div style="margin-top:12px"><p class="lbl">Адрес API</p><input id="f_rest" class="mono" value="${esc(c.rest_base_url)}" placeholder="https://…" ${canSrc?'':'disabled'}></div>` : '';
+  const changed = cur !== srcKey(c) || cur === 'bigquery' || cur === 'api';
+  const srcBlock = `<div class="panel" style="padding:12px 16px"><p class="lbl">Источник данных</p>
+    ${srcKey(c) === 'google' && cur === 'google' ? `<div class="chips"><span class="chip on">Google (переходный режим)</span></div>` : `<div class="chips">${segHtml}</div>`}
+    <p class="small" style="margin-top:8px">${hints[cur] || ''}</p>${fields}
+    ${canSrc && changed && cur !== 'google' ? `<p class="err" id="src_err"></p><div class="acts"><button class="pri" onclick="saveSource('${esc(c.company_id)}','${cur}')">Сохранить источник</button>${S.srcDraft ? '<button onclick="S.srcDraft=null;render()">Отмена</button>' : ''}</div>` : ''}</div>`;
+
+  const src = srcKey(c);
+  const months = lastMonths(12);
+  const card = (btn, text, warn) => `<div class="box">${btn}<p class="small" style="margin-top:8px">${text}</p>${warn ? `<p class="small" style="color:var(--bad);margin-top:6px">${warn}</p>` : ''}</div>`;
+  const excelCard = src === 'excel' ? card(
+    `<label class="pri" style="display:block;text-align:center;padding:8px 12px;border-radius:6px;background:var(--accent);color:var(--on-accent);font-weight:500;cursor:pointer">Загрузить Excel<input type="file" accept=".xlsx" style="display:none" onchange="excelPick(this,'${esc(c.company_id)}')"></label>`,
+    'Файл .xlsx с листами «Структура», «План посещений», «Факт посещений» (можно только нужные). Сначала покажем проверку, запишем только после «Записать».',
+    'Если «агент не найден» — имя в Факте или Плане отличается от Структуры. Исправьте файл и загрузите снова.') : '';
+  const loadCard = (src === 'bigquery' || src === 'api') ? card(
+    `<button class="pri" style="width:100%" id="rl" onclick="reload('${esc(c.company_id)}')">Загрузить данные сейчас</button>`,
+    'Заберёт заказы из источника клиента прямо сейчас, не дожидаясь вечера.' + (role()==='manager' ? ' Для менеджера — ограниченное число запусков в сутки.' : ''),
+    'Если источник отвечает ошибкой — проверьте адрес и соответствие полей. Не помогло — передайте техспециалисту.') : '';
+  const closeCard = card(
+    `<div style="display:flex;gap:8px"><select id="cm_m" style="flex:1">${months.map(([m,y],i) => `<option value="${m}.${y}" ${i===0?'selected':''}>${MONTHS_RU[m-1]} ${y}</option>`).join('')}</select><button class="pri" id="cm_b" onclick="closeMonth('${esc(c.company_id)}')">Закрыть месяц</button></div>`,
+    'Считает «Итоги месяца» для всех агентов. Обычно делается само 1-го числа, вручную — если данные за месяц догрузили позже. Повтор перезапишет итоги, дублей не будет.',
+    'Если после закрытия нет категорий — загрузите Факт с колонкой «Категория» и закройте снова.');
+  const cacheCard = card(`<button style="width:100%" onclick="reload('${esc(c.company_id)}', true)">Сбросить кеш</button>`,
+    'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
+  return `${srcBlock}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
+    <div id="xl_out"></div>`;
+}
+const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+function lastMonths(n){ const out = []; const d = new Date(); d.setDate(1); for(let i=0;i<n;i++){ d.setMonth(d.getMonth()-1); out.push([d.getMonth()+1, d.getFullYear()]); } return out; }
+
+async function saveSource(id, key){
+  const c = co(id), body = {};
+  if(key === 'excel'){ body.connection_type = ''; }
+  if(key === 'bigquery'){
+    body.connection_type = 'bigquery'; body.bq_table_ref = $('f_bq').value.trim();
+    const map = {}; document.querySelectorAll('[data-mk]').forEach(i => { if(i.value.trim()) map[i.dataset.mk] = i.value.trim(); });
+    body.bq_column_map = Object.keys(map).length ? map : null;
+  }
+  if(key === 'api'){ body.connection_type = 'rest_api'; body.rest_base_url = $('f_rest').value.trim(); }
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body});
+    Object.assign(c, r.company); S.srcDraft = null; delete S.health[id];
+    toast(r.changed ? 'Источник сохранён' : 'Изменений нет'); render();
+  } catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message); }
 }
 
-async function reload(id){
-  const b = $('rl'); b.disabled = true; b.textContent = 'Загружаю…';
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'}); toast(r.message); }
+function excelPick(input, id){
+  const f = input.files && input.files[0]; if(!f) return;
+  if(!/\.xlsx$/i.test(f.name)){ toast('Нужен файл .xlsx'); return; }
+  if(f.size > 10*1024*1024){ toast('Файл больше 10 МБ'); return; }
+  const out = $('xl_out'); out.innerHTML = '<div class="note">Проверяю файл…</div>';
+  const r = new FileReader();
+  r.onload = async () => {
+    const b64 = String(r.result).split(',')[1] || '';
+    try {
+      const res = await api('/companies/' + encodeURIComponent(id) + '/excel/check', {method:'POST', body:{filename:f.name, data:b64}});
+      out.innerHTML = `<div class="panel" style="padding:12px 16px;margin-top:14px"><p class="lbl">Проверка файла ${esc(f.name)}</p>
+        <pre style="white-space:pre-wrap;font:13px/1.5 var(--sans);margin:0">${esc(res.report)}</pre>
+        <div class="acts"><button class="pri" id="xl_w" onclick="excelWrite('${esc(id)}','${esc(res.token)}')">Записать</button><button onclick="$('xl_out').innerHTML=''">Отмена</button></div>
+        <p class="small">Запись заменит Структуру и План компании целиком, а Факт — за месяцы, которые есть в файле.</p></div>`;
+    } catch(e){ out.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+    input.value = '';
+  };
+  r.onerror = () => { out.innerHTML = '<div class="note bad">Файл не прочитался. Выберите его ещё раз.</div>'; };
+  r.readAsDataURL(f);
+}
+async function excelWrite(id, token){
+  const b = $('xl_w'); b.disabled = true; b.textContent = 'Записываю…';
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id) + '/excel/write', {method:'POST', body:{token}});
+    $('xl_out').innerHTML = `<div class="note">${esc(r.message)}</div>`; delete S.health[id];
+    await loadCompanies(); toast('Данные записаны');
+  } catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+}
+async function closeMonth(id){
+  const [m, y] = $('cm_m').value.split('.').map(Number);
+  if(!confirm(`Закрыть ${MONTHS_RU[m-1]} ${y}? Итоги месяца пересчитаются и перезапишутся.`)) return;
+  const b = $('cm_b'); b.disabled = true; b.textContent = 'Считаю…';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/close-month', {method:'POST', body:{month:m, year:y}});
+    toast(r.message); delete S.health[id]; $('xl_out').innerHTML = `<div class="note">${esc(r.message)}</div>`; }
+  catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+  b.disabled = false; b.textContent = 'Закрыть месяц';
+}
+async function reload(id, cacheOnly){
+  const b = $('rl'); if(b && !cacheOnly){ b.disabled = true; b.textContent = 'Загружаю…'; }
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'}); toast(r.message); delete S.health[id]; }
   catch(e){ toast(e.message); }
-  b.disabled = false; b.textContent = 'Повторить загрузку';
+  if(b && !cacheOnly){ b.disabled = false; b.textContent = 'Загрузить данные сейчас'; }
 }
 
 function logTable(rows, withCo){
