@@ -205,7 +205,7 @@ async function setTab(t){
 function render(){
   $('nav').innerHTML = `<div class="brand">СТТ · админ-панель${API.includes('develop') ? '<small>develop</small>' : ''}</div>
     ${VIEWS().map(([k,n]) => `<button class="navb ${S.view===k?'on':''}" onclick="go('${k}')">${n}${k==='tasks' && S.taskCount ? ` <span class="tag s-pause" style="padding:0 7px">${S.taskCount}</span>` : ''}</button>`).join('')}
-    <div class="who">${esc(S.me.name)}<br><span class="meta">${ROLES[role()]}</span></div>`;
+    <div class="who">${esc(S.me.name)}<br><span class="meta">${ROLES[role()]}</span>${isOwner() ? `<br><span class="meta" style="font-size:11px">сервер: ${esc(S.me.server_version || 'старая версия')}</span>` : ''}</div>`;
   const m = $('main');
   if(S.view === 'team') m.innerHTML = renderTeam();
   else if(S.view === 'log') m.innerHTML = renderLog();
@@ -279,7 +279,8 @@ function tabOverview(c){
     <div class="box"><p class="lbl">Отчёты</p><p class="val">${hh(c.morning_hour)} / ${hh(c.evening_hour)}</p><p class="small">${esc(c.timezone)}</p></div>
     <div class="box"><p class="lbl">Выходные</p><p class="val">${esc(c.days_off || 'нет')}</p></div>
     <div class="box"><p class="lbl">Источник данных</p><p class="val">${sourceName(c)}</p></div></div>
-  ${c.stage==='off' ? '<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются).</div>' : ''}`;
+  ${c.stage==='off' ? '<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются).</div>'
+    : canMgr() ? `<div class="acts"><button class="danger" onclick="refuseCompany('${esc(c.company_id)}')">Клиент отказался — отключить</button></div><p class="small">Все сообщения компании остановятся в течение 10 минут, дашборды закроются. Данные сохраняются — если клиент вернётся, владелец включит компанию обратно.</p>` : ''}`;
 }
 
 /* ---------- Состояние компании ---------- */
