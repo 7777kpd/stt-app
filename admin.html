@@ -227,8 +227,8 @@ function freeBlock(){
 }
 
 function renderCompanies(){
-  const V = S.companies, fl = S.filter;
-  const list = V.filter(c => fl === 'all' || (fl === 'nomgr' ? !c.manager_telegram_id : c.stage === fl));
+  const ALL = S.companies, DEL = ALL.filter(c => c.deleted_at), V = ALL.filter(c => !c.deleted_at), fl = S.filter;
+  const list = fl === 'deleted' ? DEL : V.filter(c => fl === 'all' || (fl === 'nomgr' ? !c.manager_telegram_id : c.stage === fl));
   const cnt = k => V.filter(c => c.stage === k).length;
   const title = role() === 'manager' ? 'Мои компании' : 'Компании';
   const newBtn = canMgr() ? '<button class="pri" onclick="S.newOpen=true;render()">Новая компания</button>' : '';
@@ -237,7 +237,7 @@ function renderCompanies(){
     <p class="small">${role()==='manager' ? 'Заведите нового клиента или возьмите себе свободную компанию ниже.' : 'Справочник пуст.'}</p></div>${freeBlock()}`;
   const c = co(S.sel);
   const chips = [['all','Все',V.length], ...(isOwner() ? [['nomgr','Без менеджера',V.filter(x=>!x.manager_telegram_id).length]] : []),
-    ...Object.entries(STAGES).map(([k,n]) => [k,n,cnt(k)]).filter(x => x[2])];
+    ...Object.entries(STAGES).map(([k,n]) => [k,n,cnt(k)]).filter(x => x[2]), ...(DEL.length ? [['deleted','Удалённые',DEL.length]] : [])];
   return `<div class="head"><h1>${title}</h1>${newBtn}</div>
   <p class="sub">${V.length} компаний · справочник: ${S.me.registry_source === 'db' ? 'база' : 'Google-таблица'}</p>
   <div class="split ${S.showDet ? 'show-det' : ''}">
@@ -279,7 +279,9 @@ function tabOverview(c){
     <div class="box"><p class="lbl">Отчёты</p><p class="val">${hh(c.morning_hour)} / ${hh(c.evening_hour)}</p><p class="small">${esc(c.timezone)}</p></div>
     <div class="box"><p class="lbl">Выходные</p><p class="val">${esc(c.days_off || 'нет')}</p></div>
     <div class="box"><p class="lbl">Источник данных</p><p class="val">${sourceName(c)}</p></div></div>
-  ${c.stage==='off' ? '<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются).</div>'
+  ${c.deleted_at ? `<div class="note bad">Компания удалена ${fdt(c.deleted_at)}: данные клиента стёрты, оплаты, задачи и журнал сохранены.</div>${isOwner() ? `<div class="acts"><button onclick="restoreCompany('${esc(c.company_id)}')">Вернуть в список компаний</button></div>` : ''}`
+    : c.stage==='off' ? `<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются). Данные пока хранятся.</div>${canMgr() ? `<div class="acts"><button class="danger" onclick="deleteCompany('${esc(c.company_id)}')">Удалить компанию и данные</button></div><p class="small">Удаляются Структура, План, заказы, итоги месяцев и журнал запусков. Оплаты, задачи и журнал изменений остаются. Действие необратимо.</p>` : ''}`
+    : c.stage==='pause' ? `<div class="note bad">Компания приостановлена: отчёты не уходят, дашборды закрыты. Внесите оплату во вкладке «Оплата» — всё включится сразу.</div>`
     : canMgr() ? `<div class="acts"><button class="danger" onclick="refuseCompany('${esc(c.company_id)}')">Клиент отказался — отключить</button></div><p class="small">Все сообщения компании остановятся в течение 10 минут, дашборды закроются. Данные сохраняются — если клиент вернётся, владелец включит компанию обратно.</p>` : ''}`;
 }
 
@@ -373,6 +375,7 @@ async function saveStage(id){
   if($('st_s').value !== c.stage) body.stage = $('st_s').value;
   if(($('st_t').value || null) !== (c.trial_until || null)) body.trial_until = $('st_t').value || null;
   if(!Object.keys(body).length){ toast('Изменений нет'); return; }
+  if(body.stage === 'pause' && !confirm('Приостановить компанию? Отчёты перестанут уходить, дашборды закроются. Данные сохраняются.')) return;
   if(body.stage === 'off' && !confirm('Отключить компанию? Бот перестанет её обслуживать: отчёты не уйдут, дашборды не откроются. Данные НЕ удаляются.')) return;
   try { const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body}); Object.assign(c, r.company); toast('Этап сохранён'); render(); }
   catch(e){ toast(e.message); }
@@ -591,7 +594,7 @@ function taskRow(t){ return `<div class="row ${S.tSel===t.id?'on':''}" onclick="
 function renderTasks(){
   const scopes = [['open','Открытые'],['mine','Мои'],['wait','Ждём клиента'],['done','Решённые']];
   const list = S.tasks;
-  const left = !list ? '<p class="small" style="padding:12px">Загружаю…</p>' : list.error ? `<div class="note bad">${esc(list.error)}</div>`
+  const left = !list ? '<p class="small" style="padding:12px">Загружаю…</p>' : (list.error || !Array.isArray(list)) ? `<div class="note bad">${esc(list.error || 'Сервер не вернул задачи — обновите серверную часть админки.')}</div>`
     : (list.map(taskRow).join('') || '<p class="small" style="padding:12px">Задач нет.</p>');
   const right = S.tNew ? taskNewForm() : S.tDetail ? taskDetail(S.tDetail) : '<p class="small">Выберите задачу или создайте новую.</p>';
   return `<div class="head"><h1>Задачи</h1><button class="pri" onclick="newTask('')">Новая задача</button></div>
@@ -651,7 +654,7 @@ async function assignTask(id){ try { await api('/tasks/' + id + '/assign', {meth
 function tabCTasks(c){
   const l = S.ctasks[c.company_id];
   if(!l){ loadCTasks(c.company_id).then(render); return '<p class="small">Загружаю…</p>'; }
-  if(l.error) return `<div class="note bad">${esc(l.error)}</div>`;
+  if(l.error || !Array.isArray(l)) return `<div class="note bad">${esc(l.error || 'Сервер не вернул задачи — обновите серверную часть админки.')}</div>`;
   return `<div class="acts" style="margin-top:0;margin-bottom:12px"><button class="pri" onclick="newTask('${esc(c.company_id)}')">Новая задача по компании</button></div>
     <div class="panel list">${l.map(taskRow).join('') || '<p class="small" style="padding:12px">Задач по компании нет.</p>'}</div>`;
 }
@@ -676,6 +679,7 @@ function tabPay(c){
   const b = S.bill[c.company_id];
   if(!b) { loadBill(c.company_id); return '<p class="small">Загружаю…</p>'; }
   if(b.error) return `<div class="note bad">${esc(b.error)}</div>`;
+  if(!b.settings) return '<div class="note bad">Сервер не вернул данные об оплате — обновите серверную часть админки.</div>';
   const s = b.settings, left = b.days_left;
   const untilTxt = b.paid_until ? new Date(b.paid_until.slice(0,10) + 'T00:00:00').toLocaleDateString('ru-RU') : '—';
   const leftTxt = b.paid_until ? (left < 0 ? `<span style="color:var(--bad)">закончилась ${-left} дн. назад</span>` : left <= s.remind_days ? `<span style="color:var(--warn)">через ${left} дн.</span>` : `через ${left} дн.`) : (b.stage === 'test' ? 'бесплатный тест' : 'оплат ещё не было');
@@ -696,7 +700,7 @@ function tabPay(c){
     <p class="err" id="p_err"></p><div class="acts"><button class="pri" id="p_save" onclick="savePayment('${esc(c.company_id)}')">Сохранить оплату</button></div></div>`;
   const hist = (b.payments || []).map(p => `<tr><td style="white-space:nowrap">${new Date(p.pay_date + 'T00:00:00').toLocaleDateString('ru-RU')}</td>
     <td>${p.kind === 'lic' ? `Лицензии: ${p.seats} мест × ${p.months} мес.` : `Консалтинг: ${esc(p.work)}`}</td><td>${eur(p.amount)}</td>
-    <td>${esc(p.method)}${p.comment ? `<br><span class="meta">${esc(p.comment)}</span>` : ''}</td><td>${esc(p.manager_name || '—')}</td></tr>`).join('');
+    <td>${esc(p.method)}${p.comment ? `<br><span class="meta">${esc(p.comment)}</span>` : ''}</td><td>${esc(p.manager_name || '—')}</td>${isOwner() ? `<td><button style="padding:4px 8px" title="Удалить ошибочную оплату" onclick="deletePayment(${p.id},'${esc(c.company_id)}')">✕</button></td>` : ''}</tr>`).join('');
   setTimeout(payCalc, 0);
   return `<div class="grid3">
     <div class="box"><p class="lbl">Оплачено до</p><p class="val" style="font-size:20px">${untilTxt}</p><p class="small">${leftTxt}</p></div>
@@ -704,7 +708,7 @@ function tabPay(c){
     <div class="box"><p class="lbl">По тарифу в месяц</p><p class="val" style="font-size:20px">${eur(b.tariff_month)}</p><p class="small">мин. ${eur(s.min_price)} · ${eur(s.seat_price)} за место</p></div></div>
   ${b.used_seats && b.seats_paid && b.used_seats > b.seats_paid ? `<div class="note warn">Приложение открывали ${b.used_seats} человек — больше, чем оплачено (${b.seats_paid}). При следующей оплате учтите реальное число мест.</div>` : ''}
   ${form}
-  <div class="sec"><h3>История оплат</h3>${hist ? `<div class="tw"><table><tr><th>Дата</th><th>Что</th><th>Сумма</th><th>Способ</th><th>Менеджер</th></tr>${hist}</table></div>` : '<p class="small">Оплат ещё не было.</p>'}</div>
+  <div class="sec"><h3>История оплат</h3>${hist ? `<div class="tw"><table><tr><th>Дата</th><th>Что</th><th>Сумма</th><th>Способ</th><th>Менеджер</th>${isOwner() ? '<th></th>' : ''}</tr>${hist}</table></div>` : '<p class="small">Оплат ещё не было.</p>'}</div>
   ${c.stage !== 'off' ? `<div class="sec"><div class="note"><b>Клиент отказался от СТТ?</b> Отключите компанию: все сообщения остановятся в течение 10 минут, дашборды закроются, данные сохранятся — если клиент вернётся, всё включается обратно.<div class="acts"><button class="danger" onclick="refuseCompany('${esc(c.company_id)}')">Клиент отказался</button></div></div></div>` : ''}`;
 }
 function addMonthsIso(iso, n){ const d = new Date(iso + 'T00:00:00'), day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, last)); return d; }
@@ -739,6 +743,25 @@ async function refuseCompany(id){
   if(reason === null) return;
   try { const r = await api('/companies/' + encodeURIComponent(id) + '/refuse', {method:'POST', body:{reason}});
     toast(r.message); delete S.health[id]; await loadCompanies(); render(); }
+  catch(e){ toast(e.message); }
+}
+
+async function deleteCompany(id){
+  const c = co(id);
+  const typed = prompt(`Удалить компанию «${c.name || id}» и все её данные?\n\nУдалятся Структура, План, заказы, итоги месяцев и журнал запусков. Оплаты, задачи и журнал изменений останутся. Отменить нельзя.\n\nДля подтверждения введите код компании: ${id}`, '');
+  if(typed === null) return;
+  if(typed.trim() !== id){ toast('Код не совпал — ничего не удалено'); return; }
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/delete', {method:'POST', body:{confirm:typed.trim()}});
+    toast(r.message); await loadCompanies(); S.sel = null; S.showDet = false; render(); }
+  catch(e){ toast(e.message); }
+}
+async function restoreCompany(id){
+  try { await api('/companies/' + encodeURIComponent(id) + '/restore', {method:'POST'}); toast('Компания возвращена в список. Данные нужно загрузить заново'); await loadCompanies(); render(); }
+  catch(e){ toast(e.message); }
+}
+async function deletePayment(pid, cid){
+  if(!confirm('Удалить эту оплату? «Оплачено до» и число мест пересчитаются по оставшимся оплатам.')) return;
+  try { await api('/payments/' + pid + '/delete', {method:'POST'}); toast('Оплата удалена'); delete S.health[cid]; await loadCompanies(); await loadBill(cid); }
   catch(e){ toast(e.message); }
 }
 
