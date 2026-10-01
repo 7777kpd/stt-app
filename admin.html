@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -163,6 +163,9 @@ async function boot(){
   } catch(e){ fatal(e.message); return; }
   S.tab = role() === 'tech' ? 'data' : 'overview';
   await loadCompanies();
+  if(canMgr()){ try { S.bset = await api('/billing/settings'); } catch(e){} }
+  try { S.people = await api('/tasks/people'); } catch(e){}
+  await refreshTaskCount();
   render();
 }
 
@@ -173,10 +176,11 @@ async function loadCompanies(){
 }
 
 const co = id => S.companies.find(c => c.company_id === id);
-const VIEWS = () => isOwner() ? [['companies','Компании'],['team','Команда'],['log','Журнал изменений']]
-  : [['companies', role() === 'manager' ? 'Мои компании' : 'Компании'],['log','Журнал изменений']];
-const TABS = () => role() === 'tech' ? [['data','Данные'],['clog','Журнал']]
-  : [['overview','Обзор'],['cfg','Настройки'],['data','Данные'],['clog','Журнал']];
+const VIEWS = () => isOwner() ? [['companies','Компании'],['tasks','Задачи'],['sales','Продажи'],['team','Команда'],['log','Журнал изменений'],['tariff','Тариф']]
+  : role() === 'manager' ? [['companies','Мои компании'],['tasks','Задачи'],['sales','Мои продажи'],['log','Журнал изменений']]
+  : [['companies','Компании'],['tasks','Задачи'],['log','Журнал изменений']];
+const TABS = () => role() === 'tech' ? [['data','Данные'],['ctasks','Задачи'],['clog','Журнал']]
+  : [['overview','Обзор'],['cfg','Настройки'],['data','Данные'],['pay','Оплата'],['ctasks','Задачи'],['clog','Журнал']];
 
 async function go(v){
   S.view = v; S.newOpen = false; S.addOpen = false;
@@ -184,6 +188,8 @@ async function go(v){
     if(v === 'team') S.team = await api('/team');
     if(v === 'log') S.log = await api('/log');
     if(v === 'companies') await loadCompanies();
+    if(v === 'sales') await loadSales();
+    if(v === 'tasks') await loadTasks();
   } catch(e){ toast(e.message); }
   render();
 }
@@ -191,16 +197,21 @@ async function pick(id){ S.srcDraft = null; S.sel = id; S.tab = TABS()[0][0]; S.
 async function setTab(t){
   S.tab = t; S.srcDraft = null;
   if(t === 'clog'){ try { S.clog = await api('/log?company_id=' + encodeURIComponent(S.sel)); } catch(e){ toast(e.message); } }
+  if(t === 'pay'){ S.payKind = 'lic'; await loadBill(S.sel); }
+  if(t === 'ctasks'){ await loadCTasks(S.sel); }
   render();
 }
 
 function render(){
   $('nav').innerHTML = `<div class="brand">СТТ · админ-панель${API.includes('develop') ? '<small>develop</small>' : ''}</div>
-    ${VIEWS().map(([k,n]) => `<button class="navb ${S.view===k?'on':''}" onclick="go('${k}')">${n}</button>`).join('')}
+    ${VIEWS().map(([k,n]) => `<button class="navb ${S.view===k?'on':''}" onclick="go('${k}')">${n}${k==='tasks' && S.taskCount ? ` <span class="tag s-pause" style="padding:0 7px">${S.taskCount}</span>` : ''}</button>`).join('')}
     <div class="who">${esc(S.me.name)}<br><span class="meta">${ROLES[role()]}</span></div>`;
   const m = $('main');
   if(S.view === 'team') m.innerHTML = renderTeam();
   else if(S.view === 'log') m.innerHTML = renderLog();
+  else if(S.view === 'sales') m.innerHTML = renderSales();
+  else if(S.view === 'tasks') m.innerHTML = renderTasks();
+  else if(S.view === 'tariff') m.innerHTML = renderTariff();
   else m.innerHTML = S.newOpen ? renderNew() : renderCompanies();
   if(S.view === 'companies' && S.tab === 'cfg') cfgPreview();
 }
@@ -235,7 +246,7 @@ function renderCompanies(){
       ${list.map(x => `<div class="row ${x.company_id===S.sel?'on':''}" onclick="pick('${esc(x.company_id)}')">
         <span class="dot c-${x.stage}"></span>
         <div><div class="nm">${esc(x.name || x.company_id)}</div>
-        <div class="meta">${esc(x.manager_name || 'без менеджера')} · ${esc(x.stage_name)}</div></div></div>`).join('') || '<div class="row"><span></span><div class="meta">Нет компаний</div></div>'}
+        <div class="meta">${esc(x.manager_name || 'без менеджера')} · ${esc(x.stage_name)}${payHint(x)}</div></div></div>`).join('') || '<div class="row"><span></span><div class="meta">Нет компаний</div></div>'}
     </div>
     <div class="panel det">${c ? renderDetail(c) : '<p class="small">Выберите компанию.</p>'}</div>
   </div>${freeBlock()}`;
@@ -243,7 +254,7 @@ function renderCompanies(){
 
 function renderDetail(c){
   const tabs = TABS(); if(!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
-  const body = S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : tabLog();
+  const body = S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : tabLog();
   return `<button class="back" onclick="S.showDet=false;render()">← Все компании</button>
   <div class="dhead"><div><h2>${esc(c.name || c.company_id)}</h2><div class="meta">${esc(c.company_id)} · ${esc(c.timezone)}</div></div>
   <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></div>
@@ -273,7 +284,7 @@ function tabOverview(c){
 
 /* ---------- Состояние компании ---------- */
 const HEALTH_ICON = {ok:['✓','var(--ok)'], warn:['!','var(--warn)'], bad:['✕','var(--bad)'], info:['i','var(--ink-3)']};
-const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть месяц','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data']};
+const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть месяц','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data'], payment:['Открыть оплату','pay'], tasks:['К задачам','ctasks']};
 async function loadHealth(id, force){
   if(!force && S.health[id]) return;
   S.health[id] = 'loading';
@@ -554,6 +565,242 @@ async function bqSync(id, force){
     else { S.bq[id].error = e.message; }
   }
   render();
+}
+
+/* ---------- Задачи ---------- */
+const T_STATUS = [['new','Новая'],['work','В работе'],['wait','Ждём клиента'],['done','Решена']];
+const T_KINDS = [['connect','Подключение'],['data','Данные'],['dashboard','Дашборд'],['payment','Оплата'],['other','Другое']];
+const T_CLS = {new:'s-pause', work:'s-test', wait:'s-conn', done:'s-work'};
+async function refreshTaskCount(){ try { const r = await api('/tasks?scope=' + (role()==='owner' ? 'open' : 'open')); S.taskCount = r.length; } catch(e){} }
+async function loadTasks(){ try { S.tasks = await api('/tasks?scope=' + S.tScope); } catch(e){ S.tasks = {error:e.message}; } }
+async function loadCTasks(id){ try { S.ctasks[id] = await api('/tasks?scope=all&company_id=' + encodeURIComponent(id)); } catch(e){ S.ctasks[id] = {error:e.message}; } }
+async function setTScope(sc){ S.tScope = sc; S.tSel = null; S.tDetail = null; await loadTasks(); render(); }
+async function openTask(id){
+  S.view = 'tasks'; S.tNew = null; S.tSel = id;
+  if(!S.tasks) await loadTasks();
+  try { S.tDetail = await api('/tasks/' + id); } catch(e){ S.tDetail = {error:e.message}; }
+  render(); window.scrollTo(0,0);
+}
+function newTask(companyId){ S.view = 'tasks'; S.tSel = null; S.tDetail = null; S.tNew = {company_id: companyId || ''}; if(!S.tasks) loadTasks().then(render); render(); }
+const fdt2 = iso => { const d = new Date(iso); return d.toLocaleDateString('ru-RU') + ' ' + d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}); };
+function peopleOpts(sel){ return `<option value="">не назначен</option>` + S.people.map(p => `<option value="${esc(p.telegram_id)}" ${p.telegram_id===sel?'selected':''}>${esc(p.name)} · ${ROLES[p.role]||p.role}</option>`).join(''); }
+function taskRow(t){ return `<div class="row ${S.tSel===t.id?'on':''}" onclick="openTask(${t.id})" style="grid-template-columns:minmax(0,1fr) auto">
+  <div><div class="nm">#${t.id} · ${esc(t.company_name)} · ${esc(t.title)}</div><div class="meta">${esc(t.kind_name)} · ${esc(t.assignee_name || 'не назначен')} · обновлена ${fdt2(t.updated_at)}</div></div>
+  <span class="tag ${T_CLS[t.status]}">${esc(t.status_name)}</span></div>`; }
+function renderTasks(){
+  const scopes = [['open','Открытые'],['mine','Мои'],['wait','Ждём клиента'],['done','Решённые']];
+  const list = S.tasks;
+  const left = !list ? '<p class="small" style="padding:12px">Загружаю…</p>' : list.error ? `<div class="note bad">${esc(list.error)}</div>`
+    : (list.map(taskRow).join('') || '<p class="small" style="padding:12px">Задач нет.</p>');
+  const right = S.tNew ? taskNewForm() : S.tDetail ? taskDetail(S.tDetail) : '<p class="small">Выберите задачу или создайте новую.</p>';
+  return `<div class="head"><h1>Задачи</h1><button class="pri" onclick="newTask('')">Новая задача</button></div>
+  <p class="sub">Проблемы клиентов по подключению и сопровождению. Закрыть задачу можно только с описанием решения.</p>
+  <div class="split ${S.tSel || S.tNew ? 'show-det' : ''}"><div class="panel list"><div class="filters">${scopes.map(([k,n]) => `<span class="chip ${S.tScope===k?'on':''}" onclick="setTScope('${k}')">${n}</span>`).join('')}</div>${left}</div>
+  <div class="panel det"><button class="back" onclick="S.tSel=null;S.tNew=null;S.tDetail=null;render()">← Все задачи</button>${right}</div></div>`;
+}
+function taskNewForm(){
+  const comps = S.companies.filter(c => c.stage !== 'off');
+  return `<h2 style="margin:0 0 12px;font-size:18px">Новая задача</h2>
+  <div class="grid2"><div><p class="lbl">Компания</p><select id="tn_c"><option value="">Выберите</option>${comps.map(c => `<option value="${esc(c.company_id)}" ${c.company_id===S.tNew.company_id?'selected':''}>${esc(c.name || c.company_id)}</option>`).join('')}</select></div>
+  <div><p class="lbl">Тип</p><select id="tn_k">${T_KINDS.map(([k,n]) => `<option value="${k}">${n}</option>`).join('')}</select></div></div>
+  <div style="margin-top:12px"><p class="lbl">Суть проблемы (коротко)</p><input id="tn_t" placeholder="Агент не видит маршрут на сегодня"></div>
+  <div style="margin-top:12px"><p class="lbl">Подробности (что написал клиент, что уже проверили)</p><textarea id="tn_x" rows="4" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--surface);color:var(--ink)"></textarea></div>
+  <div style="margin-top:12px"><p class="lbl">Ответственный</p><select id="tn_a">${peopleOpts(S.me.telegram_id)}</select></div>
+  <p class="err" id="tn_err"></p><div class="acts"><button onclick="S.tNew=null;render()">Отмена</button><button class="pri" id="tn_s" onclick="createTask()">Создать задачу</button></div>`;
+}
+async function createTask(){
+  const body = {company_id:$('tn_c').value, kind:$('tn_k').value, title:$('tn_t').value.trim(), text:$('tn_x').value.trim(), assignee_id:$('tn_a').value};
+  if(!body.company_id){ $('tn_err').textContent = 'Выберите компанию'; return; }
+  if(!body.title){ $('tn_err').textContent = 'Коротко опишите проблему'; return; }
+  $('tn_s').disabled = true;
+  try { const r = await api('/tasks', {method:'POST', body}); toast('Задача #' + r.id + ' создана'); S.tNew = null; delete S.ctasks[body.company_id]; delete S.health[body.company_id];
+    await loadTasks(); await refreshTaskCount(); await openTask(r.id); }
+  catch(e){ $('tn_err').textContent = e.message; $('tn_s').disabled = false; }
+}
+function taskDetail(t){
+  if(t.error) return `<div class="note bad">${esc(t.error)}</div>`;
+  const done = t.status === 'done';
+  const hist = (t.comments || []).map(c => `<div style="border-left:2px solid ${c.kind==='status'?'var(--accent)':c.kind==='system'?'var(--warn)':'var(--line)'};padding:2px 0 2px 10px;margin:8px 0">
+    <div class="meta">${fdt2(c.at)} · ${esc(c.author_name || '—')}</div><div style="white-space:pre-wrap">${esc(c.text)}</div></div>`).join('') || '<p class="small">Истории пока нет.</p>';
+  return `<div class="dhead"><div><h2 style="font-size:18px">#${t.id} · ${esc(t.title)}</h2>
+    <div class="meta">${esc(t.company_name)} · ${esc(t.kind_name)} · создал(а) ${esc(t.created_by_name || '—')} ${fdt2(t.created_at)}</div></div>
+    <span class="tag ${T_CLS[t.status]}">${esc(t.status_name)}</span></div>
+  <div class="grid2" style="margin-top:14px"><div><p class="lbl">Статус</p><div class="chips">${T_STATUS.filter(([k]) => k !== 'done').map(([k,n]) => `<span class="chip ${t.status===k?'on':''}" onclick="${t.status===k?'':`setTStatus(${t.id},'${k}')`}">${n}</span>`).join('')}</div></div>
+    <div><p class="lbl">Ответственный</p><select id="td_a" onchange="assignTask(${t.id})">${peopleOpts(t.assignee_id)}</select></div></div>
+  ${done ? `<div class="note" style="margin-top:12px"><b>Решение:</b> ${esc(t.resolution)}</div><div class="acts"><button onclick="setTStatus(${t.id},'work')">Открыть заново</button></div>` : ''}
+  <div class="sec"><h3>История</h3>${hist}</div>
+  <div class="sec"><p class="lbl">Комментарий</p><textarea id="td_c" rows="3" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--surface);color:var(--ink)"></textarea>
+    <div class="acts"><button onclick="commentTask(${t.id})">Добавить комментарий</button></div></div>
+  ${done ? '' : `<div class="sec"><p class="lbl">Решение — обязательно для закрытия</p><textarea id="td_r" rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--surface);color:var(--ink)" placeholder="Что сделали, чтобы проблема не повторилась"></textarea>
+    <p class="err" id="td_err"></p><div class="acts"><button class="pri" onclick="closeTask(${t.id})">Закрыть как решённую</button></div></div>`}
+  <div class="acts"><button onclick="S.view='companies';S.sel='${esc(t.company_id)}';S.tab=TABS()[0][0];S.showDet=true;render()">Открыть компанию</button></div>`;
+}
+async function afterTaskChange(id){ await loadTasks(); await refreshTaskCount(); if(S.tDetail) delete S.ctasks[S.tDetail.company_id]; await openTask(id); }
+async function setTStatus(id, st){ try { await api('/tasks/' + id + '/status', {method:'POST', body:{status:st}}); toast('Статус изменён'); await afterTaskChange(id); } catch(e){ toast(e.message); } }
+async function closeTask(id){
+  const r = $('td_r').value.trim(); if(!r){ $('td_err').textContent = 'Опишите решение'; return; }
+  try { await api('/tasks/' + id + '/status', {method:'POST', body:{status:'done', resolution:r}}); toast('Задача решена'); if(S.tDetail) delete S.health[S.tDetail.company_id]; await afterTaskChange(id); }
+  catch(e){ $('td_err').textContent = e.message; }
+}
+async function commentTask(id){
+  const t = $('td_c').value.trim(); if(!t){ toast('Пустой комментарий'); return; }
+  try { await api('/tasks/' + id + '/comment', {method:'POST', body:{text:t}}); toast('Комментарий добавлен'); await afterTaskChange(id); } catch(e){ toast(e.message); }
+}
+async function assignTask(id){ try { await api('/tasks/' + id + '/assign', {method:'POST', body:{assignee_id:$('td_a').value}}); toast('Ответственный изменён'); await afterTaskChange(id); } catch(e){ toast(e.message); } }
+function tabCTasks(c){
+  const l = S.ctasks[c.company_id];
+  if(!l){ loadCTasks(c.company_id).then(render); return '<p class="small">Загружаю…</p>'; }
+  if(l.error) return `<div class="note bad">${esc(l.error)}</div>`;
+  return `<div class="acts" style="margin-top:0;margin-bottom:12px"><button class="pri" onclick="newTask('${esc(c.company_id)}')">Новая задача по компании</button></div>
+    <div class="panel list">${l.map(taskRow).join('') || '<p class="small" style="padding:12px">Задач по компании нет.</p>'}</div>`;
+}
+
+/* ---------- Оплата ---------- */
+const eur = n => '€' + Math.round(Number(n) || 0).toLocaleString('ru-RU');
+const tariffOf = (s, seats) => Math.max(+s.min_price, +s.seat_price * Math.max(+seats || 0, 0));
+function daysTo(iso){ if(!iso) return null; const d = new Date(iso.slice(0,10) + 'T00:00:00'), t = new Date(); t.setHours(0,0,0,0); return Math.round((d - t) / 864e5); }
+function payHint(x){
+  if(!S.bset || x.stage === 'off') return '';
+  const end = x.stage === 'test' ? x.trial_until : x.paid_until, left = daysTo(end);
+  if(left === null || left > S.bset.remind_days) return '';
+  const what = x.stage === 'test' ? 'тест' : 'оплата';
+  return left < 0 ? ` · <span style="color:var(--bad)">${what} закончилась</span>` : ` · <span style="color:var(--warn)">${what}: ${left} дн.</span>`;
+}
+async function loadBill(id){
+  try { S.bill[id] = await api('/companies/' + encodeURIComponent(id) + '/billing'); }
+  catch(e){ S.bill[id] = {error: e.message}; }
+  if(S.sel === id) render();
+}
+function tabPay(c){
+  const b = S.bill[c.company_id];
+  if(!b) { loadBill(c.company_id); return '<p class="small">Загружаю…</p>'; }
+  if(b.error) return `<div class="note bad">${esc(b.error)}</div>`;
+  const s = b.settings, left = b.days_left;
+  const untilTxt = b.paid_until ? new Date(b.paid_until.slice(0,10) + 'T00:00:00').toLocaleDateString('ru-RU') : '—';
+  const leftTxt = b.paid_until ? (left < 0 ? `<span style="color:var(--bad)">закончилась ${-left} дн. назад</span>` : left <= s.remind_days ? `<span style="color:var(--warn)">через ${left} дн.</span>` : `через ${left} дн.`) : (b.stage === 'test' ? 'бесплатный тест' : 'оплат ещё не было');
+  const used = b.used_seats === null || b.used_seats === undefined ? 'нет данных' : b.used_seats;
+  const mgrs = S.team.filter(t => t.role === 'manager' && t.active);
+  const lic = S.payKind === 'lic';
+  const form = `<div class="sec"><h3>Внести оплату</h3>
+    <div class="chips" style="margin-bottom:10px"><span class="chip ${lic?'on':''}" onclick="S.payKind='lic';render()">Лицензии</span><span class="chip ${!lic?'on':''}" onclick="S.payKind='cons';render()">Консалтинг</span></div>
+    ${lic ? `<div class="grid3"><div><p class="lbl">Мест</p><input id="p_seats" type="number" min="1" step="1" value="${Math.max(b.seats_paid || 0, b.used_seats || 0, 1)}" oninput="payCalc()"></div>
+      <div><p class="lbl">Месяцев</p><input id="p_months" type="number" min="1" max="24" step="1" value="1" oninput="payCalc()"></div>
+      <div><p class="lbl">Сумма по тарифу</p><p class="val" id="p_sum" style="font-size:20px">—</p></div></div>
+      <p class="small" id="p_until"></p>`
+    : `<div class="grid2"><div><p class="lbl">Какая работа</p><input id="p_work" placeholder="Аудит маршрутов, обучение СВ"></div>
+      <div><p class="lbl">Сумма, €</p><input id="p_amount" type="number" min="1" step="1" placeholder="1500"></div></div>`}
+    <div class="grid2" style="margin-top:12px"><div><p class="lbl">Как пришли деньги</p><select id="p_method"><option value="">Выберите</option><option>Счёт</option><option>Денежный перевод</option><option>Наличные</option></select></div>
+      <div><p class="lbl">Комментарий (номер счёта, кто передал)</p><input id="p_comment" placeholder="Счёт № 124 от 30.09"></div></div>
+    ${isOwner() ? `<div style="margin-top:12px"><p class="lbl">Менеджер продажи</p><select id="p_mgr"><option value="">не указан</option>${mgrs.map(t => `<option value="${esc(t.telegram_id)}" ${t.telegram_id === b.manager_telegram_id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></div>` : ''}
+    <p class="err" id="p_err"></p><div class="acts"><button class="pri" id="p_save" onclick="savePayment('${esc(c.company_id)}')">Сохранить оплату</button></div></div>`;
+  const hist = (b.payments || []).map(p => `<tr><td style="white-space:nowrap">${new Date(p.pay_date + 'T00:00:00').toLocaleDateString('ru-RU')}</td>
+    <td>${p.kind === 'lic' ? `Лицензии: ${p.seats} мест × ${p.months} мес.` : `Консалтинг: ${esc(p.work)}`}</td><td>${eur(p.amount)}</td>
+    <td>${esc(p.method)}${p.comment ? `<br><span class="meta">${esc(p.comment)}</span>` : ''}</td><td>${esc(p.manager_name || '—')}</td></tr>`).join('');
+  setTimeout(payCalc, 0);
+  return `<div class="grid3">
+    <div class="box"><p class="lbl">Оплачено до</p><p class="val" style="font-size:20px">${untilTxt}</p><p class="small">${leftTxt}</p></div>
+    <div class="box"><p class="lbl">Мест оплачено</p><p class="val" style="font-size:20px">${b.seats_paid || 0}</p><p class="small">открывали в этом месяце: ${used}</p></div>
+    <div class="box"><p class="lbl">По тарифу в месяц</p><p class="val" style="font-size:20px">${eur(b.tariff_month)}</p><p class="small">мин. ${eur(s.min_price)} · ${eur(s.seat_price)} за место</p></div></div>
+  ${b.used_seats && b.seats_paid && b.used_seats > b.seats_paid ? `<div class="note warn">Приложение открывали ${b.used_seats} человек — больше, чем оплачено (${b.seats_paid}). При следующей оплате учтите реальное число мест.</div>` : ''}
+  ${form}
+  <div class="sec"><h3>История оплат</h3>${hist ? `<div class="tw"><table><tr><th>Дата</th><th>Что</th><th>Сумма</th><th>Способ</th><th>Менеджер</th></tr>${hist}</table></div>` : '<p class="small">Оплат ещё не было.</p>'}</div>
+  ${c.stage !== 'off' ? `<div class="sec"><div class="note"><b>Клиент отказался от СТТ?</b> Отключите компанию: все сообщения остановятся в течение 10 минут, дашборды закроются, данные сохранятся — если клиент вернётся, всё включается обратно.<div class="acts"><button class="danger" onclick="refuseCompany('${esc(c.company_id)}')">Клиент отказался</button></div></div></div>` : ''}`;
+}
+function addMonthsIso(iso, n){ const d = new Date(iso + 'T00:00:00'), day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + n); const last = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); d.setDate(Math.min(day, last)); return d; }
+function payCalc(){
+  const b = S.bill[S.sel]; if(!b || b.error || !$('p_seats') || !$('p_sum')) return;
+  const seats = Math.round(+$('p_seats').value), months = Math.round(+$('p_months').value);
+  if(!(seats > 0) || !(months > 0)){ $('p_sum').textContent = '—'; $('p_until').textContent = ''; return; }
+  $('p_sum').textContent = eur(tariffOf(b.settings, seats) * months);
+  const base = b.paid_until && b.days_left >= 0 ? b.paid_until.slice(0,10) : b.today;
+  $('p_until').textContent = 'Оплачено до станет: ' + addMonthsIso(base, months).toLocaleDateString('ru-RU');
+}
+async function savePayment(id){
+  const err = t => { $('p_err').textContent = t; };
+  const body = {kind: S.payKind, method: $('p_method').value, comment: $('p_comment').value.trim()};
+  if(!body.method) return err('Укажите, как пришли деньги');
+  if(S.payKind === 'lic'){
+    body.seats = Math.round(+$('p_seats').value); body.months = Math.round(+$('p_months').value);
+    if(!(body.seats > 0) || !(body.months > 0)) return err('Введите число мест и месяцев больше нуля');
+  } else {
+    body.work = $('p_work').value.trim(); body.amount = +$('p_amount').value;
+    if(!body.work) return err('Опишите, какая работа оплачена');
+    if(!(body.amount > 0)) return err('Введите сумму больше нуля');
+  }
+  if(isOwner() && $('p_mgr')) body.manager_id = $('p_mgr').value;
+  $('p_save').disabled = true;
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/payments', {method:'POST', body});
+    toast('Оплата сохранена: ' + r.message); delete S.health[id]; await loadCompanies(); await loadBill(id); }
+  catch(e){ err(e.message); $('p_save').disabled = false; }
+}
+async function refuseCompany(id){
+  const reason = prompt('Клиент отказался от СТТ. Коротко причина (необязательно):', '');
+  if(reason === null) return;
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/refuse', {method:'POST', body:{reason}});
+    toast(r.message); delete S.health[id]; await loadCompanies(); render(); }
+  catch(e){ toast(e.message); }
+}
+
+/* ---------- Продажи ---------- */
+function periodRange(){
+  const t = new Date(), y = t.getFullYear(), m = t.getMonth(), iso = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  switch(S.salesPer){
+    case 'prev': return [iso(new Date(y, m-1, 1)), iso(new Date(y, m, 0))];
+    case 'q': { const q = Math.floor(m/3)*3; return [iso(new Date(y, q, 1)), iso(new Date(y, q+3, 0))]; }
+    case 'year': return [iso(new Date(y, 0, 1)), iso(new Date(y, 11, 31))];
+    case 'custom': return [S.salesFrom || iso(new Date(y, m, 1)), S.salesTo || iso(t)];
+    default: return [iso(new Date(y, m, 1)), iso(new Date(y, m+1, 0))];
+  }
+}
+async function loadSales(){
+  const [a, b] = periodRange();
+  try { S.sales = await api(`/sales?date_from=${a}&date_to=${b}`); S.sales.range = [a, b]; }
+  catch(e){ S.sales = {error: e.message}; }
+}
+async function setSalesPer(p){ S.salesPer = p; await loadSales(); render(); }
+async function setSalesRange(){
+  const f = $('sl_f').value, t = $('sl_t').value;
+  if(!f || !t || f > t){ $('sl_err').textContent = 'Дата «с» должна быть не позже даты «по»'; return; }
+  S.salesFrom = f; S.salesTo = t; await loadSales(); render();
+}
+function renderSales(){
+  const own = role() === 'manager';
+  const per = [['month','Этот месяц'],['prev','Прошлый месяц'],['q','Квартал'],['year','Год'],['custom','Свой период']];
+  const d = S.sales;
+  if(!d) { loadSales().then(render); return '<p class="small">Загружаю…</p>'; }
+  const [a, b] = d.range || periodRange();
+  const fmt = iso => new Date(iso + 'T00:00:00').toLocaleDateString('ru-RU');
+  const head = `<h1>${own ? 'Мои продажи' : 'Продажи'}</h1><p class="sub">С ${fmt(a)} по ${fmt(b)}. Лицензии и консалтинг — отдельно.</p>
+    <div class="chips" style="margin-bottom:12px">${per.map(([k,n]) => `<span class="chip ${S.salesPer===k?'on':''}" onclick="setSalesPer('${k}')">${n}</span>`).join('')}</div>
+    ${S.salesPer === 'custom' ? `<div class="grid3" style="max-width:520px;align-items:end"><div><p class="lbl">С</p><input type="date" id="sl_f" value="${a}"></div><div><p class="lbl">По</p><input type="date" id="sl_t" value="${b}"></div><div><button onclick="setSalesRange()">Показать</button></div></div><p class="err" id="sl_err"></p>` : ''}`;
+  if(d.error) return head + `<div class="note bad">${esc(d.error)}</div>`;
+  const rows = (d.by_manager || []).map(x => `<tr><td>${esc(x.manager_name)}</td><td>${x.companies}</td><td>${eur(x.lic)}</td><td>${eur(x.cons)}</td><td><b>${eur(x.lic + x.cons)}</b></td></tr>`).join('');
+  const list = (d.payments || []).map(p => `<tr><td style="white-space:nowrap">${fmt(p.pay_date)}</td><td>${esc(p.company_name)}</td><td>${p.kind === 'lic' ? `Лицензии: ${p.seats} × ${p.months} мес.` : `Консалтинг: ${esc(p.work)}`}</td><td>${eur(p.amount)}</td><td>${esc(p.method)}</td>${own ? '' : `<td>${esc(p.manager_name)}</td>`}</tr>`).join('');
+  return head + `<div class="grid3" style="margin-bottom:16px"><div class="box"><p class="lbl">Итого</p><p class="val" style="font-size:22px">${eur(d.total_lic + d.total_cons)}</p></div>
+    <div class="box"><p class="lbl">Лицензии</p><p class="val" style="font-size:22px">${eur(d.total_lic)}</p></div>
+    <div class="box"><p class="lbl">Консалтинг</p><p class="val" style="font-size:22px">${eur(d.total_cons)}</p></div></div>
+    ${own ? '' : `<div class="panel tw" style="padding:0 6px"><table><tr><th>Менеджер</th><th>Компаний</th><th>Лицензии</th><th>Консалтинг</th><th>Итого</th></tr>${rows || '<tr><td colspan="5" style="color:var(--ink-3)">За период оплат нет.</td></tr>'}</table></div>`}
+    <div class="sec"><h3>Оплаты за период</h3>${list ? `<div class="panel tw" style="padding:0 6px"><table><tr><th>Дата</th><th>Компания</th><th>Что</th><th>Сумма</th><th>Способ</th>${own ? '' : '<th>Менеджер</th>'}</tr>${list}</table></div>` : '<p class="small">Оплат нет.</p>'}</div>`;
+}
+
+/* ---------- Тариф (владелец) ---------- */
+function renderTariff(){
+  const s = S.bset || {min_price:250, seat_price:5, remind_days:5, trial_days:30, keep_days:30};
+  const f = (id, label, v, hint) => `<div><p class="lbl">${label}</p><input id="${id}" type="number" min="0" step="1" value="${v}"><p class="small">${hint}</p></div>`;
+  return `<h1>Тариф</h1><p class="sub">Новая цена действует со следующей оплаты — уже оплаченные периоды не пересчитываются.</p>
+  <div class="panel det" style="max-width:720px"><div class="grid2">
+    ${f('t_min','Минимум в месяц, €', s.min_price, 'Платится при любом числе мест до порога')}
+    ${f('t_seat','Цена места в месяц, €', s.seat_price, `Минимум покрывает ${Math.round(s.min_price / Math.max(s.seat_price,1))} мест`)}
+    ${f('t_remind','Напомнить менеджеру за, дней', s.remind_days, 'И ещё раз в день окончания')}
+    ${f('t_trial','Бесплатный тест, дней', s.trial_days, 'Для новых компаний')}
+  </div><p class="err" id="t_err"></p><div class="acts"><button class="pri" onclick="saveTariff()">Сохранить</button></div></div>`;
+}
+async function saveTariff(){
+  const v = id => Math.round(+$(id).value);
+  const body = {min_price: v('t_min'), seat_price: v('t_seat'), remind_days: v('t_remind'), trial_days: v('t_trial')};
+  if(Object.values(body).some(x => !(x >= 0)) || body.seat_price < 1 || body.remind_days < 1 || body.trial_days < 1){ $('t_err').textContent = 'Все значения — целые числа больше нуля'; return; }
+  try { S.bset = await api('/billing/settings', {method:'POST', body}); toast('Тариф сохранён'); render(); }
+  catch(e){ $('t_err').textContent = e.message; }
 }
 
 /* ---------- Секретная ссылка ---------- */
