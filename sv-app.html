@@ -146,7 +146,7 @@
   #screen-stt .dist-tile-pct.yellow { color: var(--yellow); }
   #screen-stt .dist-tile-pct.red { color: var(--red); }
   #screen-stt .dist-tile-count { font-size: 11px; color: var(--ink-soft); font-weight: 600; }
-  #screen-stt .dist-minus-chip { flex-shrink: 0; width: 44px; text-align: center; }
+  #screen-stt .dist-minus-chip { flex-shrink: 0; width: 52px; text-align: center; }
   #screen-stt .dist-minus-chip .val { font-size: 13px; font-weight: 800; color: var(--red); }
   #screen-stt .dist-minus-chip .cap { font-size: 9px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; }
   #screen-stt .category-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
@@ -1064,9 +1064,10 @@ function renderStt(data) {
             <div class="dist-tile-pct ${lvSys}">${data.system_stt}%</div>
             <div class="dist-tile-count">${data.system_orders} заказов</div>
           </div>
-          <div class="dist-minus-chip">
-            <div class="val">−${data.off_route}</div>
-            <div class="cap">вне</div>
+          <div class="dist-minus-chip">${data.ghost_orders != null
+            ? `<div class="val">−${data.off_schedule_orders}</div><div class="cap">вне</div>
+               <div class="val" style="margin-top:4px">−${data.ghost_orders}</div><div class="cap">призрак</div>`
+            : `<div class="val">−${data.off_route}</div><div class="cap">вне</div>`}
           </div>
           <div class="dist-tile">
             <div class="dist-tile-label">Чистая</div>
@@ -1074,6 +1075,7 @@ function renderStt(data) {
             <div class="dist-tile-count">${data.clean_orders} заказов</div>
           </div>
         </div>
+        ${data.ghost_orders != null ? `<div style="font-size:10px;color:var(--ink-soft);margin:-8px 0 4px;line-height:1.35">Вне — заказ на точке маршрута не в её день. Призрак — заказ на точке, которой нет в плане агента${data.ghost_points ? ` (точек: ${data.ghost_points})` : ''}.</div>` : ''}
       </div>
     </details>
 
