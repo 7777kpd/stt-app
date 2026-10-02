@@ -960,13 +960,16 @@ function renderMonth(data) {
         ${data.is_current_month ? '<p class="card-note">За период с начала месяца по вчера включительно</p>' : ''}
         <div class="day-grid">
           <div class="day-tile"><div class="val">${data.planned_visits}</div><div class="lbl">плановых</div></div>
-          <div class="day-tile"><div class="val">${data.clean_orders}</div><div class="lbl">заказов по маршруту</div></div>
+          <div class="day-tile"><div class="val">${data.system_orders}</div><div class="lbl">системных заказов</div></div>
         </div>
         <div class="day-tiles-row">
           <div class="day-tile"><div class="val">${data.system_stt}%</div><div class="lbl">системная</div></div>
-          <span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>
+          ${data.ghost_orders != null
+            ? `<span class="day-off">−${data.off_schedule_orders}<br><span style="font-weight:600;font-size:8px">вне</span><br>−${data.ghost_orders}<br><span style="font-weight:600;font-size:8px">призрак</span></span>`
+            : `<span class="day-off">−${data.off_route_orders}<br><span style="font-weight:600;font-size:8px">вне маршрута</span></span>`}
           <div class="day-tile"><div class="val">${data.clean_stt}%</div><div class="lbl">чистая</div></div>
         </div>
+        ${data.ghost_orders != null ? `<div style="font-size:10px;color:var(--ink-soft);margin-top:8px;line-height:1.35">Вне — заказ на точке маршрута не в её день. Призрак — заказ на точке, которой нет в плане агента${data.ghost_points ? ` (точек: ${data.ghost_points})` : ''}.</div>` : ''}
       </div>
     </details>
     ${(data.categories||[]).length ? `<details class="day-card">
