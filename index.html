@@ -664,7 +664,9 @@ function buildSttScreen(data) {
             </div>
             <div class="stt-minus">
               <span class="stt-minus-sign">−</span>
-              <span class="stt-minus-text">${offRouteOrders}<br>вне</span>
+              ${data.ghost_orders != null
+                ? `<span class="stt-minus-text">${data.off_schedule_orders}<br>вне</span><span class="stt-minus-text" style="margin-top:4px">${data.ghost_orders}<br>призрак</span>`
+                : `<span class="stt-minus-text">${offRouteOrders}<br>вне</span>`}
             </div>
             <div class="stt-block">
               <div class="stt-block-label">Чистая дистрибуция</div>
@@ -672,6 +674,7 @@ function buildSttScreen(data) {
               <div class="stt-block-sub">${cleanOrders} заказов</div>
             </div>
           </div>
+          ${data.ghost_orders != null ? `<div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.35">Вне — заказ на точке маршрута не в её день. Призрак — заказ на точке, которой нет в вашем плане${data.ghost_points ? ` (точек: ${data.ghost_points})` : ''}.</div>` : ''}
         </div>
       </details>
 
