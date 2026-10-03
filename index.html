@@ -801,20 +801,20 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
   const pts = c.green + c.amber + c.red, pct = n => pts ? Math.round(n / pts * 100) : 0;
   const bar = `<div style="display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--bg);">${LV.map(l => c[l] ? `<div style="width:${c[l] / (pts || 1) * 100}%;background:${lvColor[l]}"></div>` : '').join('')}</div>`;
   const ic = (bg, t) => `<span style="width:20px;height:20px;border-radius:6px;background:${bg};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;vertical-align:middle;">${t}</span>`;
-  const sorted = [...pointCards].sort((a, b) => (a.l === 'ghost') - (b.l === 'ghost') || (a.s - b.s));
+  const sorted = [...pointCards].sort((a, b) => (a.l === 'ghost') - (b.l === 'ghost') || (a.l === 'ghost' ? b.s - a.s : a.s - b.s));
   const cards = sorted.map(p => {
     const ghost = p.l === 'ghost', st = stats(p);
     const cells = expandItems(p.i).map(([day, code]) => { const t = TYPE_NAME[code] || 'miss';
       return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:28px;"><div style="width:24px;height:24px;border-radius:6px;background:${COLOR[t]};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;">${ICON[t]}</div><span style="font-size:9px;color:var(--muted);">${dayToWd(day)}</span></div>`; }).join('');
     const calc = ghost ? 'точки нет в вашем плане' : `план ${st.plan} · по маршруту ${st.ok}${st.off ? ` · вне ${st.off} → (${st.ok} − ${st.off}) ÷ ${st.plan}` : ''}`;
-    return `<div data-att-lvl="${p.l}" data-att-off="${st.off > 0 ? 1 : 0}" style="background:var(--bg);border-radius:10px;padding:10px 12px;">
+    return `<div data-att-lvl="${p.l}" data-att-off="${st.off > 0 ? 1 : 0}" data-att-offn="${st.off}" data-att-ghostn="${ghost ? (p.s || 0) : 0}" style="background:var(--bg);border-radius:10px;padding:10px 12px;">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;"><div style="font-size:12.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.n}</div>
       <div style="font-size:15px;font-weight:700;color:${ghost ? '#3D2E66' : (lvColor[p.l] || lvColor.red)};flex-shrink:0;">${ghost ? `${p.s} ${p.s === 1 ? 'заказ' : 'заказов'}` : `${p.s}%`}</div></div>
       <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px;">${p.a || ''}</div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;">${cells}</div>
       <div style="font-size:10.5px;color:var(--muted);margin-top:6px;">${calc}</div></div>`;
   }).join('');
-  const filters = [['all','Все'],['red','Не АКБ'],['amber','АКБ'],['green','СТТ'],['off','С «вне»']].concat(c.ghost ? [['ghost','Призраки']] : []);
+  const filters = [['all','Все'],['red','Не АКБ'],['amber','АКБ'],['green','СТТ'],['off','Вне']].concat(c.ghost ? [['ghost','Призраки']] : []);
   const chips = filters.map(([k, n], idx) => `<button data-att-filter="${k}" onclick="_attFilterAgent('${k}')" style="border:1px solid var(--border);background:${idx === 0 ? 'var(--text)' : 'var(--card, #fff)'};color:${idx === 0 ? '#fff' : 'var(--text)'};font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:16px;white-space:nowrap;cursor:pointer;">${n}</button>`).join('');
   return `<div class="stt-card">
       <div style="display:flex;justify-content:space-between;align-items:baseline;"><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);">Мои точки</span><span style="font-size:22px;font-weight:700;color:var(--text);">${pointCards.length}</span></div>
@@ -829,8 +829,22 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
     <div id="att-points-agent" style="display:flex;flex-direction:column;gap:8px;">${cards}<div data-att-empty style="display:none;font-size:12px;color:var(--muted);padding:6px 0;">Нет точек под этот фильтр</div></div>`;
 }
 
+// 03.10.2026: «Вне» — по числу заказов вне маршрута, «Призраки» — по числу
+// заказов, от большего к меньшему; остальные фильтры — худший % сверху.
+function _attReorder(box, f) {
+  if (!box) return;
+  const cards = [...box.querySelectorAll(':scope > [data-att-lvl]')];
+  cards.forEach((c, i) => { if (c.dataset.attIdx == null) c.dataset.attIdx = i; });
+  const key = f === 'off' ? 'attOffn' : f === 'ghost' ? 'attGhostn' : null;
+  cards.sort((a, b) => key ? (Number(b.dataset[key]) - Number(a.dataset[key])) || (a.dataset.attIdx - b.dataset.attIdx)
+                           : a.dataset.attIdx - b.dataset.attIdx);
+  const empty = box.querySelector(':scope > [data-att-empty]');
+  cards.forEach(c => box.insertBefore(c, empty));
+}
+
 function _attFilterAgent(f) {
   document.querySelectorAll('[data-att-filter]').forEach(b => { const on = b.dataset.attFilter === f; b.style.background = on ? 'var(--text)' : 'var(--card, #fff)'; b.style.color = on ? '#fff' : 'var(--text)'; });
+  _attReorder(document.getElementById('att-points-agent'), f);
   let shown = 0;
   document.querySelectorAll('#att-points-agent [data-att-lvl]').forEach(card => {
     const ok = f === 'all' || (f === 'off' ? card.dataset.attOff === '1' : card.dataset.attLvl === f);
