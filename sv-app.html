@@ -114,7 +114,7 @@
   #screen-route .survey-unfilled { padding: 10px 16px; background: #F8F3E5; border-bottom: 1px solid #ECE3CD; font-size: 11.5px; font-style: italic; color: var(--ink-soft); opacity: 0.7; }
 
   #screen-route .grid-head, #screen-route .grid-row {
-    display: grid; grid-template-columns: 1fr 44px 44px; align-items: stretch;
+    display: grid; grid-template-columns: 1fr 44px 44px 48px; align-items: stretch;
   }
   #screen-route .grid-head { background: #F8F3E5; border-bottom: 1.5px solid #E2D9C2; }
   #screen-route .grid-head span {
@@ -515,7 +515,7 @@ function renderRoute(data) {
       <div class="ss-divider"></div>
       <div class="ss-explainer">
         Точки с 2+ пропусками заказов подряд
-        <span class="ss-explainer-sub">Месяц ни при чём — считаем последние визиты подряд</span>
+        <span class="ss-explainer-sub">Месяц ни при чём — считаем последние визиты подряд. «Вне» — заказы на точке не в её день за время этой серии</span>
       </div>
     </div>`;
 
@@ -530,17 +530,18 @@ function renderRoute(data) {
       <details class="agent-group ${agent.severity === 'high' ? 'severity-high' : 'severity-mid'}">
         <summary>
           <span class="name">${agent.name}</span>
-          <span class="meta"><span class="count">${points.length} точки</span><span class="chevron">▶</span></span>
+          <span class="meta"><span class="count">${points.length} точки${agent.points_with_off ? ` · с «вне»: ${agent.points_with_off}` : ''}</span><span class="chevron">▶</span></span>
         </summary>`;
 
     // Таблица точек
-    html += `<div class="grid-head"><span>Точка</span><span>2</span><span>3+</span></div>`;
+    html += `<div class="grid-head"><span>Точка</span><span>2</span><span>3+</span><span>Вне</span></div>`;
     points.forEach(pt => {
       html += `
         <div class="grid-row">
-          <span class="point-name">${pt.client ? `<span style="font-weight:700">${pt.client}</span><br><span style="font-size:11px;font-weight:400;color:var(--ink-soft)">${pt.name}</span>` : pt.name}</span>
+          <span class="point-name">${pt.client ? `<span style="font-weight:700">${pt.client}</span><br><span style="font-size:11px;font-weight:400;color:var(--ink-soft)">${pt.name}</span>` : pt.name}${pt.streak_start ? `<br><span style="font-size:10px;font-weight:400;color:var(--ink-soft)">серия с ${pt.streak_start}${pt.missed_streak ? ` · ${pt.missed_streak} пропусков` : ''}</span>` : ''}</span>
           <span class="mark">${pt.missed_2 ? '<span class="mark-dot two"></span>' : ''}</span>
           <span class="mark">${pt.missed_3plus ? '<span class="mark-dot three"></span>' : ''}</span>
+          <span class="mark" style="font-size:13px;font-weight:700;color:${pt.off_route > 0 ? 'var(--red)' : 'var(--ink-soft)'}">${pt.off_route || 0}</span>
         </div>`;
     });
 
@@ -568,7 +569,7 @@ function renderAtt(data) {
   if (!analysis) {
     return `<div class="empty">Нет данных за прошлый месяц — архив ещё не закрыт (/close_month).</div>`;
   }
-  return `<div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">Прошлый месяц: ${data.month || ''}</div>${analysis}`;
+  return analysis;   // 02.10.2026: месяц уже в плашке заголовка — без дубля
 }
 
 function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yearNum) {
@@ -640,72 +641,112 @@ function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yea
     </details>`;
   }
 
-  // 01.09.2026 (по просьбе — разрез по агентам): раньше все точки команды
-  // шли одним плоским списком, непонятно было, к какому агенту идти
-  // работать. Теперь — свёрнутый список агентов с бейджами (сразу видно,
-  // у кого больше "Не АКБ"/"Призрак", без открытия), уже отсортированный
-  // сервером по проблемности. Тап по агенту раскрывает ЕГО собственные
-  // вкладки/карточки — тот же вид, что у агента на его личном экране.
-  const agentsHtml = agentPointAnalysis.map((a, ai) => {
-    const c = a.counts;
-    const byLevel = { red: [], amber: [], green: [], ghost: [] };
-    a.point_cards.forEach(p => { (byLevel[p.l] || byLevel.red).push(p); });
-    const uid = `pa${ai}`;
+  // 02.10.2026: новый вид «Анализа ТТ» (единый стиль с «Итогами месяца»):
+  // сводка по команде сразу видна, фильтры по уровню/«вне»/призракам для всех
+  // агентов разом, у агента — % СТТ-точек и мини-полоса, у точки — строка
+  // расчёта по новой формуле «(по маршруту − вне) ÷ план».
+  const LV = ['green', 'amber', 'red'];
+  const lvColor = { green: '#2D6A45', amber: '#B7791F', red: '#A93B30' };
+  function cardStats(p) {
+    const it = expandItems(p.i);
+    const ok = it.filter(x => x[1] === 0).length, miss = it.filter(x => x[1] === 1).length, off = it.filter(x => x[1] === 2).length;
+    return { ok, miss, off, plan: ok + miss };
+  }
+  const team = { green: 0, amber: 0, red: 0, ghost: 0 };
+  agentPointAnalysis.forEach(a => a.point_cards.forEach(p => { team[p.l in team ? p.l : 'red']++; }));
+  const teamPts = team.green + team.amber + team.red;
+  const pct = n => teamPts ? Math.round(n / teamPts * 100) : 0;
+  const bar = (c, total, h) => `<div style="display:flex;height:${h}px;border-radius:${h/2}px;overflow:hidden;background:var(--bg);">${LV.map(l => c[l] ? `<div style="width:${c[l] / total * 100}%;background:${lvColor[l]}"></div>` : '').join('')}</div>`;
+  const ic = (bg, t) => `<span style="width:20px;height:20px;border-radius:6px;background:${bg};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:10px;vertical-align:middle;">${t}</span>`;
 
-    const badgesHtml = ['red', 'amber', 'green', 'ghost'].map(lvl => {
-      const m = levelMeta[lvl];
-      return `<span style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:7px;background:${m.bg};color:${m.text};">${m.label} ${c[lvl]}</span>`;
+  function pointCardHtml(p) {
+    const ghost = p.l === 'ghost';
+    const st = cardStats(p);
+    const cells = expandItems(p.i).map(([day, code]) => {
+      const type = TYPE_NAME[code] || 'miss';
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:2px;width:28px;">
+        <div style="width:24px;height:24px;border-radius:6px;background:${COLOR[type]};color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;">${ICON[type]}</div>
+        <span style="font-size:9px;color:var(--ink-soft);">${dayToWd(day)}</span></div>`;
     }).join('');
+    const color = ghost ? '#3D2E66' : lvColor[p.l] || lvColor.red;
+    const value = ghost ? `${p.s} ${p.s === 1 ? 'заказ' : 'заказов'}` : `${p.s}%`;
+    const calc = ghost ? 'точки нет в плане агента'
+      : `план ${st.plan} · по маршруту ${st.ok}${st.off ? ` · вне ${st.off}` : ''}${st.off ? ` → (${st.ok} − ${st.off}) ÷ ${st.plan}` : ''}`;
+    return `<div data-att-lvl="${p.l}" data-att-off="${st.off > 0 ? 1 : 0}" style="background:var(--bg);border-radius:10px;padding:10px 12px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;">
+        <div style="font-size:12.5px;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.n}</div>
+        <div style="font-size:15px;font-weight:700;color:${color};flex-shrink:0;">${value}</div></div>
+      <div style="font-size:11px;color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px;">${p.a || ''}</div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;">${cells}</div>
+      <div style="font-size:10.5px;color:var(--ink-soft);margin-top:6px;">${calc}</div>
+    </div>`;
+  }
 
-    const tabsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => {
-      const m = levelMeta[lvl];
-      return `<button data-pa-level-sv="${lvl}" data-pa-uid="${uid}" style="flex:1;border:none;font-family:inherit;font-size:11.5px;font-weight:700;padding:7px 0;border-radius:8px;cursor:pointer;background:${i===0?m.tabBg:m.bg};color:${m.text};" onclick="_switchPointAnalysisTabSv(this)">${m.label} (${byLevel[lvl].length})</button>`;
-    }).join('');
-
-    const listsHtml = ['red', 'amber', 'green', 'ghost'].map((lvl, i) => `
-      <div data-pa-list-sv="${lvl}" data-pa-uid="${uid}" style="${i===0?'':'display:none'};display:flex;flex-direction:column;gap:8px;">
-        ${byLevel[lvl].length ? byLevel[lvl].map(p => cardHtml(p, lvl)).join('') : '<div style="font-size:12px;color:var(--ink-soft);padding:8px 0;">Точек этого уровня нет</div>'}
-      </div>`).join('');
-
-    return `<details style="background:var(--card);border-radius:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(60,50,20,0.06);overflow:hidden;">
-      <summary style="cursor:pointer;list-style:none;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;">
-        <div>
-          <div style="font-size:13px;font-weight:700;color:var(--ink);">${a.agent}</div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">${badgesHtml}</div>
+  const agentsHtml = agentPointAnalysis.map(a => {
+    const c = { green: 0, amber: 0, red: 0, ghost: 0 };
+    a.point_cards.forEach(p => { c[p.l in c ? p.l : 'red']++; });
+    const pts = c.green + c.amber + c.red;
+    const withOff = a.point_cards.filter(p => p.l !== 'ghost' && cardStats(p).off > 0).length;
+    const sttPct = pts ? Math.round(c.green / pts * 100) : 0;
+    const sorted = [...a.point_cards].sort((p1, p2) => (p1.l === 'ghost') - (p2.l === 'ghost') || (p1.s - p2.s));
+    const meta = [`${pts} точек`, `Не АКБ ${c.red}`, `АКБ ${c.amber}`, `СТТ ${c.green}`]
+      .concat(withOff ? [`вне ${withOff}`] : []).concat(c.ghost ? [`призраки ${c.ghost}`] : []).join(' · ');
+    return `<details data-att-agent style="background:var(--card);border-radius:16px;margin-bottom:10px;box-shadow:0 2px 6px rgba(60,50,20,0.06);overflow:hidden;">
+      <summary style="cursor:pointer;list-style:none;padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div style="font-size:13.5px;font-weight:700;color:var(--ink);">${a.agent}</div>
+          <div style="flex-shrink:0;text-align:right;"><span style="font-size:15px;font-weight:700;color:${sttPct >= 75 ? lvColor.green : sttPct >= 50 ? lvColor.amber : lvColor.red};">${sttPct}%</span> <span style="font-size:9px;color:var(--ink-soft);">СТТ точек ▸</span></div>
         </div>
-        <span style="font-size:13px;color:var(--ink-soft);flex-shrink:0;margin-left:8px;">▶</span>
+        <div style="margin:8px 0 6px;">${bar(c, pts || 1, 6)}</div>
+        <div style="font-size:10.5px;color:var(--ink-soft);">${meta}</div>
       </summary>
-      <div style="padding:0 14px 14px;">
-        <div style="display:flex;gap:3px;background:var(--bg);border-radius:11px;padding:3px;margin:10px 0 10px;">${tabsHtml}</div>
-        ${listsHtml}
+      <div style="padding:0 14px 14px;display:flex;flex-direction:column;gap:8px;">
+        ${sorted.map(pointCardHtml).join('')}
+        <div data-att-empty style="display:none;font-size:12px;color:var(--ink-soft);padding:6px 0;">Нет точек под этот фильтр</div>
       </div>
     </details>`;
   }).join('');
 
-  return `<div class="card" style="border-left:3px solid #2D6A82;">
-    <details>
-      <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
-        <span style="display:flex;align-items:center;gap:7px;"><span>🔍</span><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#2D6A82;">Анализ системности по точкам</span></span>
-        <span style="display:flex;align-items:center;gap:8px;">
-          <span style="text-align:right;">
-            <span style="display:block;font-size:20px;font-weight:700;color:#2D6A82;line-height:1;">${pointCardsTotal}</span>
-            <span style="display:block;font-size:9px;color:var(--ink-soft);margin-top:2px;">точек</span>
-          </span>
-          <span style="font-size:13px;color:var(--ink-soft);">▶</span>
-        </span>
-      </summary>
-      <div style="border:0.5px solid var(--line);border-radius:10px;padding:10px 12px;margin:12px 0;">
-        <div style="font-size:10.5px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin-bottom:8px;">Обозначения</div>
-        <div style="display:flex;gap:18px;flex-wrap:wrap;">
-          ${legendRow('#3FAE6A', '✓', 'заказ есть', totals.ok)}
-          ${legendRow('#DC5B4E', '✗', 'заказа нет', totals.miss)}
-          ${legendRow('#378ADD', '📍', 'вне маршрута', totals.off)}
-        </div>
-      </div>
-      <div style="font-size:10.5px;color:var(--ink-soft);margin-bottom:4px;">По агентам — сначала самые проблемные</div>
-      ${agentsHtml}
-    </details>
-  </div>`;
+  const filters = [['all','Все'],['red','Не АКБ'],['amber','АКБ'],['green','СТТ'],['off','С «вне»']].concat(team.ghost ? [['ghost','Призраки']] : []);
+  const chipsHtml = filters.map(([k, n], idx) => `<button data-att-filter="${k}" onclick="_attFilterSv('${k}')" style="border:1px solid var(--line);background:${idx === 0 ? 'var(--ink)' : 'var(--card)'};color:${idx === 0 ? 'var(--card)' : 'var(--ink)'};font-family:inherit;font-size:12px;font-weight:600;padding:6px 12px;border-radius:16px;white-space:nowrap;cursor:pointer;">${n}</button>`).join('');
+
+  return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">Точки команды</span>
+        <span style="font-size:22px;font-weight:700;color:var(--ink);">${pointCardsTotal || teamPts}</span></div>
+      <div style="margin:12px 0 6px;">${bar(team, teamPts || 1, 8)}</div>
+      <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;">
+        <span style="color:${lvColor.green}">СТТ ${team.green} · ${pct(team.green)}%</span>
+        <span style="color:${lvColor.amber}">АКБ ${team.amber} · ${pct(team.amber)}%</span>
+        <span style="color:${lvColor.red}">Не АКБ ${team.red} · ${pct(team.red)}%</span></div>
+      <div style="border-top:1px solid var(--line);margin:12px 0 8px;"></div>
+      <div style="font-size:11px;color:var(--ink-soft);margin-bottom:6px;">Плановые визиты: ${totals.ok + totals.miss}</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink);align-items:center;">
+        <span>${ic('#3FAE6A','✓')} ${totals.ok}</span><span>${ic('#DC5B4E','✗')} ${totals.miss}</span><span>${ic('#378ADD','📍')} ${totals.off}</span>${team.ghost ? `<span style="color:var(--ink-soft)">👻 ${team.ghost} точек</span>` : ''}</div>
+      <div style="font-size:10px;color:var(--ink-soft);margin-top:8px;line-height:1.35;">✓ заказ в плановый день · ✗ планового заказа нет · 📍 заказ не в плановый день — вычитается из СТТ точки</div>
+    </div>
+    <div style="display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px;">${chipsHtml}</div>
+    <div style="font-size:10.5px;color:var(--ink-soft);margin:0 0 6px;">По агентам — сначала самые проблемные</div>
+    <div id="att-agents-sv">${agentsHtml}</div>`;
+}
+
+function _attFilterSv(f) {
+  document.querySelectorAll('[data-att-filter]').forEach(b => {
+    const on = b.dataset.attFilter === f;
+    b.style.background = on ? 'var(--ink)' : 'var(--card)';
+    b.style.color = on ? 'var(--card)' : 'var(--ink)';
+  });
+  document.querySelectorAll('#att-agents-sv [data-att-agent]').forEach(ag => {
+    let shown = 0;
+    ag.querySelectorAll('[data-att-lvl]').forEach(card => {
+      const ok = f === 'all' || (f === 'off' ? card.dataset.attOff === '1' : card.dataset.attLvl === f);
+      card.style.display = ok ? '' : 'none';
+      if (ok) shown++;
+    });
+    ag.style.display = (shown || f === 'all') ? '' : 'none';
+    const empty = ag.querySelector('[data-att-empty]');
+    if (empty) empty.style.display = shown ? 'none' : '';
+  });
 }
 
 function _switchPointAnalysisTabSv(btn) {
