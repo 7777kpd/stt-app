@@ -641,6 +641,22 @@ function _pointAnalysisHtmlSv(agentPointAnalysis, pointCardsTotal, monthNum, yea
     </details>`;
   }
 
+  // 03.10.2026: процент и уровень точки считаются ПРИ ПОКАЗЕ из истории дней
+  // (✓ по маршруту, ✗ пропуск, 📍 вне) по формуле (по маршруту − вне) ÷ план —
+  // не берутся готовыми из архива. Так экран верен у всех компаний, в т.ч. с
+  // архивом в Google-таблице, без перезакрытия месяца.
+  const _v2 = p => {
+    if (p.l === 'ghost' || p.i == null) return p;
+    const it = expandItems(p.i);
+    const ok = it.filter(x => x[1] === 0).length, miss = it.filter(x => x[1] === 1).length, off = it.filter(x => x[1] === 2).length;
+    // округление как на сервере (Python round: ровно .5 — к чётному), чтобы экран и бот не расходились на 1%
+    const _r = x => { const f = Math.floor(x), d = x - f; return Math.abs(d - 0.5) < 1e-9 ? (f % 2 === 0 ? f : f + 1) : Math.round(x); };
+    const plan = ok + miss, s = plan ? _r(Math.max(0, ok - off) / plan * 100) : 0;
+    const l = (ok + off === 0) ? 'red' : (s >= 75 ? 'green' : 'amber');
+    return Object.assign({}, p, { s, l });
+  };
+  agentPointAnalysis = agentPointAnalysis.map(a => Object.assign({}, a, { point_cards: (a.point_cards || []).map(_v2) }));
+
   // 02.10.2026: новый вид «Анализа ТТ» (единый стиль с «Итогами месяца»):
   // сводка по команде сразу видна, фильтры по уровню/«вне»/призракам для всех
   // агентов разом, у агента — % СТТ-точек и мини-полоса, у точки — строка
