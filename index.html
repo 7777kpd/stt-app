@@ -241,6 +241,48 @@ details.focus-details[open] .focus-chevron { transform: rotate(90deg); }
 </div>
 
 <script>
+// 04.10.2026: шкала категорий (как на всех экранах): ≥90 зелёный · 80–89 жёлтый · <80 красный.
+function catLevelA(v) { return v >= 90 ? 'green' : v >= 80 ? 'yellow' : 'red'; }
+const _CAT_C = { green: 'var(--green-bright)', yellow: 'var(--yellow-bright)', red: 'var(--red-bright)' };
+const _CAT_BG = { green: '#EAF3DE', yellow: '#FAEEDA', red: '#FCEBEB' };
+// Плашки категорий в рейтинге: худшие сначала, видно 3, остальные — «ещё N»;
+// длинные названия до 16 знаков, полное — по нажатию.
+function catChipsBlockA(categories) {
+  const items = Object.entries(categories || {}).sort((a, b) => a[1] - b[1]);
+  const chip = ([name, v]) => {
+    const l = catLevelA(v), short = name.length > 16 ? name.slice(0, 15).trim() + '…' : name;
+    const tap = short !== name ? ` data-full="${name.replace(/"/g, '&quot;')} ${v}%" onclick="event.stopPropagation();this.textContent=this.dataset.full"` : '';
+    return `<span${tap} style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:${_CAT_BG[l]};color:${_CAT_C[l]};white-space:nowrap;${tap ? 'cursor:pointer;' : ''}">${short} ${v}%</span>`;
+  };
+  const rest = items.slice(3);
+  return items.slice(0, 3).map(chip).join('') + (rest.length
+    ? `<span onclick="event.stopPropagation();this.nextElementSibling.style.display='contents';this.remove();" style="cursor:pointer;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--bg);color:var(--muted);">ещё ${rest.length}</span><span style="display:none;">${rest.map(chip).join('')}</span>`
+    : '');
+}
+
+// 04.10.2026: «Рейтинг торговых» у агента подгружается, только когда карточку
+// раскрыли (тот же рейтинг команды, что у СВ; сервер держит его 10 минут).
+let _agentRatingMonth = null;
+async function loadAgentRating(month, year) {
+  const key = month + '.' + year;
+  if (_agentRatingMonth === key) return;
+  const box = document.getElementById('agent-rating-list');
+  if (!box) return;
+  try {
+    const res = await fetch(`${API}/api/agent/${_telegramId}/rating?month=${month}&year=${year}`);
+    const d = await res.json();
+    _agentRatingMonth = key;
+    const rating = d.rating || [];
+    const top = document.getElementById('agent-rating-top');
+    if (top) top.textContent = rating.length ? rating[0].avg_score + '%' : '—';
+    box.innerHTML = rating.length
+      ? rating.map(r => window._agentRatingCard(r, d.my_name)).join('')
+      : '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Рейтинг команды пока недоступен</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Не удалось загрузить рейтинг</div>';
+  }
+}
+
 const API = new URLSearchParams(window.location.search).get('dev') === '1'
   ? 'https://develop-production-0a2d.up.railway.app'
   : 'https://worker-production-1dfb.up.railway.app';
@@ -590,13 +632,10 @@ function buildSttScreen(data) {
   // экране одного человека). Своя карточка агента выделяется рамкой.
   const rating = data.rating || [];
   const topRatingScore = rating.length ? rating[0].avg_score : null;
-  function ratingCardHtml(r) {
-    const isMe = data.my_name && r.agent === data.my_name;
+  function ratingCardHtml(r, myName) {
+    const isMe = (myName || data.my_name) && r.agent === (myName || data.my_name);
     const color = r.avg_score >= 75 ? 'var(--green-bright)' : r.avg_score >= 50 ? 'var(--yellow-bright)' : 'var(--red-bright)';
-    const chips = Object.entries(r.categories || {}).map(([name, v]) => {
-      const c = colorOf(levelOf(v));
-      return `<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;background:var(--bg);color:${c}">${name} ${v}%</span>`;
-    }).join('');
+    const chips = catChipsBlockA(r.categories);   // 04.10.2026: шкала категорий 90/80, худшие сначала
     const focusChip = (r.focus_pct !== null && r.focus_pct !== undefined)
       ? `<span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:6px;background:#EDE0C9;color:#7A5C1E">🎯 Задачи СВ ${r.focus_pct}%</span>`
       : '';
@@ -610,7 +649,10 @@ function buildSttScreen(data) {
       <div style="display:flex;gap:5px;flex-wrap:wrap;">${chips}${focusChip}</div>
     </div>`;
   }
-  const ratingListHtml = rating.map(ratingCardHtml).join('');
+  const ratingListHtml = rating.map(r => ratingCardHtml(r)).join('');
+  window._agentRatingCard = ratingCardHtml;
+  _agentRatingMonth = null;
+  const _rd = new Date(new Date().getFullYear(), new Date().getMonth() - _sttMonthOffset, 1);
 
   document.getElementById('screen-stt').innerHTML = `
     <div class="header">
@@ -709,24 +751,23 @@ function buildSttScreen(data) {
 
       ${_focusTasksCardHtml(data)}
 
-      ${rating.length ? `<div class="stt-card" style="border-left:3px solid #7A5C1E;">
-        <details>
+      ${`<div class="stt-card" style="border-left:3px solid #7A5C1E;">
+        <details ontoggle="if(this.open) loadAgentRating(${_rd.getMonth() + 1}, ${_rd.getFullYear()})">
           <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
             <span class="stt-card-head" style="margin:0"><span>🏆</span><span class="stt-card-title" style="color:#7A5C1E;">Рейтинг</span></span>
             <span style="display:flex;align-items:center;gap:8px;">
               <span style="text-align:right;">
-                <span style="display:block;font-size:20px;font-weight:700;color:var(--green-bright);line-height:1;">${topRatingScore != null ? topRatingScore + '%' : '—'}</span>
+                <span id="agent-rating-top" style="display:block;font-size:20px;font-weight:700;color:var(--green-bright);line-height:1;">${topRatingScore != null ? topRatingScore + '%' : '▸'}</span>
                 <span style="display:block;font-size:9px;color:var(--muted);margin-top:2px;">лучший</span>
               </span>
               <span style="font-size:13px;color:var(--muted);">▶</span>
             </span>
           </summary>
-          <div style="padding-top:14px;">${ratingListHtml}</div>
+          <div id="agent-rating-list" style="padding-top:14px;">${ratingListHtml || '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Загрузка…</div>'}</div>
         </details>
-      </div>` : ''}
-
-      ${_salesCardHtml(data, catsData)}
+      </div>`}
     </div>`;
+  // 04.10.2026: карточка «Продажи» убрана с «Итогов месяца» агента — на её месте «Рейтинг».
 
   document.querySelectorAll('#screen-stt [data-cat]').forEach(el => {
     el.addEventListener('click', () => {
