@@ -1088,6 +1088,9 @@ function renderStt(data) {
   // (берём первую строку "Рейтинг торговых", он уже отсортирован по
   // avg_score по убыванию).
   const topRatingScore = (data.rating && data.rating[0]) ? data.rating[0].avg_score : null;
+  // 04.10.2026: шапка карточки «Рейтинг» меняется вместе с вкладкой —
+  // «Рейтинг торговых» → лучший агент, «Рейтинг СВ» → лучший СВ.
+  _ratingTop.agents = topRatingScore; _ratingTop.svs = null; _ratingTop.view = 'rating';
 
   return `
     <div class="segment">
@@ -1197,8 +1200,8 @@ function renderStt(data) {
         <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-soft);">🏆 Рейтинг</span>
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="text-align:right;">
-            <div style="font-size:20px;font-weight:700;color:var(--green);">${topRatingScore != null ? topRatingScore + '%' : '—'}</div>
-            <div style="font-size:9px;color:var(--ink-soft);">лучший</div>
+            <div id="rating-top-val" style="font-size:20px;font-weight:700;color:var(--green);">${topRatingScore != null ? topRatingScore + '%' : '—'}</div>
+            <div id="rating-top-lbl" style="font-size:9px;color:var(--ink-soft);">лучший агент</div>
           </div>
           <span style="font-size:13px;color:var(--ink-soft);">▶</span>
         </div>
@@ -1228,11 +1231,22 @@ function showMoreSvRating() {
   if (el && window.renderSvRatingCards) el.innerHTML = window.renderSvRatingCards();
 }
 
+const _ratingTop = { agents: null, svs: null, view: 'rating' };
+function _setRatingTop() {
+  const v = document.getElementById('rating-top-val'), l = document.getElementById('rating-top-lbl');
+  if (!v || !l) return;
+  const isSv = _ratingTop.view === 'trend';
+  const val = isSv ? _ratingTop.svs : _ratingTop.agents;
+  v.textContent = val != null ? val + '%' : (isSv && !_svRatingLoaded ? '…' : '—');
+  l.textContent = isSv ? 'лучший СВ' : 'лучший агент';
+}
 function sttView(name) {
   ['rating','trend'].forEach(n => {
     document.getElementById('view-'+n).classList.toggle('active', n === name);
     document.getElementById('btn-'+n).classList.toggle('active', n === name);
   });
+  _ratingTop.view = name;
+  _setRatingTop();
   if (name === 'trend' && !_svRatingLoaded) {
     loadSvRating();
   }
@@ -1275,6 +1289,8 @@ async function loadSvRating() {
     _svRatingLoaded = true;
 
     const rows = data.rows || [];
+    _ratingTop.svs = rows.length ? rows[0].avg_score : null;
+    _setRatingTop();
 
     if (!rows.length) {
       area.innerHTML = '<div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px;">Нет других СВ на той же территории</div>';
