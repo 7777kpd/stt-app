@@ -96,6 +96,14 @@ textarea.inp{min-height:66px;resize:vertical}
 .toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;z-index:20;max-width:90%;text-align:center}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 @media (prefers-reduced-motion: reduce){.toast{transition:none}}
+.mgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px}
+.mhd{text-align:center;font-size:11px;color:var(--mut);font-weight:600;padding:2px 0}
+.mcell{min-height:74px;border:1px solid var(--line);background:var(--sf);border-radius:8px;padding:3px 2px;display:flex;flex-direction:column;gap:2px;align-items:stretch;text-align:left;overflow:hidden}
+.mcell.out{opacity:.45}.mcell.today{outline:2px solid var(--acc)}
+.mnum{font-size:12px;font-weight:600;padding-left:2px}
+.mev{font-size:9.5px;line-height:1.2;border:1px solid;border-radius:4px;padding:1px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mmore{font-size:10px;color:var(--mut);padding-left:2px}
+.tabs .tab{font-size:13px}
 </style>
 </head>
 <body>
@@ -177,8 +185,11 @@ if(e.clientTz)a.push({l:'Клиент',t:hm(e.start,e.clientTz),z:tzn(e.clientTz
 function short3(e){return timesFor(e).map(function(x,i){return (i===0?'Моё':x.l==='Руководитель'?'Рук.':x.l)+' '+x.t}).join(' · ')}
 
 /* ---------- загрузка ---------- */
-function loadWeek(wk,force){if(S.wk[wk]&&!force)return Promise.resolve();var tz=vtz(),a=dstart(wk,tz)-DAY,b=dstart(kadd(wk,7),tz)+DAY;return api('/events?from='+a+'&to='+b).then(function(d){S.wk[wk]=d.events})}
-function refresh(){var ks=Object.keys(S.wk);if(ks.indexOf(S.week0)<0)ks.push(S.week0);return Promise.all(ks.map(function(k){return loadWeek(k,true)})).then(render)}
+function loadWeeks(ws,force){var need=force?ws.slice():ws.filter(function(w){return !S.wk[w]});if(!need.length)return Promise.resolve();var tz=vtz(),a=dstart(need[0],tz)-DAY,b=dstart(kadd(need[need.length-1],7),tz)+DAY;
+return api('/events?from='+a+'&to='+b).then(function(d){need.forEach(function(w){var x=dstart(w,tz)-DAY,y=dstart(kadd(w,7),tz)+DAY;S.wk[w]=d.events.filter(function(e){return e.start<y&&e.end>x})})})}
+function loadWeek(wk,force){return loadWeeks([wk],force)}
+function visibleWeeks(){if(S.tab==='month')return monthWeeks();var a=[S.week0];if(S.modal&&S.modal.kind==='resched'&&S.rf){var w=monday(S.rf.day);if(a.indexOf(w)<0)a.push(w)}if(S.form&&S.form.day){var w2=monday(S.form.day);if(a.indexOf(w2)<0)a.push(w2)}return a.sort()}
+function refresh(){S.wk={};var ws=visibleWeeks();return Promise.all(ws.map(function(w){return loadWeek(w,true)})).then(render)}
 function loadMe(){return api('/me').then(function(d){S.me=d.me;S.users={};d.users.forEach(function(u){S.users[u.id]=u});S.clients=d.clients;S.env=d.env})}
 function guard(p,okMsg,after){S.busy=true;render();return p.then(function(r){S.busy=false;if(okMsg)toast(okMsg);return Promise.resolve(after?after(r):null).then(refresh)}).catch(function(e){S.busy=false;toast(e.message);render()})}
 
@@ -188,13 +199,25 @@ if(!S.me){app.innerHTML='<div class="phone"><div class="empty">Загрузка�
 var u=me(),h='<div class="phone">';
 if(S.tab==='team'&&isLead(u)){h+=rTeam()}else{
 h+='<div class="hd"><div class="kv"><p class="h1">Рабочий график'+(S.env==='develop'?' <span class="pill">develop</span>':'')+'</p>'+(isLead(u)?'<button class="btn" data-act="tab" data-v="team">Команда</button>':'')+'</div><div class="mut">'+esc(U(u).name)+' · '+DEPT[U(u).dept]+' · ваше время: '+esc(tzn(vtz()))+'</div>'+(U(u).dept==='mkt'?'<div class="mut">Встречи продаж и руководителя видны только как «занят».</div>':'')+'<div class="tabs">';
-[['today','Сегодня'],['week','Неделя'],['rem','Напоминания']].forEach(function(t){h+='<button class="tab'+(S.tab===t[0]?' on':'')+'" data-act="tab" data-v="'+t[0]+'">'+t[1]+'</button>'});h+='</div></div>';
+[['today','Сегодня'],['week','Неделя'],['month','Месяц'],['rem','Напоминания']].forEach(function(t){h+='<button class="tab'+(S.tab===t[0]?' on':'')+'" data-act="tab" data-v="'+t[0]+'">'+t[1]+'</button>'});h+='</div></div>';
 if(S.device&&S.device!==vtz()&&S.device!==S.me.tzKeep&&off(Date.now(),S.device)!==off(Date.now(),vtz()))h+='<div class="tzb"><div><b>Сейчас ваше устройство в '+esc(S.device)+'</b><br>В профиле: '+esc(vtz())+'. Обновить текущий часовой пояс? Встречи не сдвинутся, изменится только отображаемое время.</div><div class="g2"><button class="btn pri" data-act="tzUpdate">Обновить</button><button class="btn" data-act="tzKeep">Оставить прежний</button></div></div>';
-h+=S.tab==='today'?rToday():S.tab==='week'?rWeek():rRem();
+h+=S.tab==='today'?rToday():S.tab==='week'?rWeek():S.tab==='month'?rMonth():rRem();
 h+='<div class="fab">'+(isLead(u)?'<button class="btn" data-act="newPersonal">+ Личное время</button>':'')+'<button class="btn pri" data-act="new">+ Запланировать</button></div>'}
 h+='</div>';if(S.modal)h+='<div class="ov" data-act="ovclose"><div class="sheet" role="dialog" aria-modal="true">'+rModal()+'</div></div>';
 app.innerHTML=h}
 
+function monthKey(k){return k.slice(0,7)}
+function monthWeeks(){var p=kp(S.mon+'-01'),first=S.mon+'-01',last=kadd(p.m===12?(p.y+1)+'-01-01':p.y+'-'+pad(p.m+1)+'-01',-1),a=[],w=monday(first);while(w<=last){a.push(w);w=kadd(w,7)}return a}
+function goMonth(n){var p=kp(S.mon+'-01'),m=p.m-1+n,y=p.y+Math.floor(m/12);m=((m%12)+12)%12+1;S.mon=y+'-'+pad(m);render();loadWeeks(monthWeeks()).then(render).catch(function(e){toast(e.message)})}
+function durTxt(e){var m=Math.round((e.end-e.start)/M);if(m>=DAY/M)return Math.round(m/(DAY/M))+' дн.';return m<60?m+' мин':(m%60?Math.floor(m/60)+' ч '+(m%60)+' мин':(m/60)+' ч')}
+function rMonth(){var tz=vtz(),ws=monthWeeks(),p=kp(S.mon+'-01'),today=dkey(Date.now(),tz),h='<div class="body"><div class="kv"><button class="btn" data-act="mprev" aria-label="Прошлый месяц">‹</button><span class="h2">'+['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][p.m-1]+' '+p.y+'</span><button class="btn" data-act="mnext" aria-label="Следующий месяц">›</button></div>';
+if(ws.some(function(w){return !S.wk[w]}))return h+'<div class="empty">Загрузка…</div></div>';
+h+='<div class="mgrid">'+DN.map(function(d){return '<div class="mhd">'+d+'</div>'}).join('');
+ws.forEach(function(w){for(var i=0;i<7;i++){var k=kadd(w,i),list=dayEvents(k),out=monthKey(k)!==S.mon;
+h+='<button class="mcell'+(out?' out':'')+(k===today?' today':'')+'" data-act="mday" data-v="'+k+'"><span class="mnum">'+kp(k).d+'</span>';
+list.slice(0,3).forEach(function(e){var s=stat(e);h+='<span class="mev '+s.cls+(clash(e)?' clash':'')+'">'+(e.start>=dstart(k,tz)?hm(e.start,tz)+' ':'')+esc(shortOf(e))+'</span>'});
+if(list.length>3)h+='<span class="mmore">+'+(list.length-3)+'</span>';h+='</button>'}});
+return h+'</div><div class="mut">Нажмите на день, чтобы открыть его.</div></div>'}
 function weekDays(){var a=[];for(var i=0;i<7;i++)a.push(kadd(S.week0,i));return a}
 function dayEvents(k){var tz=vtz(),a=dstart(k,tz),b=dend(k,tz);return evs().filter(function(e){return overlap(e.start,e.end,a,b)}).sort(function(x,y){return x.start-y.start})}
 function weekNav(){var ds=weekDays();return '<div class="kv"><button class="btn" data-act="wprev" aria-label="Прошлая неделя">‹</button><button class="btn" data-act="wtoday" style="border:0;background:none"><span class="h2">'+kp(ds[0]).d+' '+(kp(ds[0]).m!==kp(ds[6]).m?MON[kp(ds[0]).m-1]+' ':'')+'– '+klab(ds[6])+'</span></button><button class="btn" data-act="wnext" aria-label="Следующая неделя">›</button></div>'}
@@ -205,11 +228,11 @@ list.forEach(function(e){var a=dstart(k,tz),b=dend(k,tz),full=e.start<=a&&e.end>
 function zoomState(k){var tz=vtz(),a=dstart(k,tz),b=dend(k,tz),n=evs().filter(function(e){return e.zoom&&active(e)&&e.type!=='personal'&&overlap(e.start,e.end,a,b)}).length;return n?'Zoom занят: '+n+' '+(n===1?'бронь':'брони'):'Zoom свободен весь день'}
 function rangeTxt(e){var tz=vtz();return hm(e.start,tz)+'–'+hm(e.end,tz)+(e.end-e.start>=DAY?' · '+dlab(e.start,tz)+' – '+dlab(e.end-1,tz):'')}
 function rCard(e){var s=stat(e),tz=vtz(),cx=clash(e),h='<button class="c '+s.cls+(cx?' clash':'')+'" data-act="open" data-v="'+e.id+'">';
-if(e.masked)return h+'<div class="nm">'+esc(e.label)+'</div><div class="mut">'+rangeTxt(e)+'</div>'+(e.zoom?'<div class="pills"><span class="pill">Zoom занят</span></div>':'')+'</button>';
+if(e.masked)return h+'<div class="nm">'+esc(e.label)+'</div><div class="mut"><b>'+rangeTxt(e)+' · '+durTxt(e)+'</b></div>'+(e.zoom?'<div class="pills"><span class="pill">Zoom занят</span></div>':'')+'</button>';
 h+='<div class="ty">'+(e.type==='personal'?'Личное время · '+esc(e.kind)+' · видите только вы':TYPES[e.type].label)+'</div><div class="nm">'+(s.ic?s.ic+' ':'')+esc(nameOf(e))+'</div>';
 if(e.title&&e.type!=='mkt'&&e.type!=='personal')h+='<div>Тема: '+esc(e.title)+'</div>';
 if(TYPES[e.type].client||e.type==='mkt')h+='<div class="mut">Ведёт: '+esc(uname(e.lead))+(e.staff&&e.staff!==e.lead?' · Сотрудник: '+esc(uname(e.staff)):'')+'</div>';
-h+='<div class="mut">'+(e.type==='personal'?rangeTxt(e):esc(short3(e)))+'</div>';
+h+='<div class="mut"><b>'+rangeTxt(e)+' · '+durTxt(e)+'</b>'+(e.type==='personal'?'':' · '+esc(short3(e)))+'</div>';if(e.seriesRule)h+='<div class="mut">🔁 '+esc(e.seriesRule)+'</div>';
 var p=[];if(s.ap)p.push(s.ap);if(s.cs)p.push(s.cs);if(e.zoom&&active(e))p.push('Zoom забронирован');if(p.length)h+='<div class="pills">'+p.map(function(x){return '<span class="pill">'+x+'</span>'}).join('')+'</div>';
 if(cx)h+='<div class="red"><b>⚠ Накладка: руководитель занят — нужно перенести</b></div>';return h+'</button>'}
 
@@ -230,13 +253,14 @@ var now=Date.now(),list=evs().filter(function(e){return !e.masked&&e.start>now&&
 if(!list.length)h+='<div class="empty">На этой неделе ближайших встреч нет.</div>';
 list.forEach(function(e){h+='<button class="c '+stat(e).cls+'" data-act="open" data-v="'+e.id+'"><div class="mut">'+DN[kwd(dkey(e.start,tz))]+', '+dlab(e.start,tz)+', '+hm(e.start,tz)+'</div><div class="nm">'+esc(nameOf(e))+'</div>'+(e.title&&e.type!=='mkt'?'<div>Тема: '+esc(e.title)+'</div>':'')+'</button>'});return h+'</div>'}
 
+function rTeamEdit(x){var f=S.te,self=x===me();return '<div><label class="lbl" for="en">Имя</label><input class="inp" id="en" data-e="name" value="'+esc(f.name)+'"></div><div class="g2"><div><label class="lbl" for="ed">Отдел</label><select class="inp" id="ed" data-e="dept"'+(self?' disabled':'')+'>'+['sales','mkt','lead'].map(function(d){return '<option value="'+d+'"'+(f.dept===d?' selected':'')+'>'+DEPT[d]+'</option>'}).join('')+'</select></div><div><label class="lbl" for="ez">Часовой пояс</label><select class="inp" id="ez" data-e="tz">'+TZLIST.concat(TZLIST.indexOf(f.tz)<0?[f.tz]:[]).map(function(z){return '<option value="'+z+'"'+(f.tz===z?' selected':'')+'>'+esc(tzn(z))+'</option>'}).join('')+'</select></div></div><div class="g2">'+B('tsave','Сохранить',true)+'<button class="btn" data-act="tcancel">Отмена</button></div>'}
 function rTeam(){var f=S.tf||(S.tf={name:'',tg:'',dept:'sales',tz:'Europe/Kiev'}),h='<div class="hd" style="padding-bottom:12px"><div class="kv"><button class="btn" data-act="tab" data-v="today">‹ Календарь</button><span class="h2">Команда</span><span style="width:60px"></span></div></div><div class="body">';
-Object.keys(S.users).forEach(function(x){var us=S.users[x];h+='<div class="box" style="gap:4px"><div class="kv"><b>'+esc(us.name)+'</b><span class="pill">'+DEPT[us.dept]+(us.active?'':' · отключён')+'</span></div><div class="mut">Telegram ID: '+esc(x)+' · '+esc(tzn(us.tz))+'</div>'+(x===me()?'':'<button class="btn" data-act="ttoggle" data-v="'+x+'"'+(S.busy?' disabled':'')+'>'+(us.active?'Отключить доступ':'Включить доступ')+'</button>')+'</div>'});
+Object.keys(S.users).forEach(function(x){var us=S.users[x];h+='<div class="box" style="gap:4px"><div class="kv"><b>'+esc(us.name)+'</b><span class="pill">'+DEPT[us.dept]+(us.active?'':' · отключён')+'</span></div><div class="mut">Telegram ID: '+esc(x)+' · '+esc(tzn(us.tz))+'</div>'+(S.te&&S.te.id===x?rTeamEdit(x):'<div class="g2"><button class="btn" data-act="tedit" data-v="'+x+'">Изменить</button>'+(x===me()?'':'<button class="btn" data-act="ttoggle" data-v="'+x+'"'+(S.busy?' disabled':'')+'>'+(us.active?'Отключить':'Включить')+'</button>')+'</div>')+'</div>'});
 h+='<div class="box"><b>+ Сотрудник</b><div><label class="lbl" for="tn">Имя</label><input class="inp" id="tn" data-t="name" value="'+esc(f.name)+'"></div><div><label class="lbl" for="ti">Telegram ID</label><input class="inp" id="ti" data-t="tg" inputmode="numeric" value="'+esc(f.tg)+'" placeholder="Человек узнаёт его командой /myid"></div><div class="g2"><div><label class="lbl" for="td">Отдел</label><select class="inp" id="td" data-ts="dept"><option value="sales"'+(f.dept==='sales'?' selected':'')+'>Продажи</option><option value="mkt"'+(f.dept==='mkt'?' selected':'')+'>Маркетинг</option><option value="lead"'+(f.dept==='lead'?' selected':'')+'>Руководитель</option></select></div><div><label class="lbl" for="tz">Часовой пояс</label><select class="inp" id="tz" data-ts="tz">'+TZLIST.map(function(z){return '<option value="'+z+'"'+(f.tz===z?' selected':'')+'>'+tzn(z)+'</option>'}).join('')+'</select></div></div><button class="btn pri" data-act="tadd"'+(S.busy?' disabled':'')+'>Добавить сотрудника</button><div class="mut">После добавления у человека в меню СТТ-бота появится команда /planner.</div></div>';
 h+='<div class="box"><b>Кто что видит</b><div><b>Руководитель</b> — всё.</div><div><b>Продажи</b> — все рабочие встречи; ваше личное время и чужие встречи один на один только как «занят».</div><div><b>Маркетинг</b> — свои встречи и маркетинг полностью; продажи, руководитель и Zoom только как «занят».</div></div>';return h+'</div>'}
 
 /* ---------- окна ---------- */
-function rModal(){var m=S.modal;if(m.kind==='event')return rEvent();if(m.kind==='create')return rCreate();if(m.kind==='personal')return rPersonal();if(m.kind==='resched')return rResched();if(m.kind==='comment')return rComment();return ''}
+function rModal(){var m=S.modal;if(m.kind==='event')return rEvent();if(m.kind==='create')return rCreate();if(m.kind==='personal')return rPersonal();if(m.kind==='resched')return rResched();if(m.kind==='remove')return rRemove();if(m.kind==='comment')return rComment();return ''}
 function shd(t,left){return '<div class="sh-hd"><button class="btn" data-act="close">'+(left||'Закрыть')+'</button><span class="h2">'+t+'</span><span style="width:60px"></span></div>'}
 function B(act,label,pri){return '<button class="btn'+(pri?' pri':'')+'" data-act="'+act+'"'+(S.busy?' disabled':'')+'>'+label+'</button>'}
 function rEvent(){var e=S.detail&&S.detail.id===S.modal.id?S.detail:ev(S.modal.id);if(!e)return shd('Встреча')+'<div class="sh-b"><div class="empty">Загрузка…</div></div>';var u=me(),tz=vtz(),s=stat(e);
@@ -244,7 +268,7 @@ if(e.masked)return shd('Занято')+'<div class="sh-b"><div class="box"><div 
 var h=shd(DN[kwd(dkey(e.start,tz))]+', '+dlab(e.start,tz))+'<div class="sh-b"><div class="box"><div class="ty">'+(e.type==='personal'?'Личное время · '+esc(e.kind):TYPES[e.type].label)+'</div>';
 if(TYPES[e.type].client)h+='<div style="font-size:22px;font-weight:600">'+esc(e.clientName)+'</div><div>'+esc(e.contact)+'</div>';else h+='<div style="font-size:20px;font-weight:600">'+esc(nameOf(e))+'</div>';
 if(e.type==='personal')h+='<div class="mut">Название видите только вы. Команда видит «Руководитель занят».</div>';
-if(e.title&&e.type!=='personal'&&e.type!=='mkt')h+='<div><b>Тема:</b> '+esc(e.title)+'</div>';if(e.desc)h+='<div class="mut" style="font-size:13px">'+esc(e.desc)+'</div>';h+='</div>';
+if(e.title&&e.type!=='personal'&&e.type!=='mkt')h+='<div><b>Тема:</b> '+esc(e.title)+'</div>';if(e.desc)h+='<div class="mut" style="font-size:13px">'+esc(e.desc)+'</div>';if(e.seriesRule)h+='<div>🔁 '+esc(e.seriesRule)+'</div>';h+='</div>';
 if(e.type!=='personal'){h+='<div class="box"><div class="kv"><span class="mut">Ведёт</span><b>'+esc(uname(e.lead))+'</b></div>';if(e.staff)h+='<div class="kv"><span class="mut">'+(e.type==='one2one'?'С сотрудником':'Сотрудник')+'</span><b>'+esc(uname(e.staff))+'</b></div>';
 var ps=e.type==='team'?'Вся команда':e.parts.map(uname).join(', ');if(ps)h+='<div class="kv"><span class="mut">Участники</span><b>'+esc(ps)+'</b></div>';if(e.ext)h+='<div class="kv"><span class="mut">Привлечён</span><b>'+esc(e.ext)+' · внешний</b></div>';h+='</div>';
 if(s.ap||s.cs)h+='<div class="box">'+(s.ap?'<div>'+s.ap+'</div>':'')+(s.cs?'<div>'+s.cs+'</div>':'')+'</div>';
@@ -256,15 +280,17 @@ var a='';
 if(e.type==='personal'&&e.owner===u)a+=B('del','Удалить личное время');
 else if(active(e)&&e.client!=='DONE'){
 if(isLead(u)&&e.approval==='PENDING')a+=B('approve','Подтвердить',true)+'<div class="g2">'+B('propose','Другое время')+B('decline','Не могу')+'</div>';
-if(e.approval==='RESCHEDULE_REQUESTED'&&!isLead(u)&&involved(e,u))a+=B('sresched','Перенести на другое время',true);
-var can=involved(e,u)||isLead(u);
-if(TYPES[e.type].client&&can){if(e.client!=='CLIENT_CONFIRMED')a+=B('cconfirm','Клиент подтвердил',!a);a+='<div class="g2">'+B('cresched','Клиент перенёс')+B('ccancel','Клиент отменил')+'</div>'+B('cdone','Встреча прошла')}
-else if(!TYPES[e.type].client&&can)a+='<div class="g2">'+B('sresched','Перенести')+B('ccancel','Отменить')+'</div>'}
+var can=involved(e,u)||isLead(u),canRm=isLead(u)||[e.createdBy,e.staff,e.lead].indexOf(u)>=0;
+if(TYPES[e.type].client&&can&&e.client!=='CLIENT_CONFIRMED')a+=B('cconfirm','Клиент подтвердил',!a);
+if(can)a+=B('move','Изменить дату и время',!a||e.approval==='RESCHEDULE_REQUESTED');
+if(TYPES[e.type].client&&can)a+=B('cdone','Встреча прошла');
+if(canRm)a+=B('remove','Удалить встречу')}
+else if(!e.masked&&e.type!=='personal'&&(isLead(u)||[e.createdBy,e.staff,e.lead].indexOf(u)>=0))a+=B('remove','Удалить встречу');
 h+=a;var hist=(S.detail&&S.detail.id===e.id&&S.detail.hist)||null;if(hist&&hist.length)h+='<div class="mut">История: '+hist.map(function(x){return esc(dlab(x.at,tz)+' '+hm(x.at,tz)+' — '+(x.who?x.who+': ':'')+x.action+(x.comment?' «'+x.comment+'»':''))}).join(' → ')+'</div>';
 return h+'</div>'}
 
 function newForm(){var u=me(),mk=U(u).dept==='mkt',leads=actUsers().filter(isLead),sales=actUsers().filter(function(x){return U(x).dept==='sales'});
-return {type:mk?'mkt':'zoom_client',clientQ:'',clientId:null,newClient:false,ntz:'Europe/Kiev',contact:'',ncontact:'',title:'',desc:'',lead:mk||!leads.length?u:leads[0],leadExt:'',staff:U(u).dept==='sales'?u:(sales[0]||''),parts:[],ext:'',day:S.day,time:'15:00',dur:60,zoom:true}}
+return {type:mk?'mkt':'zoom_client',clientQ:'',clientId:null,newClient:false,ntz:'Europe/Kiev',contact:'',ncontact:'',title:'',desc:'',lead:mk||!leads.length?u:leads[0],leadExt:'',staff:U(u).dept==='sales'?u:(sales[0]||''),parts:[],ext:'',day:S.day,time:'15:00',dur:60,zoom:true,repeat:'',until:kadd(S.day,91)}}
 function fnorm(f){var leads=actUsers().filter(isLead),o={type:f.type,lead:f.lead==='ext'?'ext:'+f.leadExt.trim():f.lead,staff:f.staff,parts:f.parts.slice()};
 if(f.type==='one2one'||f.type==='team'){o.lead=leads[0]||me();o.parts=[]}if(f.type==='team')o.parts=actUsers().filter(function(x){return x!==o.lead});if(f.type==='mkt'||f.type==='team')o.staff='';if(!TYPES[f.type].client&&f.type!=='one2one')o.staff='';return o}
 function needsApproval(o){return !isLead(me())&&people(o).some(isLead)}
@@ -291,13 +317,14 @@ h+='<div><span class="lbl">Участники</span><div class="chips">';all.for
 if(f.type==='one2one')h+='<div><label class="lbl" for="fs2">С сотрудником</label><select class="inp" id="fs2" data-s="staff"><option value="">—</option>'+uopts(f.staff,all.filter(function(x){return !isLead(x)}))+'</select></div>';
 if(f.type==='team')h+='<div class="mut">Участники: вся команда. Всем придёт уведомление и напоминание за 15 минут.</div>';
 h+='<div class="g3"><div><label class="lbl" for="fdy">Дата</label><input class="inp" type="date" id="fdy" data-s="day" value="'+f.day+'"></div><div><label class="lbl" for="ftm">Время (ваше)</label><select class="inp" id="ftm" data-s="time">'+TIMES.map(function(x){return '<option'+(x===f.time?' selected':'')+'>'+x+'</option>'}).join('')+'</select></div><div><label class="lbl" for="fdu">Длит.</label><select class="inp" id="fdu" data-s="dur">'+[30,45,60,90,120,180].map(function(x){return '<option value="'+x+'"'+(x===f.dur?' selected':'')+'>'+x+' мин</option>'}).join('')+'</select></div></div>';
+h+='<div><span class="lbl">Повторять</span><div class="chips">'+[['','Не повторять'],['week','Каждую неделю'],['2week','Раз в 2 недели'],['month','Каждый месяц']].map(function(r){return '<button class="chip'+(f.repeat===r[0]?' on':'')+'" data-act="frep" data-v="'+r[0]+'">'+r[1]+'</button>'}).join('')+'</div></div>'+(f.repeat?'<div><label class="lbl" for="fun">Повторять до</label><input class="inp" type="date" id="fun" data-s="until" value="'+f.until+'"><div class="mut" style="margin-top:4px">Занятость проверяется по первой дате. Даты серии, где кто-то или Zoom заняты, будут пропущены — система покажет какие.</div></div>':'');
 h+='<div class="box" style="flex-direction:row;justify-content:space-between;align-items:center"><span>Нужен Zoom</span><button class="chip'+(f.zoom?' on':'')+'" data-act="fzoom" aria-pressed="'+f.zoom+'">'+(f.zoom?'Вкл':'Выкл')+'</button></div><div id="chk">'+rCheck()+'</div></div>';return h}
 function rSug(){var f=S.form,q=f.clientQ.trim().toLowerCase();if(!q||f.clientId||f.newClient)return '';var m=S.clients.filter(function(c){return c.name.toLowerCase().indexOf(q)>=0}).slice(0,6),exact=S.clients.some(function(c){return c.name.toLowerCase()===q});var h='<div class="sug">';m.forEach(function(c){h+='<button data-act="fclient" data-v="'+c.id+'">'+esc(c.name)+' <span class="mut">· '+esc(tzn(c.tz))+'</span></button>'});if(!exact)h+='<button data-act="fnewclient" style="color:var(--acc)">+ Новый клиент «'+esc(f.clientQ.trim())+'»</button>';return h+'</div>'}
 function rContact(){var f=S.form,h='';if(f.clientId){var c=cl(f.clientId);h+='<label class="lbl" for="fct">Контактное лицо *</label><select class="inp" id="fct" data-s="contact"><option value="">— выберите —</option>'+c.contacts.map(function(x){return '<option'+(f.contact===x?' selected':'')+'>'+esc(x)+'</option>'}).join('')+'<option value="__new"'+(f.contact==='__new'?' selected':'')+'>+ Новый контакт</option></select>';if(f.contact==='__new')h+='<input class="inp" style="margin-top:6px" data-f="ncontact" placeholder="Имя контакта" value="'+esc(f.ncontact)+'">';h+='<div class="mut" style="margin-top:4px">Часовой пояс клиента: '+esc(tzn(c.tz))+'</div>'}
 else if(f.newClient)h+='<div class="g2"><div><label class="lbl" for="fnc">Контакт *</label><input class="inp" id="fnc" data-f="ncontact" value="'+esc(f.ncontact)+'"></div><div><label class="lbl" for="fnt">Пояс клиента</label><select class="inp" id="fnt" data-s="ntz">'+TZLIST.map(function(z){return '<option value="'+z+'"'+(f.ntz===z?' selected':'')+'>'+tzn(z)+'</option>'}).join('')+'</select></div></div><div class="mut" style="margin-top:4px">Клиент будет добавлен в справочник.</div>';return h}
-function doCreate(){var f=S.form,o=fnorm(f),tz=vtz(),s=at(f.day,f.time,tz);var body={type:f.type,title:f.title.trim(),desc:f.desc.trim(),lead:o.lead,staff:o.staff,parts:o.parts,ext:f.ext.trim(),start:s,end:s+f.dur*M,zoom:f.zoom};
+function doCreate(){var f=S.form,o=fnorm(f),tz=vtz(),s=at(f.day,f.time,tz);var body={type:f.type,title:f.title.trim(),desc:f.desc.trim(),lead:o.lead,staff:o.staff,parts:o.parts,ext:f.ext.trim(),start:s,end:s+f.dur*M,zoom:f.zoom};if(f.repeat){body.repeat=f.repeat;body.until=dend(f.until<f.day?f.day:f.until,tz)}
 if(TYPES[f.type].client){if(f.clientId)body.clientId=f.clientId;else{body.clientName=f.clientQ.trim();body.clientTz=f.ntz}body.contact=f.contact&&f.contact!=='__new'?f.contact:f.ncontact.trim()}
-var day=f.day;guard(api('/events',{method:'POST',body:body}),needsApproval(o)?'Отправлено руководителю на согласование':'Встреча сохранена',function(){S.modal=null;S.form=null;goDay(day);return loadMe()})}
+var day=f.day,na=needsApproval(o);guard(api('/events',{method:'POST',body:body}),null,function(r){var msg=(r&&r.count>1?'Создано встреч: '+r.count:'Встреча сохранена')+(na?' · отправлено руководителю':'');if(r&&r.skipped&&r.skipped.length)msg+=' · пропущены занятые даты: '+r.skipped.join('; ');toast(msg);S.modal=null;S.form=null;goDay(day);return loadMe()})}
 
 function rPersonal(){var f=S.form,h=shd('Личное время','Отмена')+'<div class="sh-b">';
 h+='<div><label class="lbl" for="pt">Название — видите только вы</label><input class="inp" id="pt" data-f="title" value="'+esc(f.title)+'" placeholder="Например: Перелёт Вена → Бангкок"></div><div><span class="lbl">Вид</span><div class="chips">'+KINDS.map(function(k){return '<button class="chip'+(f.kind===k?' on':'')+'" data-act="pkind" data-v="'+k+'">'+k+'</button>'}).join('')+'</div></div>';
@@ -313,9 +340,16 @@ var ov=evs().filter(function(e){return !e.masked&&e.type!=='personal'&&active(e)
 if(ov.length){h+='<div class="warn"><b class="red">⚠ Перекрывает '+ov.length+' '+(ov.length===1?'встречу':ov.length<5?'встречи':'встреч')+'</b>';ov.forEach(function(e){var rs=isUser(e.staff)?e.staff:e.lead;h+='<div class="box" style="padding:9px;gap:2px"><b>'+esc(nameOf(e))+'</b><span>'+dlab(e.start,tz)+', '+hm(e.start,tz)+' · ответственный: '+esc(uname(rs))+'</span>'+(TYPES[e.type].client?'<span class="mut">'+(e.client==='CLIENT_CONFIRMED'?'✓ Клиент уже подтвердил':'○ Клиент ещё не подтвердил')+'</span>':'')+'</div>'});h+='<div>Ответственным придёт запрос на перенос. Ваше время в приоритете.</div></div>'}
 var ok=f.title.trim()&&!S.busy;return h+'<button class="btn pri" data-act="psave"'+(ok?'':' disabled')+'>'+(f.title.trim()?(ov.length?'Сохранить и уведомить':'Сохранить'):'Заполните название')+'</button>'}
 
-function rResched(){var m=S.modal,e=ev(m.id),f=S.rf,tz=vtz();if(!e)return shd('Перенос');var h=shd(m.mode==='client'?'Клиент перенёс':'Перенести встречу','Отмена')+'<div class="sh-b"><div class="box"><b>'+esc(nameOf(e))+'</b><div class="mut">Сейчас: '+dlab(e.start,tz)+', '+hm(e.start,tz)+'</div></div>';
+function scopeChips(sc){return '<div><span class="lbl">Повторяющаяся встреча — что изменить?</span><div class="chips"><button class="chip'+(sc!=='following'?' on':'')+'" data-act="scope" data-v="one">Только эту</button><button class="chip'+(sc==='following'?' on':'')+'" data-act="scope" data-v="following">Эту и следующие</button></div></div>'}
+function rResched(){var m=S.modal,e=ev(m.id),f=S.rf,tz=vtz();if(!e)return shd('Изменить');var h=shd('Дата и время','Отмена')+'<div class="sh-b"><div class="box"><b>'+esc(nameOf(e))+'</b><div class="mut">Сейчас: '+dlab(e.start,tz)+', '+hm(e.start,tz)+' · '+durTxt(e)+'</div></div>';
+if(e.seriesId)h+=scopeChips(f.scope);
 h+='<div class="g2"><div><label class="lbl" for="rd">Новая дата</label><input class="inp" type="date" id="rd" data-r="day" value="'+f.day+'"></div><div><label class="lbl" for="rt">Новое время (ваше)</label><select class="inp" id="rt" data-r="time">'+TIMES.map(function(x){return '<option'+(x===f.time?' selected':'')+'>'+x+'</option>'}).join('')+'</select></div></div>';
+if(e.seriesId&&f.scope==='following')h+='<div class="mut">Следующие встречи серии сдвинутся на ту же разницу. Если какая-то дата окажется занята, система скажет какая.</div>';
 return h+'<div id="chk">'+rRCheck()+'</div></div>'}
+function rRemove(){var m=S.modal,e=ev(m.id),tz=vtz();if(!e)return shd('Удалить');var h=shd('Удалить встречу','Отмена')+'<div class="sh-b"><div class="box"><b>'+esc(nameOf(e))+'</b><div class="mut">'+dlab(e.start,tz)+', '+hm(e.start,tz)+' · '+durTxt(e)+'</div></div>';
+if(e.seriesId)h+=scopeChips(m.scope);
+h+='<div class="mut">Встреча исчезнет из календаря, время'+(e.zoom?' и Zoom освободятся':' освободится')+'. Участникам придёт уведомление.</div>';
+return h+B('rmsave',m.scope==='following'?'Удалить эту и следующие':'Удалить',true)+'</div>'}
 function rRCheck(){var m=S.modal,e=ev(m.id),f=S.rf,tz=vtz();if(!S.wk[monday(f.day)])return '<div class="mut">Проверяю занятость…</div>';var s=at(f.day,f.time,tz),d=e.end-e.start,ppl=people(e),c=conflicts(s,s+d,ppl,e.zoom,e.id),h='';
 var tl=[];var lds=ppl.filter(isLead);if(lds.length&&!isLead(me()))tl.push('Руководитель: '+hm(s,U(lds[0]).tz));if(e.clientTz)tl.push('Клиент: '+hm(s,e.clientTz));if(tl.length)h+='<div class="mut">'+tl.join(' · ')+'</div>';
 var bad=c.people.length||c.zoom;if(bad){h+='<div class="warn">';c.people.forEach(function(x){h+='<div><b class="red">'+esc(pname(x.u))+' занят(а)</b>'+(x.e.masked?'':': '+esc(nameOf(x.e)))+', '+hm(x.e.start,tz)+'–'+hm(x.e.end,tz)+'</div>'});if(c.zoom)h+='<div><b class="red">Zoom занят</b>'+(c.zoom.masked?'':': '+esc(nameOf(c.zoom)))+', '+hm(c.zoom.start,tz)+'–'+hm(c.zoom.end,tz)+'</div>';
@@ -329,9 +363,9 @@ function openEvent(id){S.modal={kind:'event',id:+id};S.detail=null;render();api(
 function ensureWeek(k,cb){var w=monday(k);if(S.wk[w]){cb();return}loadWeek(w).then(cb).catch(function(e){toast(e.message)})}
 function partial(){var c=document.getElementById('chk');if(!c||!S.modal)return;var k=S.modal.kind;c.innerHTML=k==='create'?rCheck():k==='personal'?rPCheck():rRCheck()}
 
-app.addEventListener('input',function(ev2){var t=ev2.target;if(t.dataset.t){S.tf[t.dataset.t]=t.value;return}if(t.dataset.c){S.cf=t.value;return}var k=t.dataset.f;if(!k||!S.form)return;S.form[k]=t.value;
+app.addEventListener('input',function(ev2){var t=ev2.target;if(t.dataset.t){S.tf[t.dataset.t]=t.value;return}if(t.dataset.e){S.te[t.dataset.e]=t.value;return}if(t.dataset.c){S.cf=t.value;return}var k=t.dataset.f;if(!k||!S.form)return;S.form[k]=t.value;
 if(k==='clientQ'){S.form.clientId=null;S.form.newClient=false;S.form.contact='';document.getElementById('sug').innerHTML=rSug();document.getElementById('cbox').innerHTML=rContact()}partial()});
-app.addEventListener('change',function(ev2){var t=ev2.target;if(t.dataset.ts){S.tf[t.dataset.ts]=t.value;return}
+app.addEventListener('change',function(ev2){var t=ev2.target;if(t.dataset.ts){S.tf[t.dataset.ts]=t.value;return}if(t.dataset.e){S.te[t.dataset.e]=t.value;return}
 if(t.dataset.r){S.rf[t.dataset.r]=t.value;if(t.dataset.r==='day'&&t.value)ensureWeek(t.value,partial);partial();return}
 var k=t.dataset.s;if(!k||!S.form)return;if(!t.value&&(k==='day'||k==='sDay'||k==='eDay'))return;S.form[k]=k==='dur'?+t.value:t.value;
 if(k==='sDay'&&S.form.eDay<S.form.sDay)S.form.eDay=S.form.sDay;if(k==='eDay'&&S.form.eDay<S.form.sDay)S.form.sDay=S.form.eDay;
@@ -340,7 +374,7 @@ app.addEventListener('click',function(ev2){var b=ev2.target.closest('[data-act]'
 if(a==='ovclose'){if(ev2.target===b){S.modal=null;S.form=null;render()}return}
 var id=S.modal&&S.modal.id,u=me();
 switch(a){
-case 'tab':S.tab=v;break;
+case 'tab':S.tab=v;if(v==='month'){S.mon=monthKey(S.day);render();loadWeeks(monthWeeks()).then(render).catch(function(e){toast(e.message)});return}break;
 case 'day':S.day=v;break;
 case 'dayw':S.day=v;S.tab='today';break;
 case 'wprev':goDay(kadd(S.day,-7));return;
@@ -354,9 +388,19 @@ case 'approve':guard(api('/events/'+id+'/act',{method:'POST',body:{act:'approve'
 case 'propose':case 'decline':S.cf='';S.modal={kind:'comment',id:id,act:a};break;
 case 'csave':var ca=S.modal.act;guard(api('/events/'+id+'/act',{method:'POST',body:{act:ca,comment:S.cf.trim()}}),ca==='decline'?'Отправлено: не могу':'Отправлено: другое время',function(){S.modal=null});return;
 case 'cconfirm':case 'cdone':case 'ccancel':guard(api('/events/'+id+'/act',{method:'POST',body:{act:a}}),{cconfirm:'Отмечено: клиент подтвердил',cdone:'Отмечено: встреча прошла',ccancel:'Отмечено: отменена'}[a],function(){S.modal=null});return;
-case 'cresched':case 'sresched':var e=ev(id);if(!e){toast('Встреча не найдена');return}S.rf={day:dkey(e.start,vtz()),time:hm(e.start,vtz())};S.modal={kind:'resched',id:id,mode:a==='cresched'?'client':'staff'};break;
+case 'move':case 'cresched':case 'sresched':var e=ev(id);if(!e){toast('Встреча не найдена');return}S.rf={day:dkey(e.start,vtz()),time:hm(e.start,vtz()),scope:'one'};S.modal={kind:'resched',id:id};break;
+case 'remove':S.modal={kind:'remove',id:id,scope:'one'};break;
+case 'scope':if(S.modal.kind==='remove')S.modal.scope=v;else S.rf.scope=v;break;
+case 'rmsave':var sc=S.modal.scope;guard(api('/events/'+id+'/act',{method:'POST',body:{act:'remove',scope:sc}}),null,function(r){toast(r&&r.count>1?'Удалено встреч: '+r.count:'Встреча удалена');S.modal=null});return;
+case 'frep':S.form.repeat=v;break;
+case 'mprev':goMonth(-1);return;
+case 'mnext':goMonth(1);return;
+case 'mday':S.tab='today';goDay(v);return;
+case 'tedit':var us=S.users[v];S.te={id:v,name:us.name,dept:us.dept,tz:us.tz};break;
+case 'tcancel':S.te=null;break;
+case 'tsave':var te=S.te,selfEdit=te.id===me();guard(api('/team/'+te.id,{method:'POST',body:{name:te.name,dept:selfEdit?undefined:te.dept,tz:te.tz}}),'Сохранено',function(){S.te=null;if(selfEdit)S.wk={};return loadMe()});return;
 case 'rslot':S.rf.time=v;break;
-case 'rsave':var md=S.modal.mode;guard(api('/events/'+id+'/act',{method:'POST',body:{act:md==='client'?'cresched':'resched',start:at(S.rf.day,S.rf.time,vtz())}}),'Перенесено',function(){S.modal=null});return;
+case 'rsave':guard(api('/events/'+id+'/act',{method:'POST',body:{act:'move',scope:S.rf.scope,start:at(S.rf.day,S.rf.time,vtz())}}),'Дата и время изменены',function(){S.modal=null});return;
 case 'del':guard(api('/events/'+id+'/act',{method:'POST',body:{act:'delete'}}),'Личное время удалено',function(){S.modal=null});return;
 case 'ftype':S.form.type=v;S.form.zoom=TYPES[v].zoom;if(v==='one2one'&&!isLead(u))S.form.staff=u;break;
 case 'fslot':S.form.time=v;break;
@@ -380,7 +424,7 @@ render()});
 function boot(){if(TG){TG.ready();TG.expand()}if(!INIT){S.fatal='Откройте планировщик через Telegram';render();return}render();
 try{S.device=Intl.DateTimeFormat().resolvedOptions().timeZone||null}catch(x){}
 loadMe().then(function(){var today=dkey(Date.now(),vtz());S.day=today;S.week0=monday(today);return loadWeek(S.week0)}).then(function(){render();var e=QS.get('e'),d=QS.get('do');if(!e)return;
-return api('/events/'+e).then(function(x){goDay(dkey(x.start,vtz()));return loadWeek(monday(dkey(x.start,vtz())))}).then(function(){if(d==='propose'||d==='decline'){S.cf='';S.modal={kind:'comment',id:+e,act:d};render()}else if(d==='resched'){var x=ev(e);if(x){S.rf={day:dkey(x.start,vtz()),time:hm(x.start,vtz())};S.modal={kind:'resched',id:+e,mode:'staff'};render()}}else openEvent(e)}).catch(function(err){toast(err.message)})})
+return api('/events/'+e).then(function(x){goDay(dkey(x.start,vtz()));return loadWeek(monday(dkey(x.start,vtz())))}).then(function(){if(d==='propose'||d==='decline'){S.cf='';S.modal={kind:'comment',id:+e,act:d};render()}else if(d==='resched'){var x=ev(e);if(x){S.rf={day:dkey(x.start,vtz()),time:hm(x.start,vtz()),scope:'one'};S.modal={kind:'resched',id:+e};render()}}else openEvent(e)}).catch(function(err){toast(err.message)})})
 .catch(function(err){S.fatal=err.message;render()})}
 boot();
 })();
