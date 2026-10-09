@@ -144,6 +144,22 @@
   .month-nav span { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
   .cat-chips { overflow-x: auto; }
   .cat-sel { min-width: 84px; }
+
+  .alert-sec { font-size: 10px; font-weight: 800; color: var(--red-dark); text-transform: uppercase; letter-spacing: .03em; margin: 12px 0 2px; opacity: .85; }
+  .alert-ok { font-size: 12px; font-weight: 700; color: var(--green); padding: 6px 0; }
+  .ghost-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 2px; }
+  .ghost-chips span { font-size: 10.5px; font-weight: 600; background: rgba(255,255,255,.7); color: var(--ink); border-radius: 6px; padding: 2px 7px; }
+  .la-tab { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 6px 0 4px; }
+  .la-tab th { text-align: left; font-size: 10px; color: var(--ink-soft); font-weight: 700; padding: 3px 4px; }
+  .la-tab td { padding: 4px; border-top: 1px solid rgba(169,59,48,.12); }
+  .la-tab td.grp { font-weight: 800; font-size: 11px; padding-top: 8px; }
+  .back-btn { display: inline-block; font-size: 12.5px; font-weight: 700; color: var(--blue); background: var(--card); border-radius: 100px; padding: 7px 14px; margin: -4px 0 12px; cursor: pointer; }
+  .how-box { background: var(--blue-bg); border-radius: 10px; padding: 10px 12px; margin: 10px 0 4px; }
+  .how-box summary { list-style: none; cursor: pointer; font-size: 12px; font-weight: 700; color: var(--blue); }
+  .how-box ol { font-size: 11.5px; line-height: 1.45; padding-left: 18px; margin: 8px 0; color: var(--ink); }
+  .how-box .la-tab td { border-top: 1px solid rgba(59,125,219,.15); }
+  .small-note { font-size: 11px; color: var(--ink-soft); margin: 4px 0 0; }
+  .show-more-btn { display: block; width: 100%; font-size: 13px; font-weight: 700; padding: 11px; border-radius: 12px; border: 1px dashed var(--ink-soft); background: transparent; color: var(--ink-soft); cursor: pointer; font-family: inherit; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -170,10 +186,10 @@
 // Данные: /api/leader/{id}/summary (недели, текущая неделя, «Требует решения»)
 // и /api/leader/{id}/month (закрытый месяц, рейтинги). Проценты уже посчитаны
 // сервером по единым правилам (leader_api.py) — экран их только показывает.
-// Шкалы: среднее/система/СТТ точек — ≥75 · 50–74 · <50; категории/задачи СВ/ТОП-5 — ≥90 · 80–89 · <80.
+// Шкалы: среднее/система/СТТ точек/ТОП-5 — ≥75 · 50–74 · <50; категории/задачи СВ — ≥90 · 80–89 · <80.
 function catColor(v) { return v == null ? 'var(--ink-soft)' : v >= 90 ? 'var(--green)' : v >= 80 ? 'var(--yellow)' : 'var(--red)'; }
 function sysColor(v) { return v == null ? 'var(--ink-soft)' : v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--amber)' : 'var(--red-dark)'; }
-const HI = { cats: 1, tasks: 1, top5: 1 };
+const HI = { cats: 1, tasks: 1 };   // 09.10.2026: ТОП-5 — цель 75%, шкала системы
 const colorOf = k => HI[k] ? catColor : sysColor;
 const goalOf = k => HI[k] ? 90 : 75;
 
@@ -195,7 +211,7 @@ const ddmm = iso => iso.slice(8, 10) + '.' + iso.slice(5, 7);
 const num = n => Number(n || 0).toLocaleString('ru-RU');
 const COLORS = ['#3B7DDB', '#3FAE6A', '#D98A3D', '#A93B30', '#7A5BC7', '#2A9D9A', '#C25C8F', '#8B8578'];
 
-const S = { id: null, sum: null, month: null, monthSel: null, screen: 'sum', open: {}, cat: null, rLevel: null, catsAll: {} };
+const S = { id: null, sum: null, month: null, monthSel: null, screen: 'sum', open: {}, cat: null, rLevel: null, catsAll: {}, rShow: 5, fromSum: false, sumScroll: 0 };
 
 function delta(d, unit) {
   if (d == null || isNaN(d)) return '';
@@ -255,13 +271,30 @@ function sortedChildren(group) {
   return Object.entries(group.children).sort((a, b) => (b[1].pct.avg ?? -1) - (a[1].pct.avg ?? -1));
 }
 function alertsCard() {
-  const al = S.sum.alerts || [];
-  if (!al.length) return `<div class="ok-card">✓ Требует решения: ничего. Все на цели или растут.</div>`;
-  return `<details class="alert-card collapsible-card" ${S.open.alert ? 'open' : ''} ontoggle="S.open.alert=this.open">
-    <summary><h3 style="margin:0">Требует решения · ${al.length}</h3></summary>
-    ${al.map(a => `<div class="alert-line" onclick="${a.cat ? `S.cat='${jsq(a.cat)}';openDyn('cats')` : `openDyn('avg')`}">
-      <div><b>${esc(a.name)}${a.cat ? ' · ' + esc(a.cat) : ''}</b><div class="alert-why">${esc(a.why)}</div></div><span>${a.value}% ›</span></div>`).join('')}
-    <p class="card-note">Попадает сюда только то, что ниже цели и не выросло за 3 последние недели. Ниже цели, но растёт — работа идёт, решения не нужно.</p>
+  const al = S.sum.alerts || [], b = basis(), L = S.sum.launch;
+  const ghost = b ? b.now.total.ghost : 0;
+  const ghostBy = b ? Object.entries(b.now.children).map(([n, c]) => [n, c.ghost]).filter(x => x[1] > 0).sort((x, y) => y[1] - x[1]) : [];
+  const notOpen = L ? L.agent.am_not + L.agent.pm_not + L.sv.am_not + L.sv.pm_not : 0;
+  const count = al.length + (ghost > 0 ? 1 : 0) + (notOpen > 0 ? 1 : 0);
+  const chips = list => `<div class="ghost-chips">${list.map(([n, v]) => `<span>${esc(n)} <b>${v}</b></span>`).join('')}</div>`;
+  let html = `<details class="alert-card collapsible-card" ${S.open.alert ? 'open' : ''} ontoggle="S.open.alert=this.open">
+    <summary><h3 style="margin:0">Требует решения · ${count}</h3></summary>
+    <div class="alert-sec">Ниже цели и не растёт</div>`;
+  html += al.length ? al.map(a => `<div class="alert-line" onclick="${a.cat ? `S.cat='${jsq(a.cat)}';openDyn('cats')` : `openDyn('avg')`}">
+      <div><b>${esc(a.name)}${a.cat ? ' · ' + esc(a.cat) : ''}</b><div class="alert-why">${esc(a.why)}</div></div><span>${a.value}% ›</span></div>`).join('')
+    : `<div class="alert-ok">✓ Все на цели или растут</div>`;
+  html += `<div class="alert-sec">Призраки — заказы на точках вне плана</div>`;
+  html += ghost > 0 ? `<div class="alert-line"><div><b>${num(ghost)} заказов · ${esc(b.pill)}</b><div class="alert-why">точки добавить в план или разобраться, почему агенты работают не по маршруту</div></div><span>${num(ghost)}</span></div>${chips(ghostBy)}`
+    : `<div class="alert-ok">✓ Призраков нет</div>`;
+  if (L) {
+    const dd = ddmm(L.date);
+    html += `<div class="alert-sec">Не открыли Mini App · ${dd}</div>
+      <table class="la-tab"><tr><th></th><th>утро</th><th>вечер</th></tr>
+        <tr><td>Агенты · «Итоги дня»</td><td><b>${L.agent.am_not}</b> из ${L.agent.total}</td><td><b>${L.agent.pm_not}</b> из ${L.agent.total}</td></tr>
+        <tr><td>СВ · «Итоги команды»</td><td><b>${L.sv.am_not}</b> из ${L.sv.total}</td><td><b>${L.sv.pm_not}</b> из ${L.sv.total}</td></tr></table>
+      ${chips(Object.entries(L.children).filter(([, v]) => v[0] + v[1] > 0).sort((x, y) => (y[1][0] + y[1][1]) - (x[1][0] + x[1][1])).map(([n, v]) => [n, v[0] + ' · ' + v[1]]))}`;
+  }
+  return html + `<p class="card-note">Решение нужно, если показатель ниже цели и не вырос за 3 недели. Призраки и неоткрытия показываем всегда, по подразделениям (утро · вечер). Открытие засчитываем, если «Итоги дня» (агент) или «Итоги команды» (СВ) открыты до утреннего отчёта + 1 час и в течение часа после вечернего.</p>
   </details>`;
 }
 function heroBlock(label, nowG, prevG, note, key) {
@@ -305,14 +338,15 @@ function screenSummary() {
 
 // ---------- Динамика ----------
 function series() {
-  const d = S.sum, pts = d.weeks.map(w => ({ label: ddmm(w.start), g: w, full: true }));
+  const thu = iso => { const t = new Date(iso + 'T00:00:00'); t.setDate(t.getDate() + 3); return t.getMonth(); };
+  const d = S.sum, pts = d.weeks.map(w => ({ label: ddmm(w.start), g: w, full: true, m: thu(w.start) }));
   if (d.current) {
     const e = new Date(d.current.end + 'T00:00:00');
-    pts.push({ label: d.current.days > 1 ? `пн–${DOW[e.getDay()]}` : 'пн', g: d.current.now, full: false });
+    pts.push({ label: d.current.days > 1 ? `пн–${DOW[e.getDay()]}` : 'пн', g: d.current.now, full: false, m: new Date(d.current.start + 'T00:00:00').getMonth() });
   }
   return pts;
 }
-function chart(lines, labels, goal) {
+function chart(lines, labels, goal, newAt) {
   const vals = Object.values(lines).flat().filter(v => v != null);
   if (!vals.length || labels.length < 2) return '<div class="empty" style="padding:16px">Мало данных для графика — нужна хотя бы пара недель.</div>';
   const w = 340, h = 170, L = 28, R = 22, T = 12, B = 22;
@@ -332,7 +366,9 @@ function chart(lines, labels, goal) {
       (lastI != null && lastI >= 0 ? `<circle cx="${x(lastI)}" cy="${y(v[lastI])}" r="3.5" fill="#fff" stroke="${c}" stroke-width="2"/>` : '');
   }).join('');
   const xs = labels.map((t, i) => `<text x="${x(i)}" y="${h - 6}" text-anchor="middle" font-size="9" fill="#8B8578">${t}</text>`).join('');
-  return `<svg viewBox="0 0 ${w} ${h}" width="100%">${grid.join('')}${g}${ls}${xs}</svg>
+  const step = (x(1) - x(0)) / 2;
+  const nm = newAt ? `<line x1="${x(newAt) - step}" x2="${x(newAt) - step}" y1="${T}" y2="${h - B}" stroke="#3B7DDB" stroke-dasharray="3 3"/><text x="${x(newAt) - step + 3}" y="${T + 8}" font-size="9" font-weight="700" fill="#3B7DDB">новый ТОП-5</text>` : '';
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%">${grid.join('')}${g}${nm}${ls}${xs}</svg>
     <div class="legend">${Object.keys(lines).map((n, k) => `<span><i style="background:${COLORS[k % COLORS.length]}"></i>${esc(n)}</span>`).join('')}</div>`;
 }
 const DYN = [
@@ -341,8 +377,22 @@ const DYN = [
   ['sys', 'Система', 'Системная по неделям. Рост без роста чистой значит: заказов больше, но дисциплина маршрута не выросла.'],
   ['cats', 'Категории', 'Выбранная категория по подразделениям, цель 90%. Где категория не закреплена — линии нет.'],
   ['tasks', 'Задачи СВ', 'Как супервайзеры возвращают точки с 2+ пропусками подряд. Цель 90%.'],
-  ['top5', 'ТОП-5', 'Выполнение нормы маршрутами из ТОП-5 по дефициту (закреплены на месяц по итогам прошлого). Цель 90%.'],
+  ['top5', 'ТОП-5', 'Выполнение нормы маршрутами из ТОП-5 по дефициту. Цель 75%. Пунктир «новый ТОП-5» — с нового месяца состав пересобран по итогам прошлого: до и после линии — разные маршруты.'],
 ];
+function top5How() {
+  const rs = S.sum.top5_routes || [];
+  const groups = {};
+  rs.forEach(r => (groups[r.group] = groups[r.group] || []).push(r));
+  return `<details class="how-box" ${S.open.how ? 'open' : ''} ontoggle="S.open.how=this.open"><summary>Как считается ТОП-5 ›</summary>
+    <ol><li>В начале месяца в каждой команде ТМ (без ТМ — у СВ) берём 5 маршрутов с самым большим дефицитом по итогам прошлого месяца. Состав на месяц не меняется.</li>
+    <li>Норма маршрута — 75% от базы: план визитов, но не меньше среднего по команде.</li>
+    <li>Засчитываем чистые заказы, но не больше нормы — сильный маршрут не прячет слабый.</li>
+    <li>ТОП-5 = засчитано ÷ сумма норм.</li></ol>
+    ${rs.length ? `<table class="la-tab"><tr><th>Маршрут · ${esc(S.sum.current ? 'текущая неделя' : 'прошлая неделя')}</th><th>норма</th><th>факт</th><th>%</th></tr>
+      ${Object.entries(groups).map(([g, list]) => `<tr><td colspan="4" class="grp">${esc(g)}</td></tr>` + list.map(r => `<tr><td>${esc(r.agent)}</td><td>${r.need}</td><td>${r.clean}</td><td style="color:${sysColor(r.pct)};font-weight:800">${r.pct ?? '—'}%</td></tr>`).join('')).join('')}</table>`
+      : '<p class="small-note">Маршрутов ТОП-5 пока нет — нужен закрытый прошлый месяц.</p>'}
+  </details>`;
+}
 function valOf(g, k) { return k === 'cats' ? (g.cat_pct || {})[S.cat] ?? null : g.pct[k]; }
 function screenDynamics() {
   setPill(`${S.sum.weeks.length} нед.`);
@@ -353,7 +403,8 @@ function screenDynamics() {
   if (!S.cat || !cats.includes(S.cat)) S.cat = cats[0] || null;
   const full = pts.filter(p => p.full);
   const open = S.open.dyn || 'avg';
-  return `<div class="sub">Недели с ${ddmm(S.sum.weeks[0] ? S.sum.weeks[0].start : S.sum.today)} · пн–вс${S.sum.current ? ' · последняя точка — текущая неделя' : ''}</div>` +
+  const back = S.fromSum ? '<div class="back-btn" onclick="backToSum()">‹ Назад к сводке</div>' : '';
+  return back + `<div class="sub">Недели с ${ddmm(S.sum.weeks[0] ? S.sum.weeks[0].start : S.sum.today)} · пн–вс${S.sum.current ? ' · последняя точка — текущая неделя' : ''}</div>` +
     DYN.filter(([k]) => k !== 'cats' || cats.length).map(([k, title, note]) => {
       const lines = {};
       names.forEach(n => { const v = pts.map(p => p.g.children[n] ? valOf(p.g.children[n], k) : null); if (v.some(x => x != null)) lines[n] = v; });
@@ -370,7 +421,7 @@ function screenDynamics() {
       }).join('');
       return `<details class="day-card collapsible-card" ${open === k ? 'open' : ''} ontoggle="if(this.open)S.open.dyn='${k}'">
         <summary><h3>${title}</h3><span class="sum-right">${fv.length > 1 ? delta(fv[fv.length - 1] - fv[0]) : ''}<span class="sum-val" style="color:${colorOf(k)(cur)}">${cur == null ? '—' : cur + '%'}</span></span></summary>
-        ${sw}<div class="chart-wrap">${chart(lines, pts.map(p => p.label), goalOf(k))}</div>
+        ${sw}${k === 'top5' ? top5How() : ''}<div class="chart-wrap">${chart(lines, pts.map(p => p.label), goalOf(k), k === 'top5' ? pts.findIndex((p, i) => i > 0 && p.m !== pts[i - 1].m) : null)}</div>
         <div style="margin-top:6px">${changes}</div><p class="card-note">${note}</p></details>`;
     }).join('');
 }
@@ -409,13 +460,14 @@ function screenMonth() {
         ${ch.filter(([, c]) => c.cat_pct[S.mcat] != null).map(([n, c]) => barRow(esc(n), c.cat_pct[S.mcat], catColor, delta(dif(c.cat_pct[S.mcat], prev && prev.children[n] ? prev.children[n].cat_pct[S.mcat] : null)), 90)).join('')}`,
       'Доля заказов с категорией. Считаются только те, за кем категория закреплена. Цель — 90%.', t.pct.cats) : '') +
     mCard('tasks', 'Задачи СВ', rows('tasks', catColor), 'Точки с 2+ пропусками подряд, где СВ добился заказа в следующий плановый день. Цель — 90%.', t.pct.tasks) +
-    mCard('top5', 'ТОП-5', rows('top5', catColor), `Выполнение нормы маршрутами из ТОП-5 по дефициту (${t.top5_routes} маршрутов). Цель — 90%.`, t.pct.top5) +
+    mCard('top5', 'ТОП-5', rows('top5', sysColor), `Выполнение нормы маршрутами из ТОП-5 по дефициту (${t.top5_routes} маршрутов). Норма маршрута — 75% от базы, цель — 75% нормы.`, t.pct.top5) +
     `<div class="day-card"><h3>Рейтинг по среднему</h3>
-      <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';render()">${esc(l.name)}</button>`).join('')}</div>
-      ${rl.length ? rl.map((r, i) => `<div class="rate-row"><span class="rate-n ${i < 3 ? 'top' : ''}">${i + 1}</span>
+      <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';S.rShow=5;render()">${esc(l.name)}</button>`).join('')}</div>
+      ${rl.length ? rl.slice(0, S.rShow).map((r, i) => `<div class="rate-row"><span class="rate-n ${i < 3 ? 'top' : ''}">${i + 1}</span>
         <div class="rate-name"><b>${esc(r.name)}</b>${r.parent ? `<div class="rate-sub">${esc(r.parent)}</div>` : ''}</div>
         ${delta(r.delta)}<span class="rate-pct" style="color:${sysColor(r.avg)}">${r.avg}%</span></div>`).join('') : '<div class="empty" style="padding:12px">Нет данных</div>'}
-      <p class="card-note">${S.rLevel === 'agent' ? 'Десять лучших агентов вашей зоны по среднему за месяц.' : 'Все по среднему за месяц, лучший сверху.'} Изменение — к прошлому месяцу. Одна шкала для всех одного уровня.</p></div>`;
+      ${rl.length > S.rShow ? `<button class="show-more-btn" onclick="S.rShow+=5;render()">+5 · показать ещё (${rl.length - S.rShow})</button>` : ''}
+      <p class="card-note">По среднему за месяц, лучший сверху: сначала 5, «+5» показывает следующих. Изменение — к прошлому месяцу. Одна шкала для всех одного уровня.</p></div>`;
 }
 function monthNav(m) {
   const t = new Date(S.sum ? S.sum.today + 'T00:00:00' : Date.now());
@@ -431,14 +483,19 @@ async function shiftMonth(step) {
 
 // ---------- Общее ----------
 function setPill(t) { const p = document.getElementById('topPill'); p.textContent = t; p.style.display = t ? '' : 'none'; }
-function openDyn(card) { S.open.dyn = card; go('dyn'); }
+function openDyn(card) {
+  if (S.screen === 'sum') { S.fromSum = true; S.sumScroll = document.getElementById('mainContent').scrollTop; }
+  S.open.dyn = card; go('dyn', true);
+}
+function backToSum() { S.fromSum = false; go('sum', true); document.getElementById('mainContent').scrollTop = S.sumScroll; }
 function render() {
   const c = document.getElementById('mainContent'), y = c.scrollTop;
   if (!S.sum) return;
   c.innerHTML = S.screen === 'sum' ? screenSummary() : S.screen === 'dyn' ? screenDynamics() : screenMonth();
   c.scrollTop = y;
 }
-async function go(s) {
+async function go(s, keepFrom) {
+  if (!keepFrom) S.fromSum = false;
   S.screen = s;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.s === s));
   document.getElementById('mainContent').scrollTop = 0;
