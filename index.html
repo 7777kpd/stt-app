@@ -1262,10 +1262,19 @@ function buildDayScreen(data) {
 
 
 function activateScreen(name) {
+  if (name === 'day') trackItogi(_telegramId);
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`[data-screen="${name}"]`).classList.add('active');
+}
+
+// 09.10.2026: нажатие вкладки «Итоги дня» — для вечернего отчёта «кто не открыл»
+// и дашборда руководителя. Вечером засчитывается только это нажатие (утром —
+// любое открытие). Сигнал фоновый: экран не ждёт ответа, ошибки не мешают.
+function trackItogi(id) {
+  if (!id) return;
+  try { fetch(`${API}/api/track/${id}/itogi`, { method: 'POST', keepalive: true }).catch(() => {}); } catch (e) {}
 }
 
 let _dayFocusPoints = [];
@@ -1458,6 +1467,7 @@ async function main() {
 
   const err = (sid, msg) => apiErr(sid, msg);
   _telegramId = id;
+  if (new URLSearchParams(window.location.search).get('screen') === 'day') trackItogi(id);
 
   // Load /day first to get cross-month focus points, then build route
   fetch(`${API}/api/agent/${id}/day`)

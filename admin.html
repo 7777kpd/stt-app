@@ -160,7 +160,11 @@ async function boot(){
   if(!INIT){ fatal('Откройте панель через Telegram'); return; }
   try {
     S.me = await api('/me');
-  } catch(e){ fatal(e.message); return; }
+  } catch(e){
+    // 08.10.2026: не член «Команды» — возможно, техконтакт клиента
+    try { S.client = await api('/client/me'); renderClient(); return; }
+    catch(e2){ fatal(e2.message || e.message); return; }
+  }
   S.tab = role() === 'tech' ? 'data' : 'overview';
   await loadCompanies();
   if(canMgr()){ try { S.bset = await api('/billing/settings'); } catch(e){} }
@@ -287,7 +291,7 @@ function tabOverview(c){
 
 /* ---------- Состояние компании ---------- */
 const HEALTH_ICON = {ok:['✓','var(--ok)'], warn:['!','var(--warn)'], bad:['✕','var(--bad)'], info:['i','var(--ink-3)']};
-const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть месяц','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data'], payment:['Открыть оплату','pay'], tasks:['К задачам','ctasks']};
+const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть период','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data'], payment:['Открыть оплату','pay'], tasks:['К задачам','ctasks']};
 async function loadHealth(id, force){
   if(!force && S.health[id]) return;
   S.health[id] = 'loading';
@@ -444,9 +448,10 @@ function tabData(c){
     `<button class="pri" style="width:100%" id="rl" onclick="reload('${esc(c.company_id)}')">Загрузить данные сейчас</button>`,
     'Заберёт заказы из источника клиента прямо сейчас, не дожидаясь вечера.' + (role()==='manager' ? ' Для менеджера — ограниченное число запусков в сутки.' : ''),
     'Если источник отвечает ошибкой — проверьте адрес и соответствие полей. Не помогло — передайте техспециалисту.') : '';
+  const pm = periodMonths();
   const closeCard = card(
-    `<div style="display:flex;gap:8px"><select id="cm_m" style="flex:1">${months.map(([m,y],i) => `<option value="${m}.${y}" ${i===0?'selected':''}>${MONTHS_RU[m-1]} ${y}</option>`).join('')}</select><button class="pri" id="cm_b" onclick="closeMonth('${esc(c.company_id)}')">Закрыть месяц</button></div>`,
-    'Считает «Итоги месяца» для всех агентов. Обычно делается само 1-го числа, вручную — если данные за месяц догрузили позже. Повтор перезапишет итоги, дублей не будет.',
+    `<div style="display:flex;gap:8px"><select id="cm_m" style="flex:1" onchange="periodLabel()">${pm.map(([m,y],i) => `<option value="${m}.${y}" ${i===1?'selected':''}>${MONTHS_RU[m-1]} ${y}${i===0?' · идёт':''}</option>`).join('')}</select><button class="pri" id="cm_b" onclick="closePeriod('${esc(c.company_id)}')">Закрыть период</button></div>`,
+    `<span id="cm_h">${PERIOD_HINT.closed}</span> <a href="#" onclick="checkPeriod('${esc(c.company_id)}');return false">Сверить с архивом</a>`,
     'Если после закрытия нет категорий — загрузите Факт с колонкой «Категория» и закройте снова.');
   const cacheCard = card(`<button style="width:100%" onclick="reload('${esc(c.company_id)}', true)">Сбросить кеш</button>`,
     'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
@@ -454,6 +459,21 @@ function tabData(c){
     <div id="xl_out"></div>`;
 }
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+const PERIOD_HINT = {
+  closed: 'Пересчитает итоги месяца и все его недели. Обычно делается само, вручную — если заказы догрузили позже. Повтор перезапишет цифры, дублей не будет.',
+  current: 'Месяц ещё идёт — итоги месяца закроются сами 1-го числа. Сейчас пересчитаются только закончившиеся недели.',
+};
+function periodMonths(){ const d = new Date(); return [[d.getMonth()+1, d.getFullYear()], ...lastMonths(12)]; }
+function isCurrentPeriod(v){ const d = new Date(); return v === `${d.getMonth()+1}.${d.getFullYear()}`; }
+function periodLabel(){
+  const cur = isCurrentPeriod($('cm_m').value);
+  $('cm_b').textContent = cur ? 'Обновить недели' : 'Закрыть период';
+  $('cm_h').textContent = cur ? PERIOD_HINT.current : PERIOD_HINT.closed;
+}
+function periodResult(r){
+  const weeks = (r.weeks || []).map(w => `<div>${esc(w)}</div>`).join('');
+  return `<div class="note ${r.ok === false ? 'warn' : ''}">${esc(r.message)}${weeks ? `<div style="border-top:1px solid var(--line);margin-top:8px;padding-top:8px">${weeks}</div>` : ''}</div>`;
+}
 function lastMonths(n){ const out = []; const d = new Date(); d.setDate(1); for(let i=0;i<n;i++){ d.setMonth(d.getMonth()-1); out.push([d.getMonth()+1, d.getFullYear()]); } return out; }
 
 async function saveSource(id, key){
@@ -892,20 +912,72 @@ async function excelWrite(id, token){
     await loadCompanies(); toast('Данные записаны');
   } catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
 }
-async function closeMonth(id){
-  const [m, y] = $('cm_m').value.split('.').map(Number);
-  if(!confirm(`Закрыть ${MONTHS_RU[m-1]} ${y}? Итоги месяца пересчитаются и перезапишутся.`)) return;
-  const b = $('cm_b'); b.disabled = true; b.textContent = 'Считаю…';
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/close-month', {method:'POST', body:{month:m, year:y}});
-    toast(r.message); delete S.health[id]; $('xl_out').innerHTML = `<div class="note">${esc(r.message)}</div>`; }
+async function closePeriod(id){
+  const v = $('cm_m').value, [m, y] = v.split('.').map(Number), cur = isCurrentPeriod(v);
+  if(!cur && !confirm(`Закрыть ${MONTHS_RU[m-1]} ${y}? Итоги месяца и его недели пересчитаются и перезапишутся.`)) return;
+  const b = $('cm_b'), label = b.textContent; b.disabled = true; b.textContent = 'Считаю…';
+  $('xl_out').innerHTML = '<div class="note">Считаю… для большой компании это до минуты.</div>';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/close-period', {method:'POST', body:{month:m, year:y}});
+    toast(r.ok === false ? 'Закрыто с ошибкой — см. ниже' : 'Период закрыт'); delete S.health[id]; $('xl_out').innerHTML = periodResult(r); }
   catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
-  b.disabled = false; b.textContent = 'Закрыть месяц';
+  b.disabled = false; b.textContent = label;
+}
+async function checkPeriod(id){
+  const [m, y] = $('cm_m').value.split('.').map(Number);
+  $('xl_out').innerHTML = '<div class="note">Сверяю с архивом…</div>';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/period-check', {method:'POST', body:{month:m, year:y}});
+    $('xl_out').innerHTML = `<div class="note">${r.lines.map(l => `<div>${esc(l)}</div>`).join('')}</div>`; }
+  catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
 }
 async function reload(id, cacheOnly){
   const b = $('rl'); if(b && !cacheOnly){ b.disabled = true; b.textContent = 'Загружаю…'; }
   try { const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'}); toast(r.message); delete S.health[id]; }
   catch(e){ toast(e.message); }
   if(b && !cacheOnly){ b.disabled = false; b.textContent = 'Загрузить данные сейчас'; }
+}
+
+// ============================================================
+// Экран техконтакта клиента (08.10.2026): только своя компания,
+// «Загрузить данные сейчас» и «Закрыть период» за прошлый и текущий месяц
+// ============================================================
+function renderClient(){
+  const cl = S.client;
+  $('nav').innerHTML = `<div class="brand">СТТ · данные компании${API.includes('develop') ? '<small>develop</small>' : ''}</div><div class="who">Техконтакт<br><span class="meta">ID ${esc(cl.telegram_id)}</span></div>`;
+  $('main').innerHTML = cl.companies.map(c => {
+    const st = c.status || {}, y = st.yesterday ? st.yesterday.slice(8,10) + '.' + st.yesterday.slice(5,7) : '';
+    const okY = (st.yesterday_orders || 0) > 0;
+    const step1 = c.source === 'file'
+      ? `<p class="small" style="margin:0">Данные приходят файлом по секретной ссылке. Отправьте по ней свежую выгрузку (ссылку можно взять у менеджера СТТ), затем закройте период.</p>`
+      : `<button class="pri" style="width:100%" id="crl_${esc(c.company_id)}" onclick="clientReload('${esc(c.company_id)}')">Загрузить данные сейчас</button>
+         <p class="small">Заберёт из ${c.source === 'bigquery' ? 'BigQuery' : 'API'} все заказы прошлого и текущего месяца. Повтор не задваивает заказы. Число запусков в сутки ограничено.</p>`;
+    const opts = c.months.map((p, i) => `<option value="${p.month}.${p.year}" ${i===1?'selected':''}>${MONTHS_RU[p.month-1]} ${p.year}${i===0?' · идёт':''}</option>`).join('');
+    return `<div class="panel" style="padding:16px 18px;max-width:560px;margin-bottom:16px">
+      <div class="dhead"><h2>${esc(c.name)}</h2><span class="tag ${okY ? 's-work' : 's-test'}">${okY ? 'Данные за ' + y + ' пришли' : 'Нет данных за ' + y}</span></div>
+      <p class="small">Заказов за ${esc(y)}: ${st.yesterday_orders || 0}${st.last_date ? ' · последние данные: ' + esc(st.last_date.split('-').reverse().join('.')) : ''}</p>
+      <div class="box" style="margin-top:14px"><p class="val" style="margin-bottom:8px">1. Обновить заказы</p>${step1}</div>
+      <div class="box" style="margin-top:10px"><p class="val" style="margin-bottom:8px">2. Закрыть период</p>
+        <div style="display:flex;gap:8px"><select id="ccm_${esc(c.company_id)}" style="flex:1">${opts}</select>
+        <button class="pri" id="ccb_${esc(c.company_id)}" onclick="clientClose('${esc(c.company_id)}')">Закрыть период</button></div>
+        <p class="small">Нажмите после обновления заказов — итоги месяца и недели пересчитаются, дашборды покажут новые цифры. Для текущего месяца пересчитаются только закончившиеся недели.</p></div>
+      <div id="cout_${esc(c.company_id)}"></div>
+      <p class="small" style="margin-top:12px;color:var(--ink-3)">Доступны прошлый и текущий месяц. Менеджер СТТ получает уведомление о каждом действии.</p></div>`;
+  }).join('');
+}
+async function clientReload(id){
+  const b = $('crl_' + id); b.disabled = true; b.textContent = 'Загружаю…';
+  try { const r = await api('/client/' + encodeURIComponent(id) + '/reload', {method:'POST'});
+    $('cout_' + id).innerHTML = `<div class="note">${esc(r.message)}</div>`; }
+  catch(e){ $('cout_' + id).innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+  b.disabled = false; b.textContent = 'Загрузить данные сейчас';
+}
+async function clientClose(id){
+  const [m, y] = $('ccm_' + id).value.split('.').map(Number);
+  const b = $('ccb_' + id); b.disabled = true; b.textContent = 'Считаю…';
+  $('cout_' + id).innerHTML = '<div class="note">Считаю… это может занять до минуты.</div>';
+  try { const r = await api('/client/' + encodeURIComponent(id) + '/close-period', {method:'POST', body:{month:m, year:y}});
+    $('cout_' + id).innerHTML = periodResult(r); }
+  catch(e){ $('cout_' + id).innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+  b.disabled = false; b.textContent = 'Закрыть период';
 }
 
 function logTable(rows, withCo){

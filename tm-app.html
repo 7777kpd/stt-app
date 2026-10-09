@@ -548,6 +548,7 @@ const dayCache = {};
 
 function switchScreen(screen) {
   currentScreen = screen;
+  if (screen === 'day') trackItogi(currentTelegramId);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.screen === screen));
   if (screen === 'route') {
     document.getElementById('topTitle').textContent = 'Маршрут';
@@ -1067,6 +1068,14 @@ async function loadRoute() {
   } catch (e) {
     document.getElementById('mainContent').innerHTML = '<div class="empty">⚠️ Не удалось загрузить маршрут</div>';
   }
+}
+
+// 09.10.2026: нажатие вкладки «Итоги дня» — для вечернего отчёта «кто не открыл»
+// и дашборда руководителя. Вечером засчитывается только это нажатие (утром —
+// любое открытие). Сигнал фоновый: экран не ждёт ответа, ошибки не мешают.
+function trackItogi(id) {
+  if (!id) return;
+  try { fetch(`${API}/api/track/${id}/itogi`, { method: 'POST', keepalive: true }).catch(() => {}); } catch (e) {}
 }
 
 async function main() {

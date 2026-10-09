@@ -492,6 +492,7 @@ async function jumpToDay(dateStr) {
 }
 
 function switchTab(name) {
+  if (name === 'day') trackItogi(_telegramId);
   document.querySelectorAll('.screen-panel').forEach(el => {
     el.classList.toggle('active', el.id === 'screen-' + name);
   });
@@ -1781,6 +1782,14 @@ function renderDay(data) {
 // ============================================================
 // MAIN — загрузка данных
 // ============================================================
+// 09.10.2026: нажатие вкладки «Итоги дня» — для вечернего отчёта «кто не открыл»
+// и дашборда руководителя. Вечером засчитывается только это нажатие (утром —
+// любое открытие). Сигнал фоновый: экран не ждёт ответа, ошибки не мешают.
+function trackItogi(id) {
+  if (!id) return;
+  try { fetch(`${API}/api/track/${id}/itogi`, { method: 'POST', keepalive: true }).catch(() => {}); } catch (e) {}
+}
+
 async function main() {
   _telegramId = getTelegramId();
   if (!_telegramId) {
