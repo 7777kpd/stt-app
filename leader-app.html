@@ -272,6 +272,8 @@ function sortedChildren(group) {
 }
 function alertsCard() {
   const al = S.sum.alerts || [], b = basis(), L = S.sum.launch;
+  const hh = h => String(h).padStart(2, '0') + ':00';
+  let amW = '', pmW = '';
   const ghost = b ? b.now.total.ghost : 0;
   const ghostBy = b ? Object.entries(b.now.children).map(([n, c]) => [n, c.ghost]).filter(x => x[1] > 0).sort((x, y) => y[1] - x[1]) : [];
   const notOpen = L ? L.agent.am_not + L.agent.pm_not + L.sv.am_not + L.sv.pm_not : 0;
@@ -288,13 +290,15 @@ function alertsCard() {
     : `<div class="alert-ok">✓ Призраков нет</div>`;
   if (L) {
     const dd = ddmm(L.date);
+    amW = hh(L.am_hour ?? 6) + '–' + hh((L.am_hour ?? 6) + 1); pmW = hh(L.pm_hour ?? 19) + '–' + hh((L.pm_hour ?? 19) + 1);
     html += `<div class="alert-sec">Не открыли Mini App · ${dd}</div>
-      <table class="la-tab"><tr><th></th><th>утро</th><th>вечер</th></tr>
-        <tr><td>Агенты · «Итоги дня»</td><td><b>${L.agent.am_not}</b> из ${L.agent.total}</td><td><b>${L.agent.pm_not}</b> из ${L.agent.total}</td></tr>
-        <tr><td>СВ · «Итоги команды»</td><td><b>${L.sv.am_not}</b> из ${L.sv.total}</td><td><b>${L.sv.pm_not}</b> из ${L.sv.total}</td></tr></table>
+      <table class="la-tab"><tr><th></th><th>утро<br>${amW}</th><th>вечер<br>${pmW}</th></tr>
+        <tr><td>Агенты</td><td><b>${L.agent.am_not}</b> из ${L.agent.total}</td><td><b>${L.agent.pm_not}</b> из ${L.agent.total}</td></tr>
+        <tr><td>СВ</td><td><b>${L.sv.am_not}</b> из ${L.sv.total}</td><td><b>${L.sv.pm_not}</b> из ${L.sv.total}</td></tr></table>
       ${chips(Object.entries(L.children).filter(([, v]) => v[0] + v[1] > 0).sort((x, y) => (y[1][0] + y[1][1]) - (x[1][0] + x[1][1])).map(([n, v]) => [n, v[0] + ' · ' + v[1]]))}`;
   }
-  return html + `<p class="card-note">Решение нужно, если показатель ниже цели и не вырос за 3 недели. Призраки и неоткрытия показываем всегда, по подразделениям (утро · вечер). Открытие засчитываем, если «Итоги дня» (агент) или «Итоги команды» (СВ) открыты до утреннего отчёта + 1 час и в течение часа после вечернего.</p>
+  const when = L ? `Утро: отчёт приходит в ${hh(L.am_hour ?? 6)} — засчитываем любое открытие Mini App с ${amW.replace('–', ' до ')}. Вечер: отчёт в ${hh(L.pm_hour ?? 19)} — засчитываем нажатие вкладки «Итоги дня» с ${pmW.replace('–', ' до ')} (у СВ там итоги его команды). ` : '';
+  return html + `<p class="card-note">Решение нужно, если показатель ниже цели и не вырос за 3 недели. Призраки и неоткрытия показываем всегда; в чипах по подразделениям — утро · вечер. ${when}</p>
   </details>`;
 }
 function heroBlock(label, nowG, prevG, note, key) {
