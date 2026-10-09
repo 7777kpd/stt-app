@@ -160,6 +160,9 @@
   .how-box .la-tab td { border-top: 1px solid rgba(59,125,219,.15); }
   .small-note { font-size: 11px; color: var(--ink-soft); margin: 4px 0 0; }
   .show-more-btn { display: block; width: 100%; font-size: 13px; font-weight: 700; padding: 11px; border-radius: 12px; border: 1px dashed var(--ink-soft); background: transparent; color: var(--ink-soft); cursor: pointer; font-family: inherit; margin-top: 8px; }
+  .t5-team { border-top: 1px solid rgba(59,125,219,.18); }
+  .t5-team summary { list-style: none; color: var(--ink); display: flex; justify-content: space-between; align-items: center; padding: 8px 0; cursor: pointer; font-size: 12.5px; }
+  .t5-sub { display: block; font-size: 10.5px; color: var(--ink-soft); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -276,7 +279,7 @@ function alertsCard() {
   let amW = '', pmW = '';
   const ghost = b ? b.now.total.ghost : 0;
   const ghostBy = b ? Object.entries(b.now.children).map(([n, c]) => [n, c.ghost]).filter(x => x[1] > 0).sort((x, y) => y[1] - x[1]) : [];
-  const notOpen = L ? L.agent.am_not + L.agent.pm_not + L.sv.am_not + L.sv.pm_not : 0;
+  const notOpen = L && !L.no_data ? L.agent.am_not + L.agent.pm_not + L.sv.am_not + L.sv.pm_not : 0;
   const count = al.length + (ghost > 0 ? 1 : 0) + (notOpen > 0 ? 1 : 0);
   const chips = list => `<div class="ghost-chips">${list.map(([n, v]) => `<span>${esc(n)} <b>${v}</b></span>`).join('')}</div>`;
   let html = `<details class="alert-card collapsible-card" ${S.open.alert ? 'open' : ''} ontoggle="S.open.alert=this.open">
@@ -291,11 +294,15 @@ function alertsCard() {
   if (L) {
     const dd = ddmm(L.date);
     amW = hh(L.am_hour ?? 6) + '–' + hh((L.am_hour ?? 6) + 1); pmW = hh(L.pm_hour ?? 19) + '–' + hh((L.pm_hour ?? 19) + 1);
+    if (L.no_data) html += `<div class="alert-sec">Не открыли Mini App · ${dd}</div>
+      <div class="alert-why" style="padding:4px 0 2px">За ${dd} открытий ещё нет: учёт идёт с новой версии. Первые цифры — на следующий рабочий день после заливки: утро ${amW}, вечер ${pmW}.</div>`;
+    else {
     html += `<div class="alert-sec">Не открыли Mini App · ${dd}</div>
       <table class="la-tab"><tr><th></th><th>утро<br>${amW}</th><th>вечер<br>${pmW}</th></tr>
         <tr><td>Агенты</td><td><b>${L.agent.am_not}</b> из ${L.agent.total}</td><td><b>${L.agent.pm_not}</b> из ${L.agent.total}</td></tr>
         <tr><td>СВ</td><td><b>${L.sv.am_not}</b> из ${L.sv.total}</td><td><b>${L.sv.pm_not}</b> из ${L.sv.total}</td></tr></table>
       ${chips(Object.entries(L.children).filter(([, v]) => v[0] + v[1] > 0).sort((x, y) => (y[1][0] + y[1][1]) - (x[1][0] + x[1][1])).map(([n, v]) => [n, v[0] + ' · ' + v[1]]))}`;
+    }
   }
   const when = L ? `Утро: отчёт приходит в ${hh(L.am_hour ?? 6)} — засчитываем любое открытие Mini App с ${amW.replace('–', ' до ')}. Вечер: отчёт в ${hh(L.pm_hour ?? 19)} — засчитываем нажатие вкладки «Итоги дня» с ${pmW.replace('–', ' до ')} (у СВ там итоги его команды). ` : '';
   return html + `<p class="card-note">Решение нужно, если показатель ниже цели и не вырос за 3 недели. Призраки и неоткрытия показываем всегда; в чипах по подразделениям — утро · вечер. ${when}</p>
@@ -385,15 +392,24 @@ const DYN = [
 ];
 function top5How() {
   const rs = S.sum.top5_routes || [];
-  const groups = {};
-  rs.forEach(r => (groups[r.group] = groups[r.group] || []).push(r));
+  const teams = {};
+  rs.forEach(r => (teams[r.team] = teams[r.team] || { role: r.team_role, group: r.group, list: [] }).list.push(r));
+  const rowsT = Object.entries(teams).map(([n, t]) => {
+    const need = t.list.reduce((a, r) => a + r.need, 0), got = t.list.reduce((a, r) => a + Math.min(r.clean, r.need), 0);
+    return { n, ...t, need, got, pct: need ? Math.round(got * 100 / need) : null };
+  }).sort((a, b) => (a.pct ?? 999) - (b.pct ?? 999));
+  const role = rowsT[0] ? rowsT[0].role : 'ТМ';
   return `<details class="how-box" ${S.open.how ? 'open' : ''} ontoggle="S.open.how=this.open"><summary>Как считается ТОП-5 ›</summary>
-    <ol><li>В начале месяца в каждой команде ТМ (без ТМ — у СВ) берём 5 маршрутов с самым большим дефицитом по итогам прошлого месяца. Состав на месяц не меняется.</li>
+    <ol><li>В начале месяца в каждой команде ${role} берём 5 маршрутов с самым большим дефицитом по итогам прошлого месяца. Состав на месяц не меняется.</li>
     <li>Норма маршрута — 75% от базы: план визитов, но не меньше среднего по команде.</li>
     <li>Засчитываем чистые заказы, но не больше нормы — сильный маршрут не прячет слабый.</li>
     <li>ТОП-5 = засчитано ÷ сумма норм.</li></ol>
-    ${rs.length ? `<table class="la-tab"><tr><th>Маршрут · ${esc(S.sum.current ? 'текущая неделя' : 'прошлая неделя')}</th><th>норма</th><th>факт</th><th>%</th></tr>
-      ${Object.entries(groups).map(([g, list]) => `<tr><td colspan="4" class="grp">${esc(g)}</td></tr>` + list.map(r => `<tr><td>${esc(r.agent)}</td><td>${r.need}</td><td>${r.clean}</td><td style="color:${sysColor(r.pct)};font-weight:800">${r.pct ?? '—'}%</td></tr>`).join('')).join('')}</table>`
+    ${rowsT.length ? `<div class="small-note" style="margin:0 0 4px">${rowsT.length} ${rowsT.length % 10 === 1 && rowsT.length % 100 !== 11 ? 'команда' : [2, 3, 4].includes(rowsT.length % 10) && ![12, 13, 14].includes(rowsT.length % 100) ? 'команды' : 'команд'} × 5 маршрутов · ${S.sum.current ? 'текущая неделя' : 'прошлая неделя'} · худшие сверху. Нажмите на команду — увидите её 5 маршрутов.</div>
+      ${rowsT.map(t => `<details class="t5-team" ${S.open['t5:' + t.n] ? 'open' : ''} ontoggle="S.open['t5:${jsq(t.n)}']=this.open">
+        <summary><span><b>${esc(t.n)}</b><span class="t5-sub">${esc(t.role)} · ${esc(t.group)}</span></span><span style="color:${sysColor(t.pct)};font-weight:800">${t.pct ?? '—'}% ›</span></summary>
+        <table class="la-tab"><tr><th>Маршрут</th><th>норма</th><th>факт</th><th>%</th></tr>
+        ${t.list.map(r => `<tr><td>${esc(r.agent)}</td><td>${r.need}</td><td>${r.clean}</td><td style="color:${sysColor(r.pct)};font-weight:800">${r.pct ?? '—'}%</td></tr>`).join('')}</table>
+      </details>`).join('')}`
       : '<p class="small-note">Маршрутов ТОП-5 пока нет — нужен закрытый прошлый месяц.</p>'}
   </details>`;
 }
