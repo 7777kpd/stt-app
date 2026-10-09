@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>СТТ — Руководитель</title>
+<style>
+  summary::marker { display: none; content: ''; }
+  summary::-webkit-details-marker { display: none; }
+  :root {
+    --bg: #F0EADC; --card: #FFFFFF; --ink: #2C2A26; --ink-soft: #8B8578; --line: #ECE6D8;
+    --green: #3FAE6A; --green-bg: #E6F4EC; --yellow: #E2A335; --yellow-bg: #FBF1DF;
+    --red: #DC5B4E; --red-bg: #FAE7E4; --red-dark: #A93B30; --amber: #D98A3D; --amber-bg: #F8EBDB;
+    --blue: #3B7DDB; --blue-bg: #E7EFFB;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
+  .phone { width: 100%; max-width: 480px; background: var(--bg); height: 100dvh; display: flex; flex-direction: column; }
+  .topbar { padding: 22px 20px 14px; display: flex; align-items: baseline; justify-content: space-between; flex-shrink: 0; }
+  .topbar h1 { font-size: 20px; font-weight: 700; margin: 0; }
+  .top-pill { font-size: 13px; color: var(--ink-soft); background: var(--card); border-radius: 100px; padding: 6px 12px; font-weight: 600; }
+  .content { padding: 4px 16px 24px; overflow-y: auto; flex: 1; }
+  .tabbar { display: flex; background: var(--card); border-top: 1px solid var(--line); padding: 9px 4px 14px; flex-shrink: 0; }
+  .tab { flex: 1; text-align: center; font-size: 10px; font-weight: 700; color: var(--ink-soft); background: none; border: none; font-family: inherit; cursor: pointer; padding: 6px 2px 0; }
+  .tab.active { color: var(--ink); }
+  .tab .icon { width: 26px; height: 26px; margin: 0 auto 4px; border-radius: 8px; background: var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .tab.active .icon { background: #D9CFAE; }
+  .sub { font-size: 12px; color: var(--ink-soft); font-weight: 600; margin: -4px 0 14px; }
+
+  .day-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .day-card h3 { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 0; text-transform: uppercase; letter-spacing: .02em; }
+  .card-note { font-size: 11px; color: var(--ink-soft); margin: 10px 0 0; line-height: 1.45; }
+  .collapsible-card summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .collapsible-card > summary::after { content: '▶'; font-size: 11px; color: var(--ink-soft); }
+  .collapsible-card[open] > summary::after { content: '▼'; }
+  .sum-right { display: flex; align-items: baseline; gap: 8px; margin-left: auto; }
+  .sum-val { font-size: 18px; font-weight: 800; }
+
+  .hero { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--line); }
+  .hero-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; }
+  .hero-row { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 10px; }
+  .hero-pct { font-size: 34px; font-weight: 800; line-height: 1; }
+  .goal-track { height: 8px; background: var(--line); border-radius: 4px; position: relative; }
+  .goal-fill { height: 100%; border-radius: 4px; }
+  .goal-mark { position: absolute; top: -4px; width: 2px; height: 16px; background: var(--ink); border-radius: 1px; }
+  .goal-cap { font-size: 9px; color: var(--ink-soft); font-weight: 700; text-align: right; margin-top: 4px; }
+
+  .rating-delta { font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .rating-delta.up { color: var(--green); } .rating-delta.down { color: var(--red-dark); } .rating-delta.neutral { color: var(--ink-soft); font-weight: 600; }
+
+  .bar-row { padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .bar-row:last-child { border-bottom: none; }
+  .bar-row-label { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: flex; justify-content: space-between; }
+  .bar-row-track-wrap { display: flex; align-items: center; gap: 8px; }
+  .bar-row-track { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; position: relative; }
+  .bar-row-fill { height: 100%; border-radius: 4px; }
+  .bar-row-pct { font-size: 13px; font-weight: 800; width: 40px; text-align: right; flex-shrink: 0; }
+  .goal-tick { position: absolute; top: 0; bottom: 0; width: 2px; background: rgba(44,42,38,.55); }
+
+  .day-tiles-row { display: flex; gap: 5px; margin-top: 12px; }
+  .day-tile { flex: 1; background: var(--bg); border-radius: 10px; padding: 10px 4px; text-align: center; }
+  .day-tile .val { font-size: 18px; font-weight: 800; }
+  .day-tile .lbl { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+
+  .alert-card { background: var(--red-bg); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .alert-card h3 { font-size: 12px; font-weight: 700; color: var(--red-dark); margin: 0 0 8px; text-transform: uppercase; letter-spacing: .02em; }
+  .alert-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid rgba(169,59,48,.14); font-size: 12px; }
+  .alert-row:first-of-type { border-top: none; }
+  .alert-row b { color: var(--ink); }
+  .alert-row span:last-child { font-weight: 800; color: var(--red-dark); white-space: nowrap; }
+  .alert-card .card-note { color: var(--red-dark); opacity: .8; }
+
+  .cat-head { font-size: 12px; font-weight: 800; margin: 12px 0 2px; display: flex; justify-content: space-between; }
+  .cat-head:first-of-type { margin-top: 10px; }
+
+  .chart-wrap { margin-top: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 10.5px; color: var(--ink-soft); font-weight: 600; margin-top: 6px; }
+  .legend i { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 4px; }
+  .seg { display: flex; background: var(--line); border-radius: 11px; padding: 3px; margin-bottom: 12px; }
+  .seg button { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 12px; font-weight: 700; color: var(--ink-soft); padding: 8px 0; border-radius: 8px; cursor: pointer; }
+  .seg button.active { background: var(--card); color: var(--ink); }
+
+  .alert-card summary::after { color: var(--red-dark) !important; }
+  .alert-item { padding: 10px 0; border-top: 1px solid rgba(169,59,48,.14); }
+  .alert-item:first-of-type { margin-top: 8px; }
+  .alert-top { display: flex; justify-content: space-between; font-size: 13px; }
+  .alert-top span { font-weight: 800; color: var(--red-dark); }
+  .alert-why { font-size: 11px; color: var(--ink); opacity: .75; margin-top: 3px; line-height: 1.4; }
+  .mini-weeks { display: flex; gap: 4px; margin-top: 7px; }
+  .mini-weeks span { flex: 1; text-align: center; font-size: 10px; font-weight: 800; color: #fff; border-radius: 6px; padding: 3px 0; }
+  .alert-act, .to-dyn { font-size: 11.5px; font-weight: 700; color: var(--blue); margin-top: 8px; cursor: pointer; }
+  .to-dyn { text-align: right; margin-top: 10px; }
+  .cat-chips { display: flex; gap: 6px; margin: 12px 0 4px; }
+  .cat-sel { flex: 1; border: none; background: var(--bg); border-radius: 10px; padding: 7px 6px; font-family: inherit; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+  .cat-sel span { font-size: 10.5px; font-weight: 700; color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .cat-sel b { font-size: 13px; }
+  .cat-sel.on { background: var(--ink); } .cat-sel.on span { color: #fff; }
+  .sum-right .rating-delta { font-size: 10.5px; }
+
+  .alert-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid rgba(169,59,48,.14); cursor: pointer; font-size: 13px; }
+  .alert-line:first-of-type { margin-top: 8px; }
+  .alert-line > span { font-weight: 800; color: var(--red-dark); white-space: nowrap; }
+  .lvl-bar { flex: 1; height: 8px; border-radius: 4px; overflow: hidden; display: flex; }
+  .lvl-bar i { display: block; height: 100%; }
+
+  details.br > summary { list-style: none; cursor: pointer; }
+  details.br > summary::-webkit-details-marker { display: none; }
+  .br-arrow { color: var(--ink-soft); font-weight: 700; display: inline-block; transition: transform .15s; }
+  details.br[open] .br-arrow { transform: rotate(90deg); }
+  .how { margin-left: auto; font-size: 11.5px; font-weight: 700; color: var(--blue); }
+  .comp { background: var(--bg); border-radius: 12px; padding: 10px; margin: 2px 0 8px; }
+  .comp .day-tile { background: var(--card); padding: 8px 2px; }
+  .comp .day-tile .val { font-size: 15px; }
+  .tile-d .rating-delta { font-size: 9.5px; }
+  .formula { text-align: center; font-size: 11.5px; color: var(--ink-soft); font-weight: 600; margin: 8px 0 6px; }
+  .formula b { color: var(--ink); }
+  .cat-mini { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+  .cat-mini .cat-chip { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; }
+  .kb-line { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--ink-soft); margin-top: 10px; }
+  .kb-line b { font-size: 11px; white-space: nowrap; }
+
+  .tiles3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .kb-text { text-align: center; font-size: 11.5px; color: var(--ink-soft); font-weight: 600; margin: 0 0 8px; }
+  .kb-text b { color: var(--ink); }
+
+  .rate-tabs { display: flex; background: var(--bg); border-radius: 11px; padding: 3px; margin: 10px 0 6px; }
+  .rate-tabs button { flex: 1; border: none; background: transparent; font-family: inherit; font-size: 11.5px; font-weight: 700; color: var(--ink-soft); padding: 8px 0; border-radius: 8px; cursor: pointer; }
+  .rate-tabs button.active { background: var(--card); color: var(--ink); }
+  .rate-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .rate-n { width: 22px; height: 22px; border-radius: 7px; background: var(--bg); font-size: 11px; font-weight: 800; color: var(--ink-soft); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .rate-n.top { background: var(--green-bg); color: var(--green); }
+  .rate-name { flex: 1; min-width: 0; }
+  .rate-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; }
+  .rate-pct { font-size: 14px; font-weight: 800; width: 42px; text-align: right; }
+  .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
+  .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .empty { text-align: center; padding: 40px 16px; color: var(--ink-soft); font-size: 14px; }
+  .ok-card { background: var(--green-bg); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; font-size: 13px; font-weight: 700; color: var(--green); }
+  .more-chip { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: var(--line); color: var(--ink-soft); cursor: pointer; }
+  .month-nav { display: flex; align-items: center; justify-content: space-between; margin: -4px 0 14px; }
+  .month-nav button { border: none; background: var(--card); border-radius: 100px; width: 32px; height: 32px; font-size: 15px; font-weight: 800; color: var(--ink-soft); cursor: pointer; }
+  .month-nav button:disabled { opacity: .35; cursor: default; }
+  .month-nav span { font-size: 13px; font-weight: 700; color: var(--ink-soft); }
+  .cat-chips { overflow-x: auto; }
+  .cat-sel { min-width: 84px; }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="topbar">
+    <div style="display:flex;flex-direction:column;min-width:0;">
+      <h1 id="topTitle" style="margin:0 0 6px;">Загрузка...</h1>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div id="roleIcon" style="width:22px;height:22px;border-radius:7px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;">Р</div>
+        <div style="font-size:12px;color:var(--ink-soft);"><span id="roleName">Руководитель</span> <span id="personName" style="font-weight:600;color:var(--ink);"></span></div>
+      </div>
+    </div>
+    <div class="top-pill" id="topPill" style="display:none"></div>
+  </div>
+  <div class="content" id="mainContent"><div class="loader"><div class="spinner"></div><span>Загрузка данных...</span></div></div>
+  <div class="tabbar">
+    <button class="tab active" data-s="sum" onclick="go('sum')"><span class="icon">🧭</span>Сводка</button>
+    <button class="tab" data-s="dyn" onclick="go('dyn')"><span class="icon">📈</span>Динамика</button>
+    <button class="tab" data-s="month" onclick="go('month')"><span class="icon">📊</span>Итоги месяца</button>
+  </div>
+</div>
+<script>
+// leader-app.html — общий дашборд руководителя (директор, РФ, НТО), 09.10.2026.
+// Данные: /api/leader/{id}/summary (недели, текущая неделя, «Требует решения»)
+// и /api/leader/{id}/month (закрытый месяц, рейтинги). Проценты уже посчитаны
+// сервером по единым правилам (leader_api.py) — экран их только показывает.
+// Шкалы: среднее/система/СТТ точек — ≥75 · 50–74 · <50; категории/задачи СВ/ТОП-5 — ≥90 · 80–89 · <80.
+function catColor(v) { return v == null ? 'var(--ink-soft)' : v >= 90 ? 'var(--green)' : v >= 80 ? 'var(--yellow)' : 'var(--red)'; }
+function sysColor(v) { return v == null ? 'var(--ink-soft)' : v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--amber)' : 'var(--red-dark)'; }
+const HI = { cats: 1, tasks: 1, top5: 1 };
+const colorOf = k => HI[k] ? catColor : sysColor;
+const goalOf = k => HI[k] ? 90 : 75;
+
+const API = new URLSearchParams(window.location.search).get('dev') === '1'
+  ? 'https://develop-production-0a2d.up.railway.app'
+  : 'https://worker-production-1dfb.up.railway.app';
+function getTelegramId() {
+  const p = new URLSearchParams(window.location.search);
+  if (p.get('id')) return p.get('id');
+  if (window.Telegram?.WebApp?.initDataUnsafe?.user?.id) return String(window.Telegram.WebApp.initDataUnsafe.user.id);
+  return null;
+}
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const jsq = v => String(v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+const MONTHS = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь', 'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const DOW = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+const ddmm = iso => iso.slice(8, 10) + '.' + iso.slice(5, 7);
+const num = n => Number(n || 0).toLocaleString('ru-RU');
+const COLORS = ['#3B7DDB', '#3FAE6A', '#D98A3D', '#A93B30', '#7A5BC7', '#2A9D9A', '#C25C8F', '#8B8578'];
+
+const S = { id: null, sum: null, month: null, monthSel: null, screen: 'sum', open: {}, cat: null, rLevel: null, catsAll: {} };
+
+function delta(d, unit) {
+  if (d == null || isNaN(d)) return '';
+  unit = unit == null ? ' п.п.' : unit;
+  if (!d) return '<span class="rating-delta neutral">без изменений</span>';
+  return `<span class="rating-delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲ +' : '▼ '}${d}${unit}</span>`;
+}
+const dif = (a, b) => (a == null || b == null) ? null : a - b;
+
+function barRow(nameHtml, pct, colorFn, right, goal) {
+  const w = Math.max(0, Math.min(100, pct || 0));
+  return `<div class="bar-row"><div class="bar-row-label"><span>${nameHtml}</span>${right || ''}</div>
+    <div class="bar-row-track-wrap"><div class="bar-row-track"><div class="bar-row-fill" style="width:${w}%;background:${colorFn(pct)}"></div>
+    <div class="goal-tick" style="left:${goal || 75}%"></div></div>
+    <div class="bar-row-pct" style="color:${colorFn(pct)}">${pct == null ? '—' : pct + '%'}</div></div></div>`;
+}
+
+// ---------- Раскладка среднего ----------
+const COMP = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['top5', 'ТОП-5']];
+function catChips(catPct, key) {
+  const list = Object.entries(catPct || {}).filter(([, v]) => v != null).sort((a, b) => a[1] - b[1]);
+  if (!list.length) return '';
+  const all = S.catsAll[key];
+  const shown = all ? list : list.slice(0, 3);
+  const short = c => c.length > 16 ? c.slice(0, 15) + '…' : c;
+  return `<div class="cat-mini">${shown.map(([c, v]) => `<span class="cat-chip" title="${esc(c)}" style="background:${v >= 90 ? 'var(--green-bg)' : v >= 80 ? 'var(--yellow-bg)' : 'var(--red-bg)'};color:${catColor(v)}">${esc(short(c))} ${v}%</span>`).join('')}
+    ${!all && list.length > 3 ? `<span class="more-chip" onclick="event.stopPropagation();S.catsAll['${jsq(key)}']=1;render()">ещё ${list.length - 3}</span>` : ''}</div>`;
+}
+function compBlock(c, p, key, dynName) {
+  const pc = c.pct, pp = (p && p.pct) || {};
+  const tiles = COMP.map(([k, lbl]) => `<div class="day-tile"><div class="val" style="color:${colorOf(k)(pc[k])}">${pc[k] == null ? '—' : pc[k] + '%'}</div><div class="lbl">${lbl}</div><div class="tile-d">${delta(dif(pc[k], pp[k]), '')}</div></div>`).join('');
+  const used = COMP.filter(([k]) => pc[k] != null).map(([k]) => pc[k]);
+  return `<div class="comp">
+    <div class="tiles3">${tiles}</div>
+    ${used.length ? `<div class="formula">(${used.join(' + ')}) ÷ ${used.length} = <b>${pc.avg}%</b></div>` : ''}
+    <div class="kb-text">ПАКБ <b>${num(c.pakb)}</b> · СТТ <b>${num(c.stt_pts)} шт</b> · <b style="color:${sysColor(pc.stt)}">${pc.stt == null ? '—' : pc.stt + '%'}</b></div>
+    ${catChips(c.cat_pct, key)}
+    ${dynName != null ? `<div class="to-dyn" onclick="openDyn('avg')">Динамика ${esc(dynName)} по неделям →</div>` : ''}
+  </div>`;
+}
+
+// ---------- Сводка ----------
+function basis() {
+  const d = S.sum;
+  if (d.current) {
+    const e = new Date(d.current.end + 'T00:00:00');
+    const span = d.current.days > 1 ? `пн–${DOW[e.getDay()]}` : 'пн';
+    return { now: d.current.now, prev: d.current.prev, pill: span,
+      sub: `Сейчас: ${span} ${ddmm(d.current.start)}–${ddmm(d.current.end)} · сравнение с теми же днями прошлой недели` };
+  }
+  const w = d.weeks;
+  if (!w.length) return null;
+  const last = w[w.length - 1], prev = w[w.length - 2];
+  return { now: last, prev: prev || null, pill: 'неделя', sub: `Прошлая неделя ${ddmm(last.start)}–${ddmm(last.end)} · сравнение с предыдущей неделей` };
+}
+function sortedChildren(group) {
+  return Object.entries(group.children).sort((a, b) => (b[1].pct.avg ?? -1) - (a[1].pct.avg ?? -1));
+}
+function alertsCard() {
+  const al = S.sum.alerts || [];
+  if (!al.length) return `<div class="ok-card">✓ Требует решения: ничего. Все на цели или растут.</div>`;
+  return `<details class="alert-card collapsible-card" ${S.open.alert ? 'open' : ''} ontoggle="S.open.alert=this.open">
+    <summary><h3 style="margin:0">Требует решения · ${al.length}</h3></summary>
+    ${al.map(a => `<div class="alert-line" onclick="${a.cat ? `S.cat='${jsq(a.cat)}';openDyn('cats')` : `openDyn('avg')`}">
+      <div><b>${esc(a.name)}${a.cat ? ' · ' + esc(a.cat) : ''}</b><div class="alert-why">${esc(a.why)}</div></div><span>${a.value}% ›</span></div>`).join('')}
+    <p class="card-note">Попадает сюда только то, что ниже цели и не выросло за 3 последние недели. Ниже цели, но растёт — работа идёт, решения не нужно.</p>
+  </details>`;
+}
+function heroBlock(label, nowG, prevG, note, key) {
+  const t = nowG.total, all = t.pct.avg, pv = prevG ? prevG.total.pct.avg : null;
+  const prevChildren = prevG ? prevG.children : {};
+  return `<div class="hero">
+    <details class="br" ${S.open[key + ':all'] ? 'open' : ''} ontoggle="S.open['${key}:all']=this.open">
+      <summary style="display:block">
+        <div class="hero-label">${label}</div>
+        <div class="hero-row"><span class="hero-pct" style="color:${sysColor(all)}">${all == null ? '—' : all + '%'}</span>${delta(dif(all, pv))}<span class="how">из чего ›</span></div>
+        <div class="goal-track"><div class="goal-fill" style="width:${Math.min(100, all || 0)}%;background:${sysColor(all)}"></div><div class="goal-mark" style="left:75%"></div></div>
+        <div class="goal-cap">цель 75%</div>
+      </summary>
+      ${compBlock(t, prevG ? prevG.total : null, key + ':all', key === 'sum' ? 'компании' : null)}
+    </details>
+    <div style="margin-top:4px">${sortedChildren(nowG).map(([n, c]) => {
+      const k = key + ':' + n, pc = prevChildren[n];
+      return `<details class="br" ${S.open[k] ? 'open' : ''} ontoggle="S.open['${jsq(k)}']=this.open"><summary style="display:block">${barRow(esc(n) + ' <span class="br-arrow">›</span>', c.pct.avg, sysColor, delta(dif(c.pct.avg, pc && pc.pct.avg)))}</summary>
+        ${compBlock(c, pc, k, key === 'sum' ? '' : null)}</details>`;
+    }).join('')}</div>
+    <p class="card-note">${note}</p>
+  </div>`;
+}
+function screenSummary() {
+  const d = S.sum, b = basis();
+  if (!b) return '<div class="empty">Недельные итоги ещё не посчитаны. Они появятся после первой полной недели.</div>';
+  setPill(b.pill);
+  const lvl = d.child_level_name.toLowerCase();
+  let html = `<div class="sub">${b.sub}</div>`;
+  const t = new Date(d.today + 'T00:00:00');
+  if (t.getDate() <= 7 && S.month && S.month.closed) {
+    const m = S.month;
+    html += heroBlock(`Итоги: ${MONTHS[m.month - 1]} (месяц закрыт)`, m.now, m.prev,
+      `Начало месяца: пока новый месяц не набрал данных, главная цифра — закрытый ${MONTHS[m.month - 1]}. Изменение — к предыдущему месяцу.`, 'sm');
+    html += `<div class="sub" style="margin-top:4px">${d.current ? "Текущая неделя" : "Прошлая неделя"}</div>`;
+  }
+  html += heroBlock(d.role === 'director' ? 'Среднее по компании' : 'Среднее по вашей зоне', b.now, b.prev,
+    `Среднее из шести показателей: системная, чистая, СТТ точек, категории, задачи СВ и ТОП-5. Нажмите на строку (${esc(lvl)}) — увидите, из чего сложилась цифра. Цель — 75% у каждого. Сравниваем одинаковые дни недели: маршруты построены по дням.`, 'sum');
+  return html + alertsCard();
+}
+
+// ---------- Динамика ----------
+function series() {
+  const d = S.sum, pts = d.weeks.map(w => ({ label: ddmm(w.start), g: w, full: true }));
+  if (d.current) {
+    const e = new Date(d.current.end + 'T00:00:00');
+    pts.push({ label: d.current.days > 1 ? `пн–${DOW[e.getDay()]}` : 'пн', g: d.current.now, full: false });
+  }
+  return pts;
+}
+function chart(lines, labels, goal) {
+  const vals = Object.values(lines).flat().filter(v => v != null);
+  if (!vals.length || labels.length < 2) return '<div class="empty" style="padding:16px">Мало данных для графика — нужна хотя бы пара недель.</div>';
+  const w = 340, h = 170, L = 28, R = 22, T = 12, B = 22;
+  let lo = Math.floor((Math.min(...vals, goal) - 5) / 10) * 10, hi = Math.min(100, Math.ceil((Math.max(...vals, goal) + 3) / 10) * 10);
+  lo = Math.max(0, lo); if (hi - lo < 20) lo = Math.max(0, hi - 20);
+  const x = i => L + i * (w - L - R) / (labels.length - 1), y = v => T + (hi - v) * (h - T - B) / (hi - lo);
+  const grid = []; for (let v = lo; v <= hi; v += 10) grid.push(`<line x1="${L}" x2="${w - R}" y1="${y(v)}" y2="${y(v)}" stroke="#ECE6D8"/><text x="${L - 6}" y="${y(v) + 3}" text-anchor="end" font-size="9" fill="#8B8578">${v}</text>`);
+  const g = `<line x1="${L}" x2="${w - R}" y1="${y(goal)}" y2="${y(goal)}" stroke="#2C2A26" stroke-dasharray="4 3" stroke-width="1.2"/><text x="${L + 4}" y="${y(goal) - 4}" font-size="9" font-weight="700" fill="#2C2A26">цель ${goal}%</text>`;
+  const ls = Object.entries(lines).map(([n, v], k) => {
+    const c = COLORS[k % COLORS.length];
+    const pts = v.map((p, i) => p == null ? null : [x(i), y(p)]);
+    const segs = []; let cur = [];
+    pts.forEach(p => { if (p) cur.push(p.join(',')); else { if (cur.length) segs.push(cur); cur = []; } });
+    if (cur.length) segs.push(cur);
+    const lastI = v.map((p, i) => p == null ? -1 : i).filter(i => i >= 0).pop();
+    return segs.map(sg => `<polyline fill="none" stroke="${c}" stroke-width="2.2" stroke-linejoin="round" points="${sg.join(' ')}"/>`).join('') +
+      (lastI != null && lastI >= 0 ? `<circle cx="${x(lastI)}" cy="${y(v[lastI])}" r="3.5" fill="#fff" stroke="${c}" stroke-width="2"/>` : '');
+  }).join('');
+  const xs = labels.map((t, i) => `<text x="${x(i)}" y="${h - 6}" text-anchor="middle" font-size="9" fill="#8B8578">${t}</text>`).join('');
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%">${grid.join('')}${g}${ls}${xs}</svg>
+    <div class="legend">${Object.keys(lines).map((n, k) => `<span><i style="background:${COLORS[k % COLORS.length]}"></i>${esc(n)}</span>`).join('')}</div>`;
+}
+const DYN = [
+  ['avg', 'Среднее', 'Линия — подразделение, пунктир — цель 75%. Справа — изменение между первой и последней полной неделей: растёт ли каждое или стоит на месте.'],
+  ['stt', 'Клиентская база', 'Доля точек СТТ от ПАКБ на конец каждой недели (с 1-го числа месяца). Растёт — точки переходят из АКБ в систему. В начале месяца доля всегда ниже: визитов ещё мало.'],
+  ['sys', 'Система', 'Системная по неделям. Рост без роста чистой значит: заказов больше, но дисциплина маршрута не выросла.'],
+  ['cats', 'Категории', 'Выбранная категория по подразделениям, цель 90%. Где категория не закреплена — линии нет.'],
+  ['tasks', 'Задачи СВ', 'Как супервайзеры возвращают точки с 2+ пропусками подряд. Цель 90%.'],
+  ['top5', 'ТОП-5', 'Выполнение нормы маршрутами из ТОП-5 по дефициту (закреплены на месяц по итогам прошлого). Цель 90%.'],
+];
+function valOf(g, k) { return k === 'cats' ? (g.cat_pct || {})[S.cat] ?? null : g.pct[k]; }
+function screenDynamics() {
+  setPill(`${S.sum.weeks.length} нед.`);
+  const pts = series();
+  if (!pts.length) return '<div class="empty">Недельные итоги ещё не посчитаны.</div>';
+  const names = [...new Set(pts.flatMap(p => Object.keys(p.g.children)))];
+  const cats = [...new Set(pts.flatMap(p => Object.keys(p.g.total.cat_pct || {})))].sort();
+  if (!S.cat || !cats.includes(S.cat)) S.cat = cats[0] || null;
+  const full = pts.filter(p => p.full);
+  const open = S.open.dyn || 'avg';
+  return `<div class="sub">Недели с ${ddmm(S.sum.weeks[0] ? S.sum.weeks[0].start : S.sum.today)} · пн–вс${S.sum.current ? ' · последняя точка — текущая неделя' : ''}</div>` +
+    DYN.filter(([k]) => k !== 'cats' || cats.length).map(([k, title, note]) => {
+      const lines = {};
+      names.forEach(n => { const v = pts.map(p => p.g.children[n] ? valOf(p.g.children[n], k) : null); if (v.some(x => x != null)) lines[n] = v; });
+      const tv = pts.map(p => valOf(p.g.total, k)).filter(v => v != null);
+      const cur = tv.length ? tv[tv.length - 1] : null;
+      const fv = full.map(p => valOf(p.g.total, k)).filter(v => v != null);
+      const sw = k === 'cats' ? `<div class="cat-chips">${cats.map(c => {
+        const v = pts[pts.length - 1].g.total.cat_pct[c];
+        return `<button class="cat-sel ${c === S.cat ? 'on' : ''}" onclick="event.preventDefault();S.cat='${jsq(c)}';S.open.dyn='cats';render()"><span>${esc(c)}</span><b style="color:${c === S.cat ? '#fff' : catColor(v)}">${v == null ? '—' : v + '%'}</b></button>`;
+      }).join('')}</div>` : '';
+      const changes = Object.entries(lines).map(([n]) => {
+        const v = full.map(p => p.g.children[n] ? valOf(p.g.children[n], k) : null).filter(x => x != null);
+        return `<div class="bar-row" style="padding:6px 0"><div class="bar-row-label" style="margin:0"><span>${esc(n)}</span><span>${v.length > 1 ? delta(v[v.length - 1] - v[0]) + ` <span class="rating-delta neutral">за ${v.length - 1} нед.</span>` : '<span class="rating-delta neutral">мало данных</span>'}</span></div></div>`;
+      }).join('');
+      return `<details class="day-card collapsible-card" ${open === k ? 'open' : ''} ontoggle="if(this.open)S.open.dyn='${k}'">
+        <summary><h3>${title}</h3><span class="sum-right">${fv.length > 1 ? delta(fv[fv.length - 1] - fv[0]) : ''}<span class="sum-val" style="color:${colorOf(k)(cur)}">${cur == null ? '—' : cur + '%'}</span></span></summary>
+        ${sw}<div class="chart-wrap">${chart(lines, pts.map(p => p.label), goalOf(k))}</div>
+        <div style="margin-top:6px">${changes}</div><p class="card-note">${note}</p></details>`;
+    }).join('');
+}
+
+// ---------- Итоги месяца ----------
+function mCard(k, title, inner, note, val) {
+  return `<details class="day-card collapsible-card" ${S.open['m:' + k] ? 'open' : ''} ontoggle="S.open['m:${k}']=this.open">
+    <summary><h3>${title}</h3><span class="sum-right"><span class="sum-val" style="color:${colorOf(k)(val)}">${val == null ? '—' : val + '%'}</span></span></summary>
+    ${inner}<p class="card-note">${note}</p></details>`;
+}
+function screenMonth() {
+  const m = S.month;
+  if (!m) return '<div class="loader"><div class="spinner"></div><span>Загрузка итогов месяца...</span></div>';
+  setPill(MONTHS[m.month - 1]);
+  const nav = monthNav(m);
+  if (!m.closed) return nav + `<div class="empty">Итоги за ${MONTHS[m.month - 1]} ${m.year} ещё не закрыты или пусты.</div>`;
+  const now = m.now, prev = m.prev, ch = sortedChildren(now), t = now.total, pt = prev ? prev.total.pct : {};
+  const pc = n => prev && prev.children[n] ? prev.children[n].pct : {};
+  const rows = (k, fn, right) => ch.map(([n, c]) => barRow(esc(n), c.pct[k], fn, right ? right(n, c) : delta(dif(c.pct[k], pc(n)[k])), goalOf(k))).join('');
+  const cats = Object.keys(t.cat_pct || {}).sort();
+  if (!S.mcat || !cats.includes(S.mcat)) S.mcat = cats[0];
+  const levels = m.rating_levels || [];
+  if (!S.rLevel || !levels.some(l => l.key === S.rLevel)) S.rLevel = levels.length ? levels[0].key : null;
+  const rl = (m.ratings || {})[S.rLevel] || [];
+  return nav + heroBlock(`Среднее за ${MONTHS[m.month - 1]}`, now, prev,
+      `Итоги закрытого месяца. Изменение — к предыдущему месяцу. Нажмите на строку — увидите, из чего сложилась цифра.`, 'mon') +
+    mCard('stt', 'Клиентская база', `<div class="kb-text" style="margin-top:10px">ПАКБ <b>${num(t.pakb)}</b> · СТТ <b>${num(t.stt_pts)} шт</b> · АКБ <b>${num(t.akb_pts)}</b> · Не АКБ <b>${num(t.neakb_pts)}</b></div>${rows('stt', sysColor)}`,
+      'Доля точек СТТ от всей клиентской базы (ПАКБ) за месяц. СТТ — заказ в 75%+ плановых визитов.', t.pct.stt) +
+    mCard('sys', 'Система', `<div class="day-tiles-row">
+        <div class="day-tile"><div class="val" style="color:${sysColor(t.pct.sys)}">${t.pct.sys ?? '—'}%</div><div class="lbl">системная</div></div>
+        <div class="day-tile"><div class="val" style="color:${sysColor(t.pct.clean)}">${t.pct.clean ?? '—'}%</div><div class="lbl">чистая</div></div>
+        <div class="day-tile"><div class="val">${num(t.off + t.ghost)}</div><div class="lbl">вне маршрута</div></div></div>
+        ${rows('sys', sysColor, (n, c) => `<span>${delta(dif(c.pct.sys, pc(n).sys))} <span class="rating-delta neutral">· чистая ${c.pct.clean ?? '—'}%</span></span>`)}`,
+      'Системная — заказы в плановый день ÷ план визитов. Чистая — без заказов вне маршрута и на точках не из плана.', t.pct.sys) +
+    (cats.length ? mCard('cats', 'Категории', `<div class="cat-chips">${cats.map(c => `<button class="cat-sel ${c === S.mcat ? 'on' : ''}" onclick="event.preventDefault();S.mcat='${jsq(c)}';S.open['m:cats']=true;render()"><span>${esc(c)}</span><b style="color:${c === S.mcat ? '#fff' : catColor(t.cat_pct[c])}">${t.cat_pct[c] ?? '—'}%</b></button>`).join('')}</div>
+        ${ch.filter(([, c]) => c.cat_pct[S.mcat] != null).map(([n, c]) => barRow(esc(n), c.cat_pct[S.mcat], catColor, delta(dif(c.cat_pct[S.mcat], prev && prev.children[n] ? prev.children[n].cat_pct[S.mcat] : null)), 90)).join('')}`,
+      'Доля заказов с категорией. Считаются только те, за кем категория закреплена. Цель — 90%.', t.pct.cats) : '') +
+    mCard('tasks', 'Задачи СВ', rows('tasks', catColor), 'Точки с 2+ пропусками подряд, где СВ добился заказа в следующий плановый день. Цель — 90%.', t.pct.tasks) +
+    mCard('top5', 'ТОП-5', rows('top5', catColor), `Выполнение нормы маршрутами из ТОП-5 по дефициту (${t.top5_routes} маршрутов). Цель — 90%.`, t.pct.top5) +
+    `<div class="day-card"><h3>Рейтинг по среднему</h3>
+      <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';render()">${esc(l.name)}</button>`).join('')}</div>
+      ${rl.length ? rl.map((r, i) => `<div class="rate-row"><span class="rate-n ${i < 3 ? 'top' : ''}">${i + 1}</span>
+        <div class="rate-name"><b>${esc(r.name)}</b>${r.parent ? `<div class="rate-sub">${esc(r.parent)}</div>` : ''}</div>
+        ${delta(r.delta)}<span class="rate-pct" style="color:${sysColor(r.avg)}">${r.avg}%</span></div>`).join('') : '<div class="empty" style="padding:12px">Нет данных</div>'}
+      <p class="card-note">${S.rLevel === 'agent' ? 'Десять лучших агентов вашей зоны по среднему за месяц.' : 'Все по среднему за месяц, лучший сверху.'} Изменение — к прошлому месяцу. Одна шкала для всех одного уровня.</p></div>`;
+}
+function monthNav(m) {
+  const t = new Date(S.sum ? S.sum.today + 'T00:00:00' : Date.now());
+  const isLast = (m.year * 12 + m.month) >= (t.getFullYear() * 12 + t.getMonth());
+  return `<div class="month-nav"><button onclick="shiftMonth(-1)">‹</button><span>${MONTHS[m.month - 1]} ${m.year}${m.closed ? ' · закрыт' : ''}</span><button onclick="shiftMonth(1)" ${isLast ? 'disabled' : ''}>›</button></div>`;
+}
+async function shiftMonth(step) {
+  let { month, year } = S.month;
+  month += step; if (month < 1) { month = 12; year--; } if (month > 12) { month = 1; year++; }
+  S.month = null; render();
+  await loadMonth(month, year); render();
+}
+
+// ---------- Общее ----------
+function setPill(t) { const p = document.getElementById('topPill'); p.textContent = t; p.style.display = t ? '' : 'none'; }
+function openDyn(card) { S.open.dyn = card; go('dyn'); }
+function render() {
+  const c = document.getElementById('mainContent'), y = c.scrollTop;
+  if (!S.sum) return;
+  c.innerHTML = S.screen === 'sum' ? screenSummary() : S.screen === 'dyn' ? screenDynamics() : screenMonth();
+  c.scrollTop = y;
+}
+async function go(s) {
+  S.screen = s;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.s === s));
+  document.getElementById('mainContent').scrollTop = 0;
+  render();
+  if (s === 'month' && !S.month) { await loadMonth(); render(); }
+}
+async function loadMonth(month, year) {
+  try {
+    const q = month ? `?month=${month}&year=${year}` : '';
+    const r = await fetch(`${API}/api/leader/${S.id}/month${q}`);
+    if (!r.ok) throw new Error(r.status);
+    S.month = await r.json();
+  } catch (e) { S.month = { month: month || 1, year: year || 2026, closed: false }; }
+}
+async function main() {
+  S.id = getTelegramId();
+  const m = document.getElementById('mainContent');
+  if (!S.id) { m.innerHTML = '<div class="empty">Откройте дашборд из бота</div>'; return; }
+  try {
+    const r = await fetch(`${API}/api/leader/${S.id}/summary`);
+    if (r.status === 403) { m.innerHTML = '<div class="empty">Этот экран — для директора, руководителя филиала и руководителя продаж.</div>'; return; }
+    if (!r.ok) throw new Error(r.status);
+    S.sum = await r.json();
+  } catch (e) { m.innerHTML = '<div class="empty">⚠️ Не удалось загрузить данные. Попробуйте позже.</div>'; return; }
+  document.getElementById('topTitle').textContent = S.sum.company;
+  document.getElementById('roleName').textContent = S.sum.role_name;
+  document.getElementById('roleIcon').textContent = S.sum.role_name[0];
+  document.getElementById('personName').textContent = S.sum.name;
+  if (new Date(S.sum.today + 'T00:00:00').getDate() <= 7) await loadMonth();
+  render();
+}
+if (window.Telegram?.WebApp) { try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch (e) {} }
+main();
+</script>
+</body>
+</html>
