@@ -62,13 +62,13 @@
   .day-tile .val { font-size: 18px; font-weight: 800; }
   .day-tile .lbl { font-size: 10px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
 
-  .alert-card { background: var(--red-bg); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
+  .alert-card { background: var(--card); border-radius: 16px; padding: 14px 16px; margin-bottom: 10px; }
   .alert-card h3 { font-size: 12px; font-weight: 700; color: var(--red-dark); margin: 0 0 8px; text-transform: uppercase; letter-spacing: .02em; }
   .alert-row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 0; border-top: 1px solid rgba(169,59,48,.14); font-size: 12px; }
   .alert-row:first-of-type { border-top: none; }
   .alert-row b { color: var(--ink); }
   .alert-row span:last-child { font-weight: 800; color: var(--red-dark); white-space: nowrap; }
-  .alert-card .card-note { color: var(--red-dark); opacity: .8; }
+  .alert-card .card-note { color: var(--ink-soft); }
 
   .cat-head { font-size: 12px; font-weight: 800; margin: 12px 0 2px; display: flex; justify-content: space-between; }
   .cat-head:first-of-type { margin-top: 10px; }
@@ -85,7 +85,7 @@
   .alert-item:first-of-type { margin-top: 8px; }
   .alert-top { display: flex; justify-content: space-between; font-size: 13px; }
   .alert-top span { font-weight: 800; color: var(--red-dark); }
-  .alert-why { font-size: 11px; color: var(--ink); opacity: .75; margin-top: 3px; line-height: 1.4; }
+  .alert-why { font-size: 11px; color: var(--ink-soft); margin-top: 3px; line-height: 1.4; }
   .mini-weeks { display: flex; gap: 4px; margin-top: 7px; }
   .mini-weeks span { flex: 1; text-align: center; font-size: 10px; font-weight: 800; color: #fff; border-radius: 6px; padding: 3px 0; }
   .alert-act, .to-dyn { font-size: 11.5px; font-weight: 700; color: var(--blue); margin-top: 8px; cursor: pointer; }
@@ -97,9 +97,9 @@
   .cat-sel.on { background: var(--ink); } .cat-sel.on span { color: #fff; }
   .sum-right .rating-delta { font-size: 10.5px; }
 
-  .alert-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid rgba(169,59,48,.14); cursor: pointer; font-size: 13px; }
+  .alert-line { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); cursor: pointer; font-size: 13px; }
   .alert-line:first-of-type { margin-top: 8px; }
-  .alert-line > span { font-weight: 800; color: var(--red-dark); white-space: nowrap; }
+  .alert-line > span { font-weight: 800; color: var(--ink); white-space: nowrap; }
   .lvl-bar { flex: 1; height: 8px; border-radius: 4px; overflow: hidden; display: flex; }
   .lvl-bar i { display: block; height: 100%; }
 
@@ -145,13 +145,13 @@
   .cat-chips { overflow-x: auto; }
   .cat-sel { min-width: 84px; }
 
-  .alert-sec { font-size: 10px; font-weight: 800; color: var(--red-dark); text-transform: uppercase; letter-spacing: .03em; margin: 12px 0 2px; opacity: .85; }
+  .alert-sec { font-size: 10px; font-weight: 800; color: var(--red-dark); text-transform: uppercase; letter-spacing: .03em; margin: 14px 0 2px; }
   .alert-ok { font-size: 12px; font-weight: 700; color: var(--green); padding: 6px 0; }
   .ghost-chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 4px 0 2px; }
-  .ghost-chips span { font-size: 10.5px; font-weight: 600; background: rgba(255,255,255,.7); color: var(--ink); border-radius: 6px; padding: 2px 7px; }
+  .ghost-chips span { font-size: 10.5px; font-weight: 600; background: var(--bg); color: var(--ink); border-radius: 6px; padding: 2px 7px; }
   .la-tab { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 6px 0 4px; }
   .la-tab th { text-align: left; font-size: 10px; color: var(--ink-soft); font-weight: 700; padding: 3px 4px; }
-  .la-tab td { padding: 4px; border-top: 1px solid rgba(169,59,48,.12); }
+  .la-tab td { padding: 4px; border-top: 1px solid var(--line); }
   .la-tab td.grp { font-weight: 800; font-size: 11px; padding-top: 8px; }
   .back-btn { display: inline-block; font-size: 12.5px; font-weight: 700; color: var(--blue); background: var(--card); border-radius: 100px; padding: 7px 14px; margin: -4px 0 12px; cursor: pointer; }
   .how-box { background: var(--blue-bg); border-radius: 10px; padding: 10px 12px; margin: 10px 0 4px; }
@@ -163,6 +163,7 @@
   .t5-team { border-top: 1px solid rgba(59,125,219,.18); }
   .t5-team summary { list-style: none; color: var(--ink); display: flex; justify-content: space-between; align-items: center; padding: 8px 0; cursor: pointer; font-size: 12.5px; }
   .t5-sub { display: block; font-size: 10.5px; color: var(--ink-soft); font-weight: 600; }
+  .t-soft { color: var(--ink-soft); font-size: 11px; }
 </style>
 </head>
 <body>
@@ -279,7 +280,7 @@ function alertsCard() {
   let amW = '', pmW = '';
   const ghost = b ? b.now.total.ghost : 0;
   const ghostBy = b ? Object.entries(b.now.children).map(([n, c]) => [n, c.ghost]).filter(x => x[1] > 0).sort((x, y) => y[1] - x[1]) : [];
-  const notOpen = L && !L.no_data ? L.agent.am_not + L.agent.pm_not + L.sv.am_not + L.sv.pm_not : 0;
+  const notOpen = L && !L.no_data ? (L.am_empty ? 0 : L.agent.am_not + L.sv.am_not) + (L.pm_empty ? 0 : L.agent.pm_not + L.sv.pm_not) : 0;
   const count = al.length + (ghost > 0 ? 1 : 0) + (notOpen > 0 ? 1 : 0);
   const chips = list => `<div class="ghost-chips">${list.map(([n, v]) => `<span>${esc(n)} <b>${v}</b></span>`).join('')}</div>`;
   let html = `<details class="alert-card collapsible-card" ${S.open.alert ? 'open' : ''} ontoggle="S.open.alert=this.open">
@@ -294,15 +295,18 @@ function alertsCard() {
   if (L) {
     const dd = ddmm(L.date);
     amW = hh(L.am_hour ?? 6) + '–' + hh((L.am_hour ?? 6) + 1); pmW = hh(L.pm_hour ?? 19) + '–' + hh((L.pm_hour ?? 19) + 1);
-    if (L.no_data) html += `<div class="alert-sec">Не открыли Mini App · ${dd}</div>
-      <div class="alert-why" style="padding:4px 0 2px">За ${dd} открытий ещё нет: учёт идёт с новой версии. Первые цифры — на следующий рабочий день после заливки: утро ${amW}, вечер ${pmW}.</div>`;
+    const day = L.today ? 'сегодня' : dd;
+    if (L.no_data && !L.pm_pending) html += `<div class="alert-sec">Не открыли Mini App · ${day}</div>
+      <div class="alert-why" style="padding:4px 0 2px">За ${dd} открытий ещё нет: учёт идёт с новой версии. Цифры появятся после ближайшего окна: утро ${amW}, вечер ${pmW}.</div>`;
     else {
-    html += `<div class="alert-sec">Не открыли Mini App · ${dd}</div>
+      const cell = (v, t, empty, pend) => pend ? `<span class="t-soft">после ${pmW.slice(-5)}</span>` : empty ? '<span class="t-soft">нет учёта</span>' : `<b>${v}</b> из ${t}`;
+      html += `<div class="alert-sec">Не открыли Mini App · ${day}</div>
       <table class="la-tab"><tr><th></th><th>утро<br>${amW}</th><th>вечер<br>${pmW}</th></tr>
-        <tr><td>Агенты</td><td><b>${L.agent.am_not}</b> из ${L.agent.total}</td><td><b>${L.agent.pm_not}</b> из ${L.agent.total}</td></tr>
-        <tr><td>СВ</td><td><b>${L.sv.am_not}</b> из ${L.sv.total}</td><td><b>${L.sv.pm_not}</b> из ${L.sv.total}</td></tr></table>
-      ${chips(Object.entries(L.children).filter(([, v]) => v[0] + v[1] > 0).sort((x, y) => (y[1][0] + y[1][1]) - (x[1][0] + x[1][1])).map(([n, v]) => [n, v[0] + ' · ' + v[1]]))}`;
+        <tr><td>Агенты</td><td>${cell(L.agent.am_not, L.agent.total, L.am_empty)}</td><td>${cell(L.agent.pm_not, L.agent.total, L.pm_empty, L.pm_pending)}</td></tr>
+        <tr><td>СВ</td><td>${cell(L.sv.am_not, L.sv.total, L.am_empty)}</td><td>${cell(L.sv.pm_not, L.sv.total, L.pm_empty, L.pm_pending)}</td></tr></table>
+      ${L.am_empty && (L.pm_empty || L.pm_pending) ? '' : chips(Object.entries(L.children).map(([n, v]) => [n, [L.am_empty ? 0 : v[0], L.pm_empty || L.pm_pending ? 0 : v[1]]]).filter(([, v]) => v[0] + v[1] > 0).sort((x, y) => (y[1][0] + y[1][1]) - (x[1][0] + x[1][1])).map(([n, v]) => [n, L.pm_pending ? v[0] : v[0] + ' · ' + v[1]]))}`;
     }
+
   }
   const when = L ? `Утро: отчёт приходит в ${hh(L.am_hour ?? 6)} — засчитываем любое открытие Mini App с ${amW.replace('–', ' до ')}. Вечер: отчёт в ${hh(L.pm_hour ?? 19)} — засчитываем нажатие вкладки «Итоги дня» с ${pmW.replace('–', ' до ')} (у СВ там итоги его команды). ` : '';
   return html + `<p class="card-note">Решение нужно, если показатель ниже цели и не вырос за 3 недели. Призраки и неоткрытия показываем всегда; в чипах по подразделениям — утро · вечер. ${when}</p>
@@ -357,7 +361,7 @@ function series() {
   }
   return pts;
 }
-function chart(lines, labels, goal, newAt) {
+function chart(lines, labels, goal, newAt, newLabel) {
   const vals = Object.values(lines).flat().filter(v => v != null);
   if (!vals.length || labels.length < 2) return '<div class="empty" style="padding:16px">Мало данных для графика — нужна хотя бы пара недель.</div>';
   const w = 340, h = 170, L = 28, R = 22, T = 12, B = 22;
@@ -378,7 +382,7 @@ function chart(lines, labels, goal, newAt) {
   }).join('');
   const xs = labels.map((t, i) => `<text x="${x(i)}" y="${h - 6}" text-anchor="middle" font-size="9" fill="#8B8578">${t}</text>`).join('');
   const step = (x(1) - x(0)) / 2;
-  const nm = newAt ? `<line x1="${x(newAt) - step}" x2="${x(newAt) - step}" y1="${T}" y2="${h - B}" stroke="#3B7DDB" stroke-dasharray="3 3"/><text x="${x(newAt) - step + 3}" y="${T + 8}" font-size="9" font-weight="700" fill="#3B7DDB">новый ТОП-5</text>` : '';
+  const nm = newAt ? `<line x1="${x(newAt) - step}" x2="${x(newAt) - step}" y1="${T}" y2="${h - B}" stroke="#3B7DDB" stroke-dasharray="3 3"/><text x="${x(newAt) - step + 3}" y="${T + 8}" font-size="9" font-weight="700" fill="#3B7DDB">${newLabel || 'новый ТОП-5'}</text>` : '';
   return `<svg viewBox="0 0 ${w} ${h}" width="100%">${grid.join('')}${g}${nm}${ls}${xs}</svg>
     <div class="legend">${Object.keys(lines).map((n, k) => `<span><i style="background:${COLORS[k % COLORS.length]}"></i>${esc(n)}</span>`).join('')}</div>`;
 }
@@ -388,7 +392,7 @@ const DYN = [
   ['sys', 'Система', 'Системная по неделям. Рост без роста чистой значит: заказов больше, но дисциплина маршрута не выросла.'],
   ['cats', 'Категории', 'Выбранная категория по подразделениям, цель 90%. Где категория не закреплена — линии нет.'],
   ['tasks', 'Задачи СВ', 'Как супервайзеры возвращают точки с 2+ пропусками подряд. Цель 90%.'],
-  ['top5', 'ТОП-5', 'Выполнение нормы маршрутами из ТОП-5 по дефициту. Цель 75%. Пунктир «новый ТОП-5» — с нового месяца состав пересобран по итогам прошлого: до и после линии — разные маршруты.'],
+  ['top5', 'ТОП-5', 'Выполнение нормы маршрутами из ТОП-5 по дефициту. Цель 75%. Состав пятёрки меняется раз в месяц: в начале месяца у каждого ТМ берутся 5 маршрутов с наибольшим дефицитом прошлого месяца. Пунктир — с этой недели считается новая пятёрка (напр. «ТОП-5 октября» выбрана по итогам сентября), поэтому линии до и после пунктира — про разные маршруты.'],
 ];
 function top5How() {
   const rs = S.sum.top5_routes || [];
@@ -441,7 +445,7 @@ function screenDynamics() {
       }).join('');
       return `<details class="day-card collapsible-card" ${open === k ? 'open' : ''} ontoggle="if(this.open)S.open.dyn='${k}'">
         <summary><h3>${title}</h3><span class="sum-right">${fv.length > 1 ? delta(fv[fv.length - 1] - fv[0]) : ''}<span class="sum-val" style="color:${colorOf(k)(cur)}">${cur == null ? '—' : cur + '%'}</span></span></summary>
-        ${sw}${k === 'top5' ? top5How() : ''}<div class="chart-wrap">${chart(lines, pts.map(p => p.label), goalOf(k), k === 'top5' ? pts.findIndex((p, i) => i > 0 && p.m !== pts[i - 1].m) : null)}</div>
+        ${sw}${k === 'top5' ? top5How() : ''}<div class="chart-wrap">${chart(lines, pts.map(p => p.label), goalOf(k), k === 'top5' ? pts.findIndex((p, i) => i > 0 && p.m !== pts[i - 1].m) : null, k === 'top5' ? (() => { const i = pts.findIndex((p, j) => j > 0 && p.m !== pts[j - 1].m); return i > 0 ? 'ТОП-5 ' + MONTHS_GEN[pts[i].m] : ''; })() : '')}</div>
         <div style="margin-top:6px">${changes}</div><p class="card-note">${note}</p></details>`;
     }).join('');
 }
