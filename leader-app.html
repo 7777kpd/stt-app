@@ -287,10 +287,10 @@ function alertsCard() {
   const chips = list => `<div class="ghost-chips">${list.map(([n, v]) => `<span>${esc(n)} <b>${v}</b></span>`).join('')}</div>`;
   let html = `<details class="alert-card collapsible-card" ${S.open.alert ? 'open' : ''} ontoggle="S.open.alert=this.open">
     <summary><h3 style="margin:0">Требует решения · ${count}</h3></summary>
-    <div class="alert-sec">Ниже цели и не растёт</div>`;
+    <div class="alert-sec">Падает</div>`;
   html += al.length ? al.map(a => `<div class="alert-line" onclick="${a.cat ? `S.cat='${jsq(a.cat)}';openDyn('cats')` : `openDyn('avg')`}">
       <div><b>${esc(a.name)}</b><div class="alert-why">${esc(a.why)}</div></div><span class="al-val"><small>${a.cat ? 'категория ' + esc(a.cat) : 'среднее'}</small>${a.value}% ›</span></div>`).join('')
-    : `<div class="alert-ok">✓ Все на цели или уже растут</div>`;
+    : `<div class="alert-ok">✓ Ничего не падает</div>`;
   html += `<div class="alert-sec">Призраки — заказы на точках вне плана</div>`;
   html += ghost > 0 ? `<div class="alert-line"><div><b>${num(ghost)} заказов · ${esc(b.pill)}</b><div class="alert-why">точки добавить в план или разобраться, почему агенты работают не по маршруту</div></div><span>${num(ghost)}</span></div>${chips(ghostBy)}`
     : `<div class="alert-ok">✓ Призраков нет</div>`;
@@ -311,7 +311,7 @@ function alertsCard() {
 
   }
   const when = L ? `Утро: отчёт приходит в ${hh(L.am_hour ?? 6)} — засчитываем любое открытие Mini App с ${amW.replace('–', ' до ')}. Вечер: отчёт в ${hh(L.pm_hour ?? 19)} — засчитываем нажатие вкладки «Итоги дня» с ${pmW.replace('–', ' до ')} (у СВ там итоги его команды). ` : '';
-  return html + `<p class="card-note">Решение нужно, если показатель ниже цели, не вырос за 3 полные недели и на этой неделе тоже не растёт (та же база, что в «Среднем» наверху). Призраки и неоткрытия показываем всегда; в чипах по подразделениям — утро · вечер. ${when}</p>
+  return html + `<p class="card-note">В «Падает» — среднее или категория, которые ниже, чем 3 полные недели назад, и на этой неделе не растут (та же база, что в «Среднем» наверху). Неважно, выше цели или ниже: падение — сигнал в любом случае. Сверху — самое сильное падение, до 5 пунктов. Призраки и неоткрытия показываем всегда; в чипах по подразделениям — утро · вечер. ${when}</p>
   </details>`;
 }
 function heroBlock(label, nowG, prevG, note, key) {
