@@ -166,6 +166,7 @@
   .t-soft { color: var(--ink-soft); font-size: 11px; }
   .al-val { text-align: right; }
   .al-val small { display: block; font-size: 10px; font-weight: 700; color: var(--ink-soft); }
+  .dyn-head { font-size: 12px; line-height: 1.5; background: var(--bg); border-radius: 10px; padding: 8px 10px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -310,8 +311,8 @@ function alertsCard() {
     }
 
   }
-  const when = L ? `Утро: отчёт приходит в ${hh(L.am_hour ?? 6)} — засчитываем любое открытие Mini App с ${amW.replace('–', ' до ')}. Вечер: отчёт в ${hh(L.pm_hour ?? 19)} — засчитываем нажатие вкладки «Итоги дня» с ${pmW.replace('–', ' до ')} (у СВ там итоги его команды). ` : '';
-  return html + `<p class="card-note">В «Падает» — среднее или категория, которые ниже, чем 3 полные недели назад, и на этой неделе не растут (та же база, что в «Среднем» наверху). Неважно, выше цели или ниже: падение — сигнал в любом случае. Сверху — самое сильное падение, до 5 пунктов. Призраки и неоткрытия показываем всегда; в чипах по подразделениям — утро · вечер. ${when}</p>
+  const when = L ? `<br><b>Mini App:</b> утро — любое открытие ${amW}, вечер — нажатие «Итоги дня» ${pmW}.` : '';
+  return html + `<p class="card-note"><b>Падает:</b> последняя полная неделя ниже среднего за 3 недели до неё, и эта неделя не лучше прошлой.${when}</p>
   </details>`;
 }
 function heroBlock(label, nowG, prevG, note, key) {
@@ -389,7 +390,7 @@ function chart(lines, labels, goal, newAt, newLabel) {
     <div class="legend">${Object.keys(lines).map((n, k) => `<span><i style="background:${COLORS[k % COLORS.length]}"></i>${esc(n)}</span>`).join('')}</div>`;
 }
 const DYN = [
-  ['avg', 'Среднее', 'Линия — подразделение, пунктир — цель 75%. Справа — изменение между первой и последней полной неделей: растёт ли каждое или стоит на месте.'],
+  ['avg', 'Среднее', 'Линия — подразделение, пунктир — цель 75%.'],
   ['stt', 'Клиентская база', 'Доля точек СТТ от ПАКБ на конец каждой недели (с 1-го числа месяца). Растёт — точки переходят из АКБ в систему. В начале месяца доля всегда ниже: визитов ещё мало.'],
   ['sys', 'Система', 'Системная по неделям. Рост без роста чистой значит: заказов больше, но дисциплина маршрута не выросла.'],
   ['cats', 'Категории', 'Выбранная категория по подразделениям, цель 90%. Где категория не закреплена — линии нет.'],
@@ -420,6 +421,13 @@ function top5How() {
   </details>`;
 }
 function valOf(g, k) { return k === 'cats' ? (g.cat_pct || {})[S.cat] ?? null : g.pct[k]; }
+// 10.10.2026: изменение = последняя полная неделя − среднее предыдущих полных недель
+function vsAvg(v) {
+  if (v.length < 2) return null;
+  const last = v[v.length - 1], prev = v.slice(0, -1), avg = prev.reduce((a, b) => a + b, 0) / prev.length;
+  return { last, avg: Math.round(avg * 10) / 10, d: Math.round(last - avg), n: prev.length };
+}
+const f1 = x => String(x).replace('.', ',');
 function screenDynamics() {
   setPill(`${S.sum.weeks.length} нед.`);
   const pts = series();
@@ -430,25 +438,31 @@ function screenDynamics() {
   const full = pts.filter(p => p.full);
   const open = S.open.dyn || 'avg';
   const back = S.fromSum ? '<div class="back-btn" onclick="backToSum()">‹ Назад к сводке</div>' : '';
-  return back + `<div class="sub">Недели с ${ddmm(S.sum.weeks[0] ? S.sum.weeks[0].start : S.sum.today)} · пн–вс${S.sum.current ? ' · последняя точка — текущая неделя' : ''}</div>` +
+  return back + `<div class="sub">Полные недели пн–вс с ${ddmm(S.sum.weeks[0] ? S.sum.weeks[0].start : S.sum.today)}. Изменение = последняя полная неделя − среднее предыдущих.</div>` +
     DYN.filter(([k]) => k !== 'cats' || cats.length).map(([k, title, note]) => {
       const lines = {};
       names.forEach(n => { const v = pts.map(p => p.g.children[n] ? valOf(p.g.children[n], k) : null); if (v.some(x => x != null)) lines[n] = v; });
       const tv = pts.map(p => valOf(p.g.total, k)).filter(v => v != null);
-      const cur = tv.length ? tv[tv.length - 1] : null;
+      const curWeek = S.sum.current ? (tv.length ? tv[tv.length - 1] : null) : null;
       const fv = full.map(p => valOf(p.g.total, k)).filter(v => v != null);
+      const va = vsAvg(fv), cur = va ? va.last : (fv.length ? fv[fv.length - 1] : null);
+      const lastFull = full.length ? full[full.length - 1] : null;
+      const head = va ? `<div class="dyn-head">Неделя ${lastFull.label}: <b>${va.last}%</b> − среднее за ${va.n} нед. до неё <b>${f1(va.avg)}%</b> = <b>${va.d > 0 ? '+' : ''}${va.d} п.п.</b>
+        ${curWeek != null ? `<div class="t-soft">Идёт неделя (${pts[pts.length - 1].label}): ${curWeek}% — пустой кружок на графике, в расчёт не входит</div>` : ''}</div>` : '';
       const sw = k === 'cats' ? `<div class="cat-chips">${cats.map(c => {
         const v = pts[pts.length - 1].g.total.cat_pct[c];
         return `<button class="cat-sel ${c === S.cat ? 'on' : ''}" onclick="event.preventDefault();S.cat='${jsq(c)}';S.open.dyn='cats';render()"><span>${esc(c)}</span><b style="color:${c === S.cat ? '#fff' : catColor(v)}">${v == null ? '—' : v + '%'}</b></button>`;
       }).join('')}</div>` : '';
       const changes = Object.entries(lines).map(([n]) => {
         const v = full.map(p => p.g.children[n] ? valOf(p.g.children[n], k) : null).filter(x => x != null);
-        return `<div class="bar-row" style="padding:6px 0"><div class="bar-row-label" style="margin:0"><span>${esc(n)}</span><span>${v.length > 1 ? delta(v[v.length - 1] - v[0]) + ` <span class="rating-delta neutral">за ${v.length - 1} нед.</span>` : '<span class="rating-delta neutral">мало данных</span>'}</span></div></div>`;
+        const a = vsAvg(v);
+        return `<div class="bar-row" style="padding:6px 0"><div class="bar-row-label" style="margin:0"><span>${esc(n)}</span><span>${a ? `<span class="rating-delta neutral">${a.last}% ·</span> ` + delta(a.d) : '<span class="rating-delta neutral">мало данных</span>'}</span></div></div>`;
       }).join('');
       return `<details class="day-card collapsible-card" ${open === k ? 'open' : ''} ontoggle="if(this.open)S.open.dyn='${k}'">
-        <summary><h3>${title}</h3><span class="sum-right">${fv.length > 1 ? delta(fv[fv.length - 1] - fv[0]) : ''}<span class="sum-val" style="color:${colorOf(k)(cur)}">${cur == null ? '—' : cur + '%'}</span></span></summary>
-        ${sw}${k === 'top5' ? top5How() : ''}<div class="chart-wrap">${chart(lines, pts.map(p => p.label), goalOf(k), k === 'top5' ? pts.findIndex((p, i) => i > 0 && p.m !== pts[i - 1].m) : null, k === 'top5' ? (() => { const i = pts.findIndex((p, j) => j > 0 && p.m !== pts[j - 1].m); return i > 0 ? 'ТОП-5 ' + MONTHS_GEN[pts[i].m] : ''; })() : '')}</div>
-        <div style="margin-top:6px">${changes}</div><p class="card-note">${note}</p></details>`;
+        <summary><h3>${title}</h3><span class="sum-right">${va ? delta(va.d) : ''}<span class="sum-val" style="color:${colorOf(k)(cur)}">${cur == null ? '—' : cur + '%'}</span></span></summary>
+        ${head}${sw}${k === 'top5' ? top5How() : ''}<div class="chart-wrap">${chart(lines, pts.map(p => p.label), goalOf(k), k === 'top5' ? pts.findIndex((p, i) => i > 0 && p.m !== pts[i - 1].m) : null, k === 'top5' ? (() => { const i = pts.findIndex((p, j) => j > 0 && p.m !== pts[j - 1].m); return i > 0 ? 'ТОП-5 ' + MONTHS_GEN[pts[i].m] : ''; })() : '')}</div>
+        <div class="t-soft" style="margin-top:8px">По подразделениям: последняя полная неделя и изменение к среднему за предыдущие</div>
+        <div style="margin-top:2px">${changes}</div><p class="card-note">${note}</p></details>`;
     }).join('');
 }
 
