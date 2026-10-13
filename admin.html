@@ -430,6 +430,7 @@ function tabData(c){
       : `<div class="box" style="margin-top:12px"><p class="small" style="margin:0 0 8px">Структуру и План эта компания может присылать файлом по секретной ссылке — Факт при этом продолжит приходить из ${srcKey(c)==='bigquery'?'BigQuery':'API'}.</p>${canMgr()||canTech() ? `<button onclick="saveSource('${esc(c.company_id)}','file')">Создать ссылку для Структуры и Плана</button>` : ''}</div>`;
   }
   if(srcKey(c) === 'bigquery' && cur === 'bigquery') linkBlock = bqSpBlock(c);
+  if(['bigquery','api'].includes(srcKey(c)) && c.spreadsheet_id) linkBlock += archiveBlock(c);
   if(srcKey(c) === 'google') linkBlock = migrateBlock(c);
   else if(c.can_rollback && isOwner()) linkBlock += `<p class="small" style="margin-top:10px">Компания переведена с Google мастером. Если что-то не так — <a href="#" onclick="rollbackGoogle('${esc(c.company_id)}');return false">вернуть на Google</a>.</p>`;
   const srcBlock = `<div class="panel" style="padding:12px 16px"><p class="lbl">Источник данных</p>
@@ -599,6 +600,27 @@ async function bqSync(id, force){
     else { S.bq[id].error = e.message; }
   }
   render();
+}
+
+/* ---------- Архив итогов месяца: Google → база (13.10.2026) ---------- */
+function archiveBlock(c){
+  const ready = c.structure_on_db && c.plan_on_db, can = canTech();
+  return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">Архив итогов месяца — ещё в Google-таблице</strong>
+    <p class="small" style="margin:4px 0 8px">Заказы, Структура и План уже в базе. В Google остались только «Итоги месяца» (листы «Итоги ГГГГ-ММ»): по ним работают вкладка «Итоги месяца», выбор ТОП-5 и закрытие месяца. Кнопка скопирует все месяцы в базу и отключит Google-таблицу. Структуру и План она не трогает. Таблица у клиента не удаляется.</p>
+    ${!ready ? '<div class="note warn">Сначала загрузите Структуру и План в базу (блок BigQuery выше).</div>'
+      : can ? `<div class="acts"><button class="pri" id="ar_b" onclick="archiveToDb('${esc(c.company_id)}')">Перенести архив и отключить Google</button></div>`
+      : '<p class="small">Переносит владелец или техспециалист.</p>'}
+    <div id="ar_out"></div></div>`;
+}
+async function archiveToDb(id){
+  if(!confirm('Перенести архив итогов месяца в базу и отключить Google-таблицу компании?\n\nЗаймёт до минуты. Если что-то не перенесётся — Google останется подключён, ничего не сломается.')) return;
+  const b = $('ar_b'); b.disabled = true; b.textContent = 'Переношу архив…';
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id) + '/archive-to-db', {method:'POST'});
+    toast('Архив перенесён'); delete S.health[id]; await loadCompanies();
+    render();
+    const o = $('xl_out'); if(o) o.innerHTML = `<div class="note">${esc(r.message)}<br>${(r.lines||[]).map(esc).join('<br>')}</div>`;
+  } catch(e){ $('ar_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; b.disabled = false; b.textContent = 'Перенести архив и отключить Google'; }
 }
 
 /* ---------- План посещений: изменения маршрутов (13.10.2026) ---------- */
