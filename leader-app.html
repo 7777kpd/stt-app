@@ -390,16 +390,16 @@ function howRead() {
     <div>• <b>▲ / ▼</b> — насколько лучше или хуже этого среднего.</div></details>`;
 }
 function routesBlock() {
-  // 13.10.2026: правило изменения маршрутов. Цифры «в этом месяце» появятся, когда
-  // загрузка Плана начнёт запоминать новые точки и отложенные изменения.
+  // 13.10.2026: правило изменения маршрутов + что изменилось в этом месяце по зоне
+  // руководителя (S.sum.routes из leader_api; у компаний с Планом в Google — только правило).
   const r = S.sum.routes;
-  const head = r && (r.new_points || r.pending) ? `🗺 Маршруты: ${r.new_points ? r.new_points + ' новых точек' : ''}${r.new_points && r.pending ? ' · ' : ''}${r.pending ? r.pending + ' изменений ждут ' + r.pending_from : ''} ›`
+  const head = r && (r.new_points || r.pending) ? `🗺 Маршруты: ${r.new_points ? r.new_points + (r.new_points % 10 === 1 && r.new_points % 100 !== 11 ? ' новая точка' : [2,3,4].includes(r.new_points % 10) && ![12,13,14].includes(r.new_points % 100) ? ' новые точки' : ' новых точек') : ''}${r.new_points && r.pending ? ' · ' : ''}${r.pending ? r.pending + ' ' + (r.pending === 1 ? 'изменение ждёт' : 'изменений ждут') + ' ' + esc(r.pending_from) : ''} ›`
     : '🗺 Маршруты: как считаем изменения ›';
   return `<details class="routes" ${S.open.routes ? 'open' : ''} ontoggle="S.open.routes=this.open"><summary class="rt-h">${head}</summary>
     <div class="rt-b">Как считаем изменения маршрутов</div>
     <div class="rt-l">✅ <b>Новая точка</b> начинает считаться со дня, когда её добавили. До этого дня по ней нет ни визитов по плану, ни пропусков.</div>
     <div class="rt-l">⏳ <b>Сменили день визита или убрали точку</b> — заработает с 1-го числа следующего месяца. Если прислали 1–3 числа — с 1-го числа этого месяца.</div>
-    ${r && r.lines && r.lines.length ? `<div class="rt-b" style="margin-top:8px">В этом месяце</div>${r.lines.map(t => `<div class="rt-l">• ${t}</div>`).join('')}` : ''}
+    ${r && r.lines && r.lines.length ? `<div class="rt-b" style="margin-top:8px">В этом месяце</div>${r.lines.map(t => `<div class="rt-l">• ${esc(t)}</div>`).join('')}` : ''}
     <div class="rt-s">Зачем так: чтобы цифры уже прошедших дней не менялись задним числом.</div></details>`;
 }
 function screenSummary() {
