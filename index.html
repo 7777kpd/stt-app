@@ -1052,7 +1052,16 @@ function _switchSalesTab(btn) {
 function _focusTasksCardHtml(data) {
   const total = data.focus_tasks_total || 0;
   const completed = data.focus_tasks_completed || 0;
-  if (!total) return '';
+  // 13.10.2026: задач нет, а плановые визиты были — точек с 2+ пропусками подряд
+  // не возникло: «Задачи СВ» выполнены на 100%. Нет и визитов — карточку не показываем.
+  if (!total) {
+    if (!(data.planned_visits || data.passed_visits)) return '';
+    return `<div class="stt-card" style="border-left:3px solid #B8862B;display:flex;align-items:center;justify-content:space-between;">
+      <div style="display:flex;align-items:center;gap:7px;"><span>🎯</span><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#B8862B;">Задачи СВ</span></div>
+      <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:#3FAE6A;">100%</div>
+        <div style="font-size:9px;color:var(--muted);">точек с 2+ пропусками не было</div></div>
+    </div>`;
+  }
   const pct = Math.round(completed / total * 100);
   // 04.09.2026: цвет — ≥90 зелёный, 80-90 жёлтый, <80 красный.
   const color = pct >= 90 ? '#3FAE6A' : pct >= 80 ? '#E2A335' : '#DC5B4E';
