@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -291,7 +291,7 @@ function tabOverview(c){
 
 /* ---------- Состояние компании ---------- */
 const HEALTH_ICON = {ok:['✓','var(--ok)'], warn:['!','var(--warn)'], bad:['✕','var(--bad)'], info:['i','var(--ink-3)']};
-const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть период','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data'], payment:['Открыть оплату','pay'], tasks:['К задачам','ctasks']};
+const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть период','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data'], payment:['Открыть оплату','pay'], tasks:['К задачам','ctasks'], plan:['К Плану','data']};
 async function loadHealth(id, force){
   if(!force && S.health[id]) return;
   S.health[id] = 'loading';
@@ -455,7 +455,7 @@ function tabData(c){
     'Если после закрытия нет категорий — загрузите Факт с колонкой «Категория» и закройте снова.');
   const cacheCard = card(`<button style="width:100%" onclick="reload('${esc(c.company_id)}', true)">Сбросить кеш</button>`,
     'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
-  return `${srcBlock}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
+  return `${srcBlock}${src !== 'google' ? planBlock(c) : ''}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
     <div id="xl_out"></div>`;
 }
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -573,22 +573,60 @@ async function bqSave(id){
     toast('Адреса сохранены'); await loadBq(id); }
   catch(e){ toast(e.message); }
 }
+// 10.10.2026: «Проверить» и «Загрузить сейчас» сначала сохраняют введённые адреса —
+// раньше они работали только с уже сохранёнными, а перерисовка стирала поля.
+async function bqEnsureSaved(id){
+  const s = $('bq_s'), p = $('bq_p');
+  if(!s || !p || s.disabled) return;
+  const v = {structure: s.value.trim(), plan: p.value.trim()}, r = S.bq[id].refs || {};
+  if(v.structure === (r.structure || '') && v.plan === (r.plan || '')) return;
+  S.bq[id].refs = v;                       // поля не сотрутся при перерисовке, даже если сохранение не удалось
+  await api('/companies/' + encodeURIComponent(id) + '/bq-sp', {method:'POST', body:v});
+}
 async function bqCheck(id){
   const btn = $('bq_c'); btn.disabled = true; btn.textContent = 'Читаю BigQuery…';
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/check', {method:'POST'}); S.bq[id].check = r; S.bq[id].error = ''; S.bq[id].blocked = ''; }
+  try { await bqEnsureSaved(id); const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/check', {method:'POST'}); S.bq[id].check = r; S.bq[id].error = ''; S.bq[id].blocked = ''; }
   catch(e){ S.bq[id].error = e.message; S.bq[id].check = null; }
   render();
 }
 async function bqSync(id, force){
   if(force && !confirm('Записать данные из BigQuery, несмотря на предупреждение? Структура и План компании будут заменены.')) return;
   const btn = $('bq_y'); if(btn){ btn.disabled = true; btn.textContent = 'Загружаю…'; }
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/sync', {method:'POST', body:{force:!!force}});
-    toast(r.message); delete S.health[id]; await loadBq(id); return; }
+  try { await bqEnsureSaved(id); const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/sync', {method:'POST', body:{force:!!force}});
+    toast(r.message); delete S.health[id]; delete S.plan[id]; await loadBq(id); return; }
   catch(e){
     if(/Похоже на сбой|меньше половины/.test(e.message)){ S.bq[id].blocked = e.message; S.bq[id].error = ''; }
     else { S.bq[id].error = e.message; }
   }
   render();
+}
+
+/* ---------- План посещений: изменения маршрутов (13.10.2026) ---------- */
+async function loadPlan(id){
+  S.plan[id] = 'loading';
+  try { S.plan[id] = await api('/companies/' + encodeURIComponent(id) + '/plan-status'); }
+  catch(e){ S.plan[id] = {error:e.message, lines:[]}; }
+  if(S.sel === id) render();
+}
+function planBlock(c){
+  const p = S.plan[c.company_id];
+  if(!p || p === 'loading'){ if(!p) loadPlan(c.company_id); return '<div class="panel" style="padding:12px 16px;margin-top:12px"><p class="small">Загружаю План…</p></div>'; }
+  const lines = (p.lines || []).map(t => `<div class="small" style="padding:3px 0">• ${esc(t)}</div>`).join('');
+  const last = (p.last || []).map(x => `<div class="small" style="padding:4px 0;border-top:1px solid var(--line)">${fdt(x.at)} · ${esc(x.actor_name)} · ${esc(x.details)}</div>`).join('');
+  const btn = p.pending && canMgr() ? `<div class="note warn" style="margin-top:10px"><b>${p.pending} ${p.pending === 1 ? 'изменение ждёт' : 'изменений ждут'} ${esc(p.pending_from)}.</b> Если клиент просит включить их сейчас — можно, но показатели этого месяца пересчитаются задним числом.
+      <div class="acts"><button class="danger" id="pl_now" onclick="planApplyNow('${esc(c.company_id)}')">Применить План сейчас</button></div></div>`
+    : p.pending ? `<p class="small" style="margin-top:8px">Применить раньше 1-го числа может владелец или менеджер СТТ.</p>` : '';
+  return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">План посещений: изменения маршрутов</strong>
+    <p class="small" style="margin:4px 0 8px">✅ Новая точка считается со дня, когда её добавили. ⏳ Смена дня визита и удаление точки — с 1-го числа следующего месяца; если файл пришёл 1–3 числа — с 1-го числа этого месяца. Так цифры прошедших дней не меняются задним числом.</p>
+    ${p.error ? `<div class="note bad">${esc(p.error)}</div>` : (lines || '<p class="small">В этом месяце маршруты не менялись.</p>')}${btn}
+    ${last ? `<p class="lbl" style="margin-top:12px">Применяли досрочно</p>${last}` : ''}</div>`;
+}
+async function planApplyNow(id){
+  const p = S.plan[id] || {};
+  if(!confirm(`Применить План сейчас?\n\nСмена дней и удаление точек (${p.pending}) начнут действовать с 1-го числа ЭТОГО месяца, а не с ${p.pending_from}. Системная, чистая, ТОП-5 и итоги уже прошедших дней пересчитаются по новому плану — цифры, которые руководители уже видели, изменятся.\n\nДействие попадёт в журнал.`)) return;
+  const b = $('pl_now'); if(b){ b.disabled = true; b.textContent = 'Применяю…'; }
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/plan-apply-now', {method:'POST'}); toast(r.message); delete S.health[id]; await loadPlan(id); }
+  catch(e){ toast(e.message); if(b){ b.disabled = false; b.textContent = 'Применить План сейчас'; } }
 }
 
 /* ---------- Задачи ---------- */
@@ -870,7 +908,7 @@ function fileLinkBlock(c){
       <div class="small" style="margin-top:8px">
       <p>Раз в день (например, в 19:00) регламентным заданием сформировать один Excel-файл .xlsx с тремя листами и отправить его <b>POST-запросом</b> на ссылку выше: тело запроса — сам файл, заголовок <code>X-Filename</code> — имя файла (необязательно).</p>
       <p><b>«Структура»</b> — все сотрудники с руководителями и категориями; <b>«План посещений»</b> — агент, код ТТ, ТТ, дни визита; <b>«Факт посещений»</b> — Дата заказа, Агент, Код ТТ, Категория (можно также ТТ, Клиент, Сумма) за вчера или за текущий месяц. Названия листов и колонок — как в шаблоне Excel СТТ.</p>
-      <p>Структура и План каждый раз заменяются целиком, Факт — за дни из файла. Колонку «Telegram ID» 1С заполнять не нужно: бот сохранит ID сотрудников сам.</p>
+      <p>Структура каждый раз заменяется целиком. План — по правилу маршрутов: новые точки начинают считаться сразу, смена дней визита и удаление точек — с 1-го числа следующего месяца (если файл пришёл 1–3 числа — с 1-го числа этого месяца). Поэтому присылать полный План каждый день можно и нужно. Факт — за дни из файла. Колонку «Telegram ID» 1С заполнять не нужно: бот сохранит ID сотрудников сам.</p>
       <p>Ответ 200 — файл принят. Ответ 400 — файл не принят, причина в ответе (JSON, поле <code>detail</code>); при этом менеджер СТТ и техконтакт получат сообщение в Telegram.</p>
       <p>В 1С: <code>HTTPСоединение</code> к серверу из ссылки (HTTPS, порт 443) → <code>HTTPЗапрос</code> с адресом ресурса из ссылки → <code>УстановитьИмяФайлаТела(ПутьКФайлу)</code> → <code>ОтправитьДляОбработки</code>.</p>
       </div></details>
@@ -897,7 +935,7 @@ function excelPick(input, id){
       out.innerHTML = `<div class="panel" style="padding:12px 16px;margin-top:14px"><p class="lbl">Проверка файла ${esc(f.name)}</p>
         <pre style="white-space:pre-wrap;font:13px/1.5 var(--sans);margin:0">${esc(res.report)}</pre>
         <div class="acts"><button class="pri" id="xl_w" onclick="excelWrite('${esc(id)}','${esc(res.token)}')">Записать</button><button onclick="$('xl_out').innerHTML=''">Отмена</button></div>
-        <p class="small">Запись заменит Структуру и План компании целиком, а Факт — за месяцы, которые есть в файле.</p></div>`;
+        <p class="small">Запись заменит Структуру целиком, План — по правилу маршрутов (что именно изменится — в конце отчёта), а Факт — за месяцы, которые есть в файле.</p></div>`;
     } catch(e){ out.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
     input.value = '';
   };
@@ -908,7 +946,7 @@ async function excelWrite(id, token){
   const b = $('xl_w'); b.disabled = true; b.textContent = 'Записываю…';
   try {
     const r = await api('/companies/' + encodeURIComponent(id) + '/excel/write', {method:'POST', body:{token}});
-    $('xl_out').innerHTML = `<div class="note">${esc(r.message)}</div>`; delete S.health[id];
+    $('xl_out').innerHTML = `<div class="note">${esc(r.message)}</div>`; delete S.health[id]; delete S.plan[id];
     await loadCompanies(); toast('Данные записаны');
   } catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
 }
