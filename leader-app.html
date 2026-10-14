@@ -506,7 +506,10 @@ function screenDynamics() {
   const pts = series();
   if (!pts.length) return '<div class="empty">Недельные итоги ещё не посчитаны.</div>';
   const names = [...new Set(pts.flatMap(p => Object.keys(p.g.children)))];
-  const cats = [...new Set(pts.flatMap(p => Object.keys(p.g.total.cat_pct || {})))].sort();
+  // 14.10.2026: переключатель категорий — от большего % (последняя неделя) к меньшему
+  const lastCp = pts[pts.length - 1].g.total.cat_pct || {};
+  const cats = [...new Set(pts.flatMap(p => Object.keys(p.g.total.cat_pct || {})))]
+    .sort((a, b) => (lastCp[b] ?? -1) - (lastCp[a] ?? -1) || a.localeCompare(b));
   if (!S.cat || !cats.includes(S.cat)) S.cat = cats[0] || null;
   const full = pts.filter(p => p.full);
   const open = S.open.dyn || 'avg';
@@ -587,7 +590,7 @@ function screenMonth() {
   const now = m.now, prev = m.prev, ch = sortedChildren(now), t = now.total, pt = prev ? prev.total.pct : {};
   const pc = n => prev && prev.children[n] ? prev.children[n].pct : {};
   const rows = (k, fn, right) => ch.map(([n, c]) => barRow(esc(n), c.pct[k], fn, right ? right(n, c) : delta(dif(c.pct[k], pc(n)[k])), goalOf(k))).join('');
-  const cats = Object.keys(t.cat_pct || {}).sort();
+  const cats = Object.keys(t.cat_pct || {}).sort((a, b) => (t.cat_pct[b] ?? -1) - (t.cat_pct[a] ?? -1) || a.localeCompare(b));   // 14.10.2026: по убыванию
   if (!S.mcat || !cats.includes(S.mcat)) S.mcat = cats[0];
   const levels = m.rating_levels || [];
   if (!S.rLevel || !levels.some(l => l.key === S.rLevel)) S.rLevel = levels.length ? levels[0].key : null;
