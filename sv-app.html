@@ -344,12 +344,13 @@ function catLevel(v) { return v >= 90 ? 'green' : v >= 80 ? 'yellow' : 'red'; }
 function sysLevel(v) { return v >= 75 ? 'green' : v >= 50 ? 'yellow' : 'red'; }
 function catColor(v) { return 'var(--' + catLevel(v) + ')'; }
 function sysColor(v) { return 'var(--' + sysLevel(v) + ')'; }
-// Плашки категорий: худшие сначала, видно 3, остальные — «ещё N»; длинные
+// Плашки категорий: от большего % к меньшему (14.10.2026); в свёрнутом виде
+// видны 3 самые слабые, остальные (выше) — «ещё N»; длинные
 // названия обрезаются до 16 знаков, полное — по нажатию. onGreen — плашки
 // стоят на зелёной карточке «Лучший результат»: зелёным даём белый фон.
 function catChipsBlock(categories, opts) {
   opts = opts || {};
-  const items = Object.entries(categories || {}).sort((a, b) => a[1] - b[1]);
+  const items = Object.entries(categories || {}).sort((a, b) => b[1] - a[1]);
   const chip = ([name, v]) => {
     const lvl = catLevel(v);
     const bg = (lvl === 'green' && opts.onGreen) ? '#FFFFFF' : 'var(--' + lvl + '-bg)';
@@ -357,10 +358,10 @@ function catChipsBlock(categories, opts) {
     const fullAttr = short !== name ? ` data-full="${name.replace(/"/g, '&quot;')} ${v}%" onclick="event.stopPropagation();this.textContent=this.dataset.full" style="cursor:pointer;` : ' style="';
     return `<span${fullAttr}font-size:11px;font-weight:600;padding:4px 9px;border-radius:8px;background:${bg};color:var(--${lvl});white-space:nowrap;">${short} ${v}%</span>`;
   };
-  const head = items.slice(0, 3).map(chip).join('');
-  const rest = items.slice(3);
+  const head = items.slice(-3).map(chip).join('');
+  const rest = items.slice(0, -3);
   if (!rest.length) return head;
-  return head + `<span onclick="event.stopPropagation();this.nextElementSibling.style.display='contents';this.remove();" style="cursor:pointer;font-size:11px;font-weight:600;padding:4px 9px;border-radius:8px;background:var(--bg);color:var(--ink-soft);">ещё ${rest.length}</span><span style="display:none;">${rest.map(chip).join('')}</span>`;
+  return `<span style="display:none;">${rest.map(chip).join('')}</span><span style="display:contents;">${head}</span><span onclick="event.stopPropagation();this.previousElementSibling.previousElementSibling.style.display='contents';this.remove();" style="cursor:pointer;font-size:11px;font-weight:600;padding:4px 9px;border-radius:8px;background:var(--bg);color:var(--ink-soft);">ещё ${rest.length}</span>`;
 }
 
 const API = new URLSearchParams(window.location.search).get('dev') === '1'
@@ -926,7 +927,7 @@ function renderStt(data) {
   // правильно считает и присылает в каждом c.total. count тоже теперь
   // берётся готовым из c.orders, а не восстанавливается округлением
   // c.pct*total/100 (источник лишней погрешности).
-  const catsHtml = (data.categories || []).map(c => {
+  const catsHtml = (data.categories || []).slice().sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1)).map(c => {   // 14.10.2026: по убыванию
     const color = catColor(c.pct);   // 04.10.2026: шкала категорий 90/80
     return `
     <div class="category-row">
@@ -1312,7 +1313,7 @@ async function loadSvRating() {
 
     function catChipsHtml(categories, muted, onGreen) {
       if (!muted) return catChipsBlock(categories, { onGreen: !!onGreen });   // 04.10.2026
-      return Object.entries(categories || {}).map(([cat, v]) => {
+      return Object.entries(categories || {}).sort((a, b) => b[1] - a[1]).map(([cat, v]) => {
         if (muted) {
           return `<span style="font-size:11px;background:#F5F0E6;color:var(--ink-soft);padding:4px 9px;border-radius:8px;font-weight:600;">${cat} ${v}%</span>`;
         }
@@ -1739,7 +1740,7 @@ function renderDay(data) {
   // день — сразу после блока "Команда за день", до списка по торговым.
   const catShares = data.cat_shares_today || {};
   const totalOrdersToday = data.total_orders_today || 0;
-  const catRows = Object.entries(catShares).map(([name, v]) => {
+  const catRows = Object.entries(catShares).sort((a, b) => (b[1].pct ?? -1) - (a[1].pct ?? -1)).map(([name, v]) => {   // 14.10.2026: по убыванию
     const barColor = catColor(v.pct);   // 04.10.2026: шкала категорий 90/80
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
       <span style="width:70px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--ink-soft);">${name}</span>
