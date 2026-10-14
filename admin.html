@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}, routes:{}};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -345,6 +345,44 @@ function tabCfg(c){
   ${viewersBlock(c)}`;
 }
 
+/* ---------- Маршруты из API клиента (14.10.2026) ---------- */
+// План визитов по датам (RDB: /routes). Кнопка забирает «сегодня + 14 дней»,
+// сравнивает с Планом, который сейчас в работе, и сохраняет забор как точку отсчёта
+// для «Стабильности маршрутов». Дальше бот забирает их сам каждую ночь.
+function routesApiBlock(c){
+  const id = c.company_id, r = S.routes[id], can = canTech() || canMgr();
+  let body = '';
+  if(r === 'loading') body = '<p class="small">Забираю маршруты и сравниваю… до минуты.</p>';
+  else if(r && r.error) body = `<div class="note bad">${esc(r.error)}</div>`;
+  else if(r){
+    const n = x => Number(x || 0).toLocaleString('ru-RU');
+    const list = (title, arr) => arr && arr.length ? `<details style="margin-top:6px"><summary style="cursor:pointer">${title}</summary><div class="small" style="margin-top:4px">${arr.map(esc).join('<br>')}</div></details>` : '';
+    body = `<div class="note" style="margin-top:4px">Период ${esc(r.period)} · сборка у клиента: ${esc(r.last_refresh || '—')}<br>
+      В API: <b>${n(r.api_points)}</b> точек у ${n(r.api_agents)} агентов${r.vacancy_rows ? ` (+${n(r.vacancy_rows)} строк вакансий без агента)` : ''}.<br>
+      В нашем Плане на те же дни: <b>${n(r.our_points)}</b> точек у ${n(r.our_agents)} агентов.</div>
+      <div class="grid3" style="margin-top:10px">
+        <div class="box"><p class="lbl">Совпали дни</p><p class="val">${n(r.same)}${r.same_pct != null ? ` · ${r.same_pct}%` : ''}</p><p class="small">из ${n(r.both)} общих точек</p></div>
+        <div class="box"><p class="lbl">Дни отличаются</p><p class="val">${n(r.diff)}</p><p class="small">точка есть в обоих, дни разные</p></div>
+        <div class="box"><p class="lbl">Только в API / только у нас</p><p class="val">${n(r.only_api)} / ${n(r.only_our)}</p><p class="small">точки нет во втором источнике</p></div></div>
+      ${list('Примеры: дни отличаются', r.ex_diff)}${list('Примеры: только в API', r.ex_only_api)}${list('Примеры: только в нашем Плане', r.ex_only_our)}
+      ${list('Агенты только в API (нет в нашем Плане)', r.agents_only_api)}${list('Агенты только в нашем Плане (нет в API)', r.agents_only_our)}
+      ${r.agents && r.agents.length ? `<details style="margin-top:6px"><summary style="cursor:pointer">По агентам — больше всего расхождений сверху</summary>
+        <table class="small" style="width:100%;margin-top:6px;border-collapse:collapse"><tr style="color:var(--ink-3)"><td>Агент</td><td>API</td><td>у нас</td><td>совп.</td><td>дни</td><td>только API</td><td>только у нас</td></tr>
+        ${r.agents.map(a => `<tr style="border-top:1px solid var(--line)"><td>${esc(a.agent)}</td><td>${a.api}</td><td>${a.our}</td><td>${a.same}</td><td>${a.diff}</td><td>${a.only_api}</td><td>${a.only_our}</td></tr>`).join('')}</table></details>` : ''}
+      <p class="small" style="margin-top:8px">Записано: ${esc(r.saved || '—')}</p>`;
+  }
+  return `<div class="panel" style="padding:12px 16px;margin-top:12px"><p class="lbl">Маршруты из API (план визитов по датам)</p>
+    <p class="small" style="margin:4px 0 8px">Бот сам забирает маршруты каждую ночь после 02:00 по времени компании — для «Стабильности маршрутов» в дашборде руководителя. Кнопка заберёт их сейчас и сравнит с Планом, который сейчас в работе. Расчёты дашбордов это не меняет.</p>
+    ${can ? `<div class="acts"><button class="pri" id="rt_b" onclick="routesCheck('${esc(id)}')" ${r === 'loading' ? 'disabled' : ''}>Забрать сейчас и сравнить с Планом</button></div>` : ''}
+    ${body}</div>`;
+}
+async function routesCheck(id){
+  S.routes[id] = 'loading'; render();
+  try { S.routes[id] = await api('/companies/' + encodeURIComponent(id) + '/routes-check', {method:'POST'}); }
+  catch(e){ S.routes[id] = {error: e.message}; }
+  if(S.sel === id) render();
+}
+
 /* ---------- Доступ ко всем дашбордам (14.10.2026) ---------- */
 async function loadViewers(id){
   S.viewers[id] = 'loading';
@@ -497,7 +535,7 @@ function tabData(c){
     'Если после закрытия нет категорий — загрузите Факт с колонкой «Категория» и закройте снова.');
   const cacheCard = card(`<button style="width:100%" onclick="reload('${esc(c.company_id)}', true)">Сбросить кеш</button>`,
     'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
-  return `${srcBlock}${src !== 'google' ? planBlock(c) : ''}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
+  return `${srcBlock}${src === 'api' ? routesApiBlock(c) : ''}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
     <div id="xl_out"></div>`;
 }
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -645,11 +683,19 @@ async function bqSync(id, force){
 
 /* ---------- Архив итогов месяца: Google → база (13.10.2026) ---------- */
 function archiveBlock(c){
+  // 14.10.2026: текст по тому, что у компании реально ещё в Google (раньше всем писалось
+  // «Структура и План уже в базе» и «блок BigQuery выше» — у API-компаний это неправда).
   const ready = c.structure_on_db && c.plan_on_db, can = canTech();
+  if(!ready){
+    const left = [!c.structure_on_db && 'Структура', !c.plan_on_db && 'План посещений', 'Итоги месяца'].filter(Boolean).join(', ');
+    const how = srcKey(c) === 'bigquery' ? 'загрузите Структуру и План из BigQuery (блок выше)'
+      : 'загрузите Структуру и План Excel-файлом (кнопка «Загрузить Excel» ниже) или по секретной ссылке';
+    return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">Google-таблица ещё нужна</strong>
+      <p class="small" style="margin:4px 0 0">Заказы уже в базе. В Google остались: ${left}. Чтобы отключить Google, ${how} — после этого здесь появится перенос архива итогов месяца.</p></div>`;
+  }
   return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">Архив итогов месяца — ещё в Google-таблице</strong>
     <p class="small" style="margin:4px 0 8px">Заказы, Структура и План уже в базе. В Google остались только «Итоги месяца» (листы «Итоги ГГГГ-ММ»): по ним работают вкладка «Итоги месяца», выбор ТОП-5 и закрытие месяца. Кнопка скопирует все месяцы в базу и отключит Google-таблицу. Структуру и План она не трогает. Таблица у клиента не удаляется.</p>
-    ${!ready ? '<div class="note warn">Сначала загрузите Структуру и План в базу (блок BigQuery выше).</div>'
-      : can ? `<div class="acts"><button class="pri" id="ar_b" onclick="archiveToDb('${esc(c.company_id)}')">Перенести архив и отключить Google</button></div>`
+    ${can ? `<div class="acts"><button class="pri" id="ar_b" onclick="archiveToDb('${esc(c.company_id)}')">Перенести архив и отключить Google</button></div>`
       : '<p class="small">Переносит владелец или техспециалист.</p>'}
     <div id="ar_out"></div></div>`;
 }
