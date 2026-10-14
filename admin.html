@@ -284,9 +284,9 @@ function tabOverview(c){
     <div class="box"><p class="lbl">Выходные</p><p class="val">${esc(c.days_off || 'нет')}</p></div>
     <div class="box"><p class="lbl">Источник данных</p><p class="val">${sourceName(c)}</p></div></div>
   ${c.deleted_at ? `<div class="note bad">Компания удалена ${fdt(c.deleted_at)}: данные клиента стёрты, оплаты, задачи и журнал сохранены.</div>${isOwner() ? `<div class="acts"><button onclick="restoreCompany('${esc(c.company_id)}')">Вернуть в список компаний</button></div>` : ''}`
-    : c.stage==='off' ? `<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются). Данные пока хранятся.</div>${canMgr() ? `<div class="acts"><button class="danger" onclick="deleteCompany('${esc(c.company_id)}')">Удалить компанию и данные</button></div><p class="small">Удаляются Структура, План, заказы, итоги месяцев и журнал запусков. Оплаты, задачи и журнал изменений остаются. Действие необратимо.</p>` : ''}`
+    : c.stage==='off' ? `<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются). Данные пока хранятся.</div>${canMgr() ? `<div class="acts" id="del_box"><button class="danger" onclick="deleteCompany('${esc(c.company_id)}')">Удалить компанию и данные</button></div><p class="small">Удаляются Структура, План, заказы, итоги месяцев и журнал запусков. Оплаты, задачи и журнал изменений остаются. Действие необратимо.</p>` : ''}`
     : c.stage==='pause' ? `<div class="note bad">Компания приостановлена: отчёты не уходят, дашборды закрыты. Внесите оплату во вкладке «Оплата» — всё включится сразу.</div>`
-    : canMgr() ? `<div class="acts"><button class="danger" onclick="refuseCompany('${esc(c.company_id)}')">Клиент отказался — отключить</button></div><p class="small">Все сообщения компании остановятся в течение 10 минут, дашборды закроются. Данные сохраняются — если клиент вернётся, владелец включит компанию обратно.</p>` : ''}`;
+    : canMgr() ? `<div class="acts" id="ref_box"><button class="danger" onclick="refuseCompany('${esc(c.company_id)}')">Клиент отказался — отключить</button></div><p class="small">Все сообщения компании остановятся в течение 10 минут, дашборды закроются. Данные сохраняются — если клиент вернётся, владелец включит компанию обратно.</p>` : ''}`;
 }
 
 /* ---------- Состояние компании ---------- */
@@ -818,22 +818,40 @@ async function savePayment(id){
     toast('Оплата сохранена: ' + r.message); delete S.health[id]; await loadCompanies(); await loadBill(id); }
   catch(e){ err(e.message); $('p_save').disabled = false; }
 }
-async function refuseCompany(id){
-  const reason = prompt('Клиент отказался от СТТ. Коротко причина (необязательно):', '');
-  if(reason === null) return;
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/refuse', {method:'POST', body:{reason}});
+// 14.10.2026: окно prompt() в Telegram не открывается (сразу возвращает «отмена»),
+// поэтому кнопки «отключить» и «удалить» молча ничего не делали. Теперь поле
+// ввода и подтверждение — прямо на странице.
+function refuseCompany(id){
+  const box = $('ref_box'); if(!box) return;
+  box.style.display = 'block';
+  box.innerHTML = `<p class="lbl">Клиент отказался от СТТ. Коротко причина (необязательно)</p>
+    <input id="ref_r" maxlength="300" placeholder="например: тест закончен">
+    <div class="acts"><button class="danger" id="ref_go" onclick="refuseGo('${esc(id)}')">Отключить</button><button onclick="render()">Отмена</button></div>`;
+  $('ref_r').focus();
+}
+async function refuseGo(id){
+  const b = $('ref_go'); b.disabled = true; b.textContent = 'Отключаю…';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/refuse', {method:'POST', body:{reason: $('ref_r').value}});
     toast(r.message); delete S.health[id]; await loadCompanies(); render(); }
-  catch(e){ toast(e.message); }
+  catch(e){ toast(e.message); b.disabled = false; b.textContent = 'Отключить'; }
 }
 
-async function deleteCompany(id){
-  const c = co(id);
-  const typed = prompt(`Удалить компанию «${c.name || id}» и все её данные?\n\nУдалятся Структура, План, заказы, итоги месяцев и журнал запусков. Оплаты, задачи и журнал изменений останутся. Отменить нельзя.\n\nДля подтверждения введите код компании: ${id}`, '');
-  if(typed === null) return;
-  if(typed.trim() !== id){ toast('Код не совпал — ничего не удалено'); return; }
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/delete', {method:'POST', body:{confirm:typed.trim()}});
+function deleteCompany(id){
+  const c = co(id), box = $('del_box'); if(!box) return;
+  box.style.display = 'block';
+  box.innerHTML = `<p class="lbl">Удалить компанию «${esc(c.name || id)}» и все её данные? Удалятся Структура, План, заказы, итоги месяцев и журнал запусков. Оплаты, задачи и журнал изменений останутся. Отменить нельзя.</p>
+    <p class="small">Для подтверждения введите код компании: <b>${esc(id)}</b></p>
+    <input id="del_c" autocomplete="off">
+    <div class="acts"><button class="danger" id="del_go" onclick="deleteGo('${esc(id)}')">Удалить</button><button onclick="render()">Отмена</button></div>`;
+  $('del_c').focus();
+}
+async function deleteGo(id){
+  const typed = $('del_c').value.trim();
+  if(typed !== id){ toast('Код не совпал — ничего не удалено'); return; }
+  const b = $('del_go'); b.disabled = true; b.textContent = 'Удаляю…';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/delete', {method:'POST', body:{confirm:typed}});
     toast(r.message); await loadCompanies(); S.sel = null; S.showDet = false; render(); }
-  catch(e){ toast(e.message); }
+  catch(e){ toast(e.message); b.disabled = false; b.textContent = 'Удалить'; }
 }
 async function restoreCompany(id){
   try { await api('/companies/' + encodeURIComponent(id) + '/restore', {method:'POST'}); toast('Компания возвращена в список. Данные нужно загрузить заново'); await loadCompanies(); render(); }
