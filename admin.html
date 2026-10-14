@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}, routes:{}};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}, routes:{}, rstat:{}};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -351,6 +351,13 @@ function tabCfg(c){
 // для «Стабильности маршрутов». Дальше бот забирает их сам каждую ночь.
 function routesApiBlock(c){
   const id = c.company_id, r = S.routes[id], can = canTech() || canMgr();
+  const st = S.rstat[id];
+  if(st === undefined){ S.rstat[id] = 'loading'; api('/companies/' + encodeURIComponent(id) + '/routes-status').then(x => { S.rstat[id] = x || {}; if(S.sel === id) render(); }).catch(() => { S.rstat[id] = {}; }); }
+  const sObj = st && st !== 'loading' ? st : {};
+  const planLine = sObj.plan_from_api
+    ? `<div class="note" style="margin-top:10px">✅ <b>План посещений берётся из API</b> с ${fd(sObj.plan_from_api)}: бот обновляет его каждую ночь. Новая точка — со дня появления, смена дня и удаление — с 1-го числа следующего месяца.</div>`
+    : (canTech() ? `<div class="box" style="margin-top:10px"><p class="small" style="margin:0 0 8px">Сейчас План посещений компании — из ${c.plan_on_db ? 'базы (Excel)' : 'Google-таблицы'}. Можно брать его прямо из маршрутов API: всегда как у клиента в системе, без файлов. Даты маршрутов переводятся в наш План «по дням недели».</p>
+        <div class="acts"><button id="pa_b" onclick="planFromApi('${esc(id)}')">Брать План из API</button></div><div id="pa_out"></div></div>` : '');
   let body = '';
   if(r === 'loading') body = '<p class="small">Забираю маршруты и сравниваю… до минуты.</p>';
   else if(r && r.error) body = `<div class="note bad">${esc(r.error)}</div>`;
@@ -374,7 +381,16 @@ function routesApiBlock(c){
   return `<div class="panel" style="padding:12px 16px;margin-top:12px"><p class="lbl">Маршруты из API (план визитов по датам)</p>
     <p class="small" style="margin:4px 0 8px">Бот сам забирает маршруты каждую ночь после 02:00 по времени компании — для «Стабильности маршрутов» в дашборде руководителя. Кнопка заберёт их сейчас и сравнит с Планом, который сейчас в работе. Расчёты дашбордов это не меняет.</p>
     ${can ? `<div class="acts"><button class="pri" id="rt_b" onclick="routesCheck('${esc(id)}')" ${r === 'loading' ? 'disabled' : ''}>Забрать сейчас и сравнить с Планом</button></div>` : ''}
-    ${body}</div>`;
+    ${body}${planLine}</div>`;
+}
+const fd = iso => { const d = String(iso || '').slice(0, 10).split('-'); return d.length === 3 ? `${d[2]}.${d[1]}.${d[0]}` : ''; };
+async function planFromApi(id){
+  if(!confirm('Брать План посещений компании из маршрутов API?\n\nПлан из Google/Excel перестанет использоваться. Дашборды начнут считать по маршрутам клиента: новые точки — сразу, смена дня и удаление — с 1-го числа следующего месяца. Структура остаётся как есть.')) return;
+  const b = $('pa_b'); b.disabled = true; b.textContent = 'Забираю маршруты и записываю План…';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/plan-from-api', {method:'POST'});
+    toast('План из API включён'); delete S.rstat[id]; delete S.plan[id]; delete S.health[id]; await loadCompanies(); render();
+    const o = $('pa_out'); if(o) o.innerHTML = `<div class="note">${esc(r.message)}</div>`; }
+  catch(e){ $('pa_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; b.disabled = false; b.textContent = 'Брать План из API'; }
 }
 async function routesCheck(id){
   S.routes[id] = 'loading'; render();
@@ -515,7 +531,7 @@ function tabData(c){
   const srcBlock = `<div class="panel" style="padding:12px 16px"><p class="lbl">Источник данных</p>
     ${srcKey(c) === 'google' && cur === 'google' ? `<div class="chips"><span class="chip on">Google (переходный режим)</span></div>` : `<div class="chips">${segHtml}</div>`}
     <p class="small" style="margin-top:8px">${hints[cur] || ''}</p>${fields}
-    ${canPick(cur) && changed && cur !== 'google' ? `<p class="err" id="src_err"></p><div class="acts"><button class="pri" onclick="saveSource('${esc(c.company_id)}','${cur}')">${cur === 'file' && srcKey(c) !== 'file' ? 'Создать ссылку' : 'Сохранить источник'}</button>${S.srcDraft ? '<button onclick="S.srcDraft=null;render()">Отмена</button>' : ''}</div>` : ''}</div>${linkBlock}`;
+    ${canPick(cur) && changed && cur !== 'google' ? `<p class="err" id="src_err"></p><div class="acts"><button class="pri" onclick="saveSource('${esc(c.company_id)}','${cur}')">${cur === 'file' && srcKey(c) !== 'file' ? 'Создать ссылку' : 'Сохранить источник'}</button>${S.srcDraft ? '<button onclick="S.srcDraft=null;render()">Отмена</button>' : ''}</div>` : ''}</div>${srcKey(c) === 'api' && cur === 'api' ? routesApiBlock(c) : ''}${linkBlock}`;   // 14.10.2026: маршруты — сразу под источником
 
   const src = srcKey(c);
   const months = lastMonths(12);
@@ -535,7 +551,7 @@ function tabData(c){
     'Если после закрытия нет категорий — загрузите Факт с колонкой «Категория» и закройте снова.');
   const cacheCard = card(`<button style="width:100%" onclick="reload('${esc(c.company_id)}', true)">Сбросить кеш</button>`,
     'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
-  return `${srcBlock}${src === 'api' ? routesApiBlock(c) : ''}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
+  return `${srcBlock}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
     <div id="xl_out"></div>`;
 }
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
