@@ -391,24 +391,66 @@ function howRead() {
     <div>• <b>Сравнение</b> — со средним за 4 прошлые недели, по тем же дням.</div>
     <div>• <b>▲ / ▼</b> — насколько лучше или хуже этого среднего.</div></details>`;
 }
-function routesBlock() {
-  // 13.10.2026: правило изменения маршрутов + что изменилось в этом месяце по зоне
-  // руководителя (S.sum.routes из leader_api; у компаний с Планом в Google — только правило).
-  const r = S.sum.routes;
-  const head = r && (r.new_points || r.pending) ? `🗺 Маршруты: ${r.new_points ? r.new_points + (r.new_points % 10 === 1 && r.new_points % 100 !== 11 ? ' новая точка' : [2,3,4].includes(r.new_points % 10) && ![12,13,14].includes(r.new_points % 100) ? ' новые точки' : ' новых точек') : ''}${r.new_points && r.pending ? ' · ' : ''}${r.pending ? r.pending + ' ' + (r.pending === 1 ? 'изменение ждёт' : 'изменений ждут') + ' ' + esc(r.pending_from) : ''} ›`
-    : '🗺 Маршруты: как считаем изменения ›';
-  return `<details class="routes" ${S.open.routes ? 'open' : ''} ontoggle="S.open.routes=this.open"><summary class="rt-h">${head}</summary>
-    <div class="rt-b">Как считаем изменения маршрутов</div>
-    <div class="rt-l">✅ <b>Новая точка</b> начинает считаться со дня, когда её добавили. До этого дня по ней нет ни визитов по плану, ни пропусков.</div>
-    <div class="rt-l">⏳ <b>Сменили день визита или убрали точку</b> — заработает с 1-го числа следующего месяца. Если прислали 1–3 числа — с 1-го числа этого месяца.</div>
-    ${r && r.lines && r.lines.length ? `<div class="rt-b" style="margin-top:8px">В этом месяце</div>${r.lines.map(t => `<div class="rt-l">• ${esc(t)}</div>`).join('')}` : ''}
-    <div class="rt-s">Зачем так: чтобы цифры уже прошедших дней не менялись задним числом.</div></details>`;
+// ---------- «Стабильность маршрутов» (14.10.2026) ----------
+// Доля точек, у которых день визита за период не менялся. Цель 95%, в «Среднее» не
+// входит (это планирование, а не работа агента). Заменила блок «Маршруты: N новых
+// точек»: новые точки — плитка «добавили», ожидающие 1-го числа — строка ⏳, правило — в пояснении.
+const STAB_GOAL = 95;
+function stabColor(v) { return v == null ? 'var(--ink-soft)' : v >= STAB_GOAL ? 'var(--green)' : v >= 85 ? 'var(--amber)' : 'var(--red-dark)'; }
+const dmy = d => String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
+function stabTiles(t) {
+  return `<div class="day-tiles-row"><div class="day-tile"><div class="val">${num(t.moved)}</div><div class="lbl">сменили день</div></div>
+    <div class="day-tile"><div class="val">${num(t.added)}</div><div class="lbl">добавили</div></div>
+    <div class="day-tile"><div class="val">${num(t.removed)}</div><div class="lbl">убрали</div></div></div>`;
+}
+function stabRows(g, prevMap) {
+  return Object.entries(g.children).filter(([, c]) => c.total)
+    .sort((a, b) => (b[1].pct ?? -1) - (a[1].pct ?? -1))
+    .map(([n, c]) => barRow(esc(n), c.pct, stabColor, delta(dif(c.pct, (prevMap || {})[n])), STAB_GOAL)).join('');
+}
+function stabNote() {
+  const r = S.sum && S.sum.routes;
+  return `${r && r.pending ? `<div style="font-size:12.5px;margin-top:10px">⏳ ${r.pending} ${r.pending === 1 ? 'изменение ждёт' : 'изменений ждут'} ${esc(r.pending_from)}</div>` : ''}
+    <p class="card-note">Стабильность — доля точек, у которых день визита за период не менялся. Чем выше, тем быстрее клиент привыкает к дню агента и ждёт его. Цель — ${STAB_GOAL}%. В «Среднее» не входит.${r ? '<br>Как считаем изменения: новая точка — со дня, когда её добавили; сменили день или убрали точку — с 1-го числа следующего месяца (если прислали 1–3 числа — с 1-го числа этого месяца).' : ''}</p>`;
+}
+function stabCard(key, title, val, inner) {
+  return `<details class="day-card collapsible-card" ${S.open[key] ? 'open' : ''} ontoggle="S.open['${key}']=this.open">
+    <summary><h3>${title}</h3><span class="sum-right"><span class="sum-val" style="color:${stabColor(val)}">${val == null ? '—' : val + '%'}</span></span></summary>${inner}</details>`;
+}
+function stabWaiting(s, month) {
+  if (!s || !s.started) return '<div class="period">Изменения маршрутов ещё не отслеживаются для этой компании.</div>';
+  if (month) return `<div class="period">Изменения маршрутов считаем с ${ddmm(s.started)}. Первые итоги — за первый полный месяц наблюдения.</div>`;
+  const d = new Date(s.started + 'T00:00:00');
+  d.setDate(d.getDate() + (8 - d.getDay()) % 7);            // первый понедельник с начала отсчёта
+  const e = new Date(d); e.setDate(e.getDate() + 6);
+  return `<div class="period">Изменения маршрутов считаем с ${ddmm(s.started)}. Первая неделя — ${dmy(d)}–${dmy(e)}, цифры появятся в понедельник после неё.</div>`;
+}
+function stabilityBlock() {
+  const s = S.sum.stability, w = s && s.week;
+  if (!w) return stabCard('stab', 'Стабильность маршрутов', null, stabWaiting(s) + stabNote());
+  const t = w.total;
+  return stabCard('stab', 'Стабильность маршрутов', t.pct,
+    `<div class="period">За неделю <b>${ddmm(w.start)}–${ddmm(w.end)}</b> у ${t.pct ?? '—'}% точек день визита не менялся. ${w.base != null ? delta(Math.round(dif(t.pct, w.base))) : ''}
+      ${w.base != null ? `<br>За ${weeksBefore(w.base_n)} в среднем — ${f1(w.base)}%.` : ''}</div>
+     ${stabTiles(t)}${stabRows(w, w.base_children)}${stabNote()}`);
+}
+function stabMonthCard(m) {
+  const s = m.stability;
+  if (!s) return '';
+  const g = s.month;
+  if (!g) return stabCard('m:stab', 'Стабильность маршрутов', null, stabWaiting(s, true) + stabNote());
+  const t = g.total, top = g.top_agents || [];
+  return stabCard('m:stab', 'Стабильность маршрутов', t.pct,
+    `<div class="period">За <b>${MONTHS[m.month - 1].toLowerCase()}</b> у ${t.pct ?? '—'}% точек день визита не менялся.${g.prev != null ? ` ${delta(dif(t.pct, g.prev))} к прошлому месяцу.` : ''}</div>
+     ${stabTiles(t)}${stabRows(g, g.prev_children)}
+     ${top.length ? `<div style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.04em;margin-top:12px">Больше всего смен дня — агенты</div>${top.map((a, i) => `<div style="font-size:12.5px;padding:3px 0">${i + 1}. ${esc(a.agent)}${a.sv ? ` (СВ ${esc(a.sv)})` : ''} — ${num(a.moved)} ${a.moved % 10 === 1 && a.moved % 100 !== 11 ? 'точка' : [2, 3, 4].includes(a.moved % 10) && ![12, 13, 14].includes(a.moved % 100) ? 'точки' : 'точек'}</div>`).join('')}` : ''}
+     ${stabNote()}`);
 }
 function screenSummary() {
   const d = S.sum, b = basis();
   if (!b) return '<div class="empty">Недельные итоги ещё не посчитаны. Они появятся после первой полной недели.</div>';
   setPill(b.pill);
-  let html = howRead() + routesBlock();
+  let html = howRead();
   const t = new Date(d.today + 'T00:00:00');
   if (t.getDate() <= 7 && S.month && S.month.closed) {
     const m = S.month;
@@ -417,7 +459,7 @@ function screenSummary() {
   }
   html += heroBlock(d.role === 'director' ? 'Среднее по компании' : 'Среднее по вашей зоне', b.now, b.prev,
     `Цифра — оценка из 6 показателей: системная, чистая, СТТ точек, категории, задачи СВ, ТОП-5. Цель — 75%. Нажмите на строку — увидите, из чего сложилась цифра.`, 'sum', b);
-  return html + alertsCard();
+  return html + stabilityBlock() + alertsCard();
 }
 
 // ---------- Динамика ----------
@@ -610,6 +652,7 @@ function screenMonth() {
       'Доля заказов с категорией. Считаются только те, за кем категория закреплена. Цель — 90%.', t.pct.cats) : '') +
     mCard('tasks', 'Задачи СВ', rows('tasks', catColor), 'Точки с 2+ пропусками подряд, где СВ добился заказа в следующий плановый день. Цель — 90%.', t.pct.tasks) +
     mCard('top5', 'ТОП-5', rows('top5', sysColor), `Выполнение нормы маршрутами из ТОП-5 по дефициту (${t.top5_routes} маршрутов). Норма маршрута — 75% от базы, цель — 75% нормы.`, t.pct.top5) +
+    stabMonthCard(m) +
     `<div class="day-card"><h3>Рейтинг по среднему</h3>
       <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';S.rShow=5;render()">${esc(l.name)}</button>`).join('')}</div>
       ${rl.length ? rl.slice(0, S.rShow).map((r, i) => `<div class="rate-row"><span class="rate-n ${i < 3 ? 'top' : ''}">${i + 1}</span>
