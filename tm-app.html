@@ -612,7 +612,7 @@ function renderDay(data) {
 
   const svsHtml = (data.svs || []).map(s => {
     const color = sysColor(s.system_pct);   // 04.10.2026: шкала системы 75/50
-    const catsChips = (s.categories || []).map(c => {
+    const catsChips = (s.categories || []).slice().sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1)).map(c => {   // 14.10.2026: по убыванию
       const cls = c.pct >= 90 ? 'good' : 'bad';   // 04.10.2026: шкала категорий
       return `<span class="cat-chip ${cls}">${c.name.slice(0,4)} ${fmtPct(c.pct)}</span>`;
     }).join('');
@@ -874,7 +874,7 @@ function renderMonth(data) {
 
   function ratingCard(r, rank) {
     const isBest = rank === 1;
-    const chips = r.categories.map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
+    const chips = r.categories.slice().sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1)).map(c => `<span class="chip ${c.pct>=75?'good':'bad'}">${c.name} ${c.pct.toFixed(1)}%</span>`).join('');
     // 17.09.2026 (возвращено — "Дефицит заказов" остался только в
     // отдельной карточке "ТОП-5 дефицит заказов" и в "Рейтинг ТМ" (там
     // это и есть основной критерий — единообразно с "Рейтинг
@@ -987,7 +987,7 @@ function renderMonth(data) {
           <span style="font-size:13px;color:var(--ink-soft);">▶</span>
         </div>
       </summary>
-      <div style="padding-top:14px;">${data.categories.map(c => { const color = catColor(c.pct); return `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:${color}"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:${color}">${c.pct}%</span></div></div>`; }).join('')}</div>
+      <div style="padding-top:14px;">${data.categories.slice().sort((x, y) => (y.pct ?? -1) - (x.pct ?? -1)).map(c => { const color = catColor(c.pct); return `<div style="margin-bottom:10px"><div style="font-size:13px;font-weight:600;margin-bottom:5px">${c.name}</div><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="width:${c.pct}%;height:100%;background:${color}"></div></div><span style="font-size:11px;color:var(--ink-soft)">${c.orders} из ${c.total}</span><span style="font-size:13px;font-weight:800;color:${color}">${c.pct}%</span></div></div>`; }).join('')}</div>
     </details>` : ''}
     ${data.top5_deficit_pct != null ? `<details class="day-card">
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
