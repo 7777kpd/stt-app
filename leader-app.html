@@ -250,10 +250,12 @@ function barRow(nameHtml, pct, colorFn, right, goal) {
 // ---------- Раскладка среднего ----------
 const COMP = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['top5', 'ТОП-5']];
 function catChips(catPct, key) {
-  const list = Object.entries(catPct || {}).filter(([, v]) => v != null).sort((a, b) => a[1] - b[1]);
+  // 14.10.2026: категории — от большего % к меньшему. В свёрнутом виде
+  // по-прежнему видны 3 самые слабые (ради них и смотрят), тоже по убыванию.
+  const list = Object.entries(catPct || {}).filter(([, v]) => v != null).sort((a, b) => b[1] - a[1]);
   if (!list.length) return '';
   const all = S.catsAll[key];
-  const shown = all ? list : list.slice(0, 3);
+  const shown = all ? list : list.slice(-3);
   const short = c => c.length > 16 ? c.slice(0, 15) + '…' : c;
   return `<div class="cat-mini">${shown.map(([c, v]) => `<span class="cat-chip" title="${esc(c)}" style="background:${v >= 90 ? 'var(--green-bg)' : v >= 80 ? 'var(--yellow-bg)' : 'var(--red-bg)'};color:${catColor(v)}">${esc(short(c))} ${v}%</span>`).join('')}
     ${!all && list.length > 3 ? `<span class="more-chip" onclick="event.stopPropagation();S.catsAll['${jsq(key)}']=1;render()">ещё ${list.length - 3}</span>` : ''}</div>`;
