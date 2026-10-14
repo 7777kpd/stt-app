@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -341,7 +341,48 @@ function tabCfg(c){
     <div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div></div>
     <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>
   <p class="err" id="f_err"></p>
-  ${e ? `<div class="acts"><button class="pri" id="f_save" onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="render()">Отменить изменения</button></div>` : ''}`;
+  ${e ? `<div class="acts"><button class="pri" id="f_save" onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="render()">Отменить изменения</button></div>` : ''}
+  ${viewersBlock(c)}`;
+}
+
+/* ---------- Доступ ко всем дашбордам (14.10.2026) ---------- */
+async function loadViewers(id){
+  S.viewers[id] = 'loading';
+  try { S.viewers[id] = (await api('/companies/' + encodeURIComponent(id) + '/viewers')).viewers || []; }
+  catch(e){ S.viewers[id] = {error: e.message}; }
+  if(S.sel === id && S.tab === 'cfg') render();
+}
+function viewersBlock(c){
+  const id = c.company_id, v = S.viewers[id], e = canMgr();
+  let list;
+  if(!v || v === 'loading'){ if(!v) loadViewers(id); list = '<p class="small">Загружаю…</p>'; }
+  else if(v.error) list = `<p class="err">${esc(v.error)}</p>`;
+  else list = v.length ? v.map(x => `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)">
+      <div><div class="nm">${esc(x.name || 'без имени')}</div><div class="meta">ID ${esc(x.telegram_id)}</div></div>
+      ${e ? `<button class="danger" style="padding:4px 10px;font-size:13px" onclick="removeViewer('${esc(id)}','${esc(x.telegram_id)}')">Убрать</button>` : ''}</div>`).join('')
+    : '<p class="small" style="margin:6px 0">Пока никого.</p>';
+  return `<div class="sec"><h3>Доступ ко всем дашбордам</h3>
+    <p class="small" style="margin:0 0 6px">Видят любой дашборд этой компании — директора, РФ, РОП, ТМ, СВ, агента — через команду /dashboard в боте. Другие компании им не видны. В лицензии не считаются, отчёты им не приходят.</p>
+    ${list}
+    ${e ? `<div class="grid2" style="margin-top:12px"><div><p class="lbl">Имя</p><input id="vw_n" maxlength="100" placeholder="как подписать"></div>
+      <div><p class="lbl">Telegram ID</p><input id="vw_t" inputmode="numeric" placeholder="только цифры"></div></div>
+      <p class="err" id="vw_err"></p>
+      <div class="acts"><button class="pri" id="vw_b" onclick="addViewer('${esc(id)}')">Добавить</button></div>
+      <p class="small">Свой Telegram ID человек узнаёт у бота @userinfobot. Доступ появится сразу.</p>` : ''}</div>`;
+}
+async function addViewer(id){
+  const tg = $('vw_t').value.trim(), name = $('vw_n').value.trim();
+  if(!/^\d{5,15}$/.test(tg)){ $('vw_err').textContent = 'Telegram ID — только цифры (5–15 знаков)'; return; }
+  const b = $('vw_b'); b.disabled = true; b.textContent = 'Добавляю…';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/viewers', {method:'POST', body:{telegram_id:tg, name}});
+    S.viewers[id] = r.viewers || []; toast('Доступ добавлен'); render(); }
+  catch(e){ $('vw_err').textContent = e.message; b.disabled = false; b.textContent = 'Добавить'; }
+}
+async function removeViewer(id, tg){
+  if(!confirm('Убрать доступ ко всем дашбордам у ID ' + tg + '?')) return;
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/viewers/remove', {method:'POST', body:{telegram_id:tg}});
+    S.viewers[id] = r.viewers || []; toast('Доступ убран'); render(); }
+  catch(e){ toast(e.message); }
 }
 function cfgPreview(){
   const el = $('f_prev'); if(!el) return;
