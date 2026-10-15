@@ -511,21 +511,23 @@ function renderRouteCard(a, rank, monthLabel, monthNum, yearNum) {
     <summary>
       <div><span class="rc-name">${rank} · ${a.agent}</span><span class="rc-sub">${a.sv || ''}</span></div>
       <div class="rc-right">
-        <div class="rc-deficit"><div class="num">${a.deficit_orders}</div><div class="lbl">дефицит заказов</div></div>
+        <div class="rc-deficit"><div class="num">${a.deficit_orders}</div><div class="lbl">дефицит чистых заказов</div></div>
         <span class="rc-chevron">▶</span>
       </div>
     </summary>
     <div class="rc-body">
       <div class="formula-toggle" onclick="toggleFormula(this, event)">
-        <div class="formula-head"><span>Как посчитали ${a.deficit_orders}?</span><span>▾</span></div>
+        <div class="formula-head"><span>Как посчитали дефицит чистых заказов ${a.deficit_orders}?</span><span>▾</span></div>
         <div class="formula-body">
           <div class="frow"><span>План визитов (мес)</span><span>${a.plan}</span></div>
           <div class="frow"><span>Средний по команде</span><span>${a.team_average_plan}</span></div>
-          <div class="frow"><span>Требуемый план заказов = ${a.base}×75%</span><span>${a.need_orders}</span></div>
-          <div class="frow"><span>Заказов по факту</span><span>${a.orders}</span></div>
-          <div class="frow total"><span>Дефицит заказов</span><span>${a.deficit_orders}</span></div>
+          <div class="frow"><span>Требуемый план чистых заказов = ${a.base}×75%</span><span>${a.need_orders}</span></div>
+          <div class="frow"><span>Заказов по факту (системные)</span><span>${a.orders}</span></div>
+          ${a.off_route != null ? `<div class="frow"><span>− вне маршрута и призраки</span><span>−${a.off_route}</span></div>
+          <div class="frow"><span>Чистых заказов = ${a.orders} − ${a.off_route}</span><span>${Math.max(0, a.orders - a.off_route)}</span></div>` : ''}
+          <div class="frow total"><span>Дефицит чистых = ${a.need_orders} − ${a.off_route != null ? Math.max(0, a.orders - a.off_route) : a.orders}</span><span>${a.deficit_orders}</span></div>
           <div class="frow" style="border-top:1px dashed rgba(59,111,160,.3);margin-top:4px;padding-top:8px"><span>Плановых визитов в день = ${a.base}÷раб.дни</span><span>${a.daily_avg}</span></div>
-          <div class="frow"><span>Плановых заказов в день = ${a.need_orders}÷раб.дни</span><span>${a.daily_orders_avg}</span></div>
+          <div class="frow"><span>Плановых чистых заказов в день = ${a.need_orders}÷раб.дни</span><span>${a.daily_orders_avg}</span></div>
         </div>
       </div>
       ${weeklyLoadHtml}
@@ -1007,7 +1009,7 @@ function renderMonth(data) {
     </details>` : ''}
     ${data.top5_deficit_pct != null ? `<details class="day-card">
       <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
-        <div><span class="card-label">📉 ТОП-5 дефицит заказов</span><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${data.top5_orders} из ${data.top5_need_orders} нужно</div></div>
+        <div><span class="card-label">📉 ТОП-5 дефицит заказов</span><div style="font-size:10px;color:var(--ink-soft);margin-top:2px">${data.top5_orders} чистых из ${data.top5_need_orders} нужно</div></div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="text-align:right;"><div style="font-size:20px;font-weight:700;color:${data.top5_deficit_pct>=100?'var(--green)':data.top5_deficit_pct>=80?'var(--yellow)':'var(--red)'};">${data.top5_deficit_pct}%</div></div>
           <span style="font-size:13px;color:var(--ink-soft);">▶</span>
