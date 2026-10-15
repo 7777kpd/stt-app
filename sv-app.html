@@ -360,15 +360,14 @@ function sysColor(v) { return 'var(--' + sysLevel(v) + ')'; }
 // Задачи СВ; у ТМ и выше ещё ТОП-5. Нагрузка в балл не входит.
 function scoreParts(p) {
   const f = v => (Math.round(v * 10) / 10).toFixed(1);
-  const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1]];
+  const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1], ['Нагрузка визитов от среднего по компании', p.load, 0]];
   if (p.top5In) parts.push(['ТОП-5', p.top5, 0]);
   const used = parts.filter(x => x[1] != null);
-  const tiles = parts.map(([l, v, c]) => `<div class="sp-tile"><div class="sp-v" style="color:${v == null ? 'var(--ink-soft)' : (c ? catColor(v) : sysColor(v))}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('')
-    + (p.top5In ? '' : '<div class="sp-tile off"><div class="sp-v">—</div><div class="sp-l">ТОП-5 (у ТМ)</div></div>');
+  const tiles = parts.map(([l, v, c]) => `<div class="sp-tile"><div class="sp-v" style="color:${v == null ? 'var(--ink-soft)' : (c ? catColor(v) : sysColor(v))}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('');
   return `<div class="sp-grid">${tiles}</div>${used.length ? `<div class="sp-formula">Балл = (${used.map(x => f(x[1])).join(' + ')}) ÷ ${used.length} = <b>${f(p.avg)}%</b></div>` : ''}`;
 }
-function loadLine(v) { return v == null ? '' : `<div class="sp-load">Нагрузка <b>${v}%</b> от среднего</div>`; }
-const SCORE_NOTE = '<div class="sp-note">Балл одинаковый на всех дашбордах: среднее из Системной, Чистой, СТТ точек, Категорий (одно число — среднее) и Задач СВ. У ТМ и выше добавляется ТОП-5. Нагрузка в балл не входит — показывает, сколько плановых визитов на агента по сравнению со средним.</div>';
+function loadLine(v) { return v == null ? '' : `<div class="sp-load">Нагрузка плановых визитов <b>${v}%</b> от среднего</div>`; }
+const SCORE_NOTE = '<div class="sp-note">Балл — среднее этих показателей, одинаковое на всех дашбордах.<br><b>Нагрузка визитов</b> — плановых визитов на агента к среднему по компании. Входит в балл полной цифрой: меньше среднего — балл ниже, больше — выше.</div>';
 
 // Плашки категорий: от большего % к меньшему (14.10.2026); в свёрнутом виде
 // видны 3 самые слабые, остальные (выше) — «ещё N»; длинные
@@ -999,7 +998,7 @@ function renderStt(data) {
     // 04.09.2026: "Задачи СВ" — отдельный чип, тем же принципом, что и
     // категории, если есть данные за этот период (только прошлый месяц).
     // 15.10.2026: «Задачи СВ» — теперь плитка в частях балла (scoreParts)
-    const parts = scoreParts({ sys: r.sys, clean: r.net, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5In: false, avg: r.avg_score });
+    const parts = scoreParts({ sys: r.sys, clean: r.net, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5In: false, load: r.load_score, loadRaw: r.load_pct, avg: r.avg_score });
     let deltaHtml = '';
     if (r.delta !== null && r.delta !== undefined) {
       const up = r.delta >= 0;
@@ -1010,7 +1009,7 @@ function renderStt(data) {
     return `<div class="card" style="padding:16px;margin-bottom:10px;${isBest?'background:var(--green-bg)':''}">
       ${isBest ? `<p style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;margin:0 0 8px">Лучший результат — ${data.month || ''}</p>` : `<p style="font-size:11px;font-weight:700;color:var(--ink-soft);margin:0 0 8px">#${rank}</p>`}
       <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <div><span style="font-size:${isBest?16:15}px;font-weight:800">${r.agent}</span>${loadLine(r.load_pct)}</div>
+        <div><span style="font-size:${isBest?16:15}px;font-weight:800">${r.agent}</span></div>
         <div style="text-align:right"><span style="display:block;font-size:${isBest?22:18}px;font-weight:800;color:${isBest?'var(--green)':'var(--ink)'}">${r.avg_score}%</span>${deltaHtml}</div>
       </div>
       ${parts}
@@ -1365,8 +1364,8 @@ async function loadSvRating() {
             </div>
             <span style="font-size:20px;font-weight:700;color:var(--green);">${r.avg.toFixed(1)}%</span>
           </div>
-          ${loadLine(r.load_pct)}
-          ${scoreParts({ sys: r.system_stt, clean: r.clean_stt, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5: r.top5_pct, top5In: !!r.top5_in_avg, avg: r.avg })}
+          
+          ${scoreParts({ sys: r.system_stt, clean: r.clean_stt, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5: r.top5_pct, top5In: !!r.top5_in_avg, load: r.load_score, loadRaw: r.load_pct, avg: r.avg })}
           <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false, r === top3[0])}</div>
           ${pakbMiniBar(r.pakb)}
         </div>`;
@@ -1392,8 +1391,8 @@ async function loadSvRating() {
                 </div>
                 <span style="font-size:15px;font-weight:700;color:var(--ink-soft);">${r.avg.toFixed(1)}%</span>
               </div>
-              ${loadLine(r.load_pct)}
-              ${scoreParts({ sys: r.system_stt, clean: r.clean_stt, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5: r.top5_pct, top5In: !!r.top5_in_avg, avg: r.avg })}
+              
+              ${scoreParts({ sys: r.system_stt, clean: r.clean_stt, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5: r.top5_pct, top5In: !!r.top5_in_avg, load: r.load_score, loadRaw: r.load_pct, avg: r.avg })}
               <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}</div>
               ${pakbMiniBar(r.pakb)}
             </div>`;
