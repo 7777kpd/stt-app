@@ -268,13 +268,12 @@ function spColor(v, cat) {
 }
 function scoreParts(p) {
   const f = v => (Math.round(v * 10) / 10).toFixed(1);
-  const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1]];
+  const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1], ['Нагрузка визитов от среднего по компании', p.load, 0]];
   const used = parts.filter(x => x[1] != null);
-  const tiles = parts.map(([l, v, c]) => `<div class="sp-tile"><div class="sp-v" style="color:${v == null ? 'var(--muted)' : spColor(v, c)}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('')
-    + '<div class="sp-tile off"><div class="sp-v">—</div><div class="sp-l">ТОП-5 (у ТМ)</div></div>';
+  const tiles = parts.map(([l, v, c]) => `<div class="sp-tile"><div class="sp-v" style="color:${v == null ? 'var(--muted)' : spColor(v, c)}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('');
   return `<div class="sp-grid">${tiles}</div>${used.length ? `<div class="sp-formula">Балл = (${used.map(x => f(x[1])).join(' + ')}) ÷ ${used.length} = <b>${f(p.avg)}%</b></div>` : ''}`;
 }
-const SCORE_NOTE = '<div class="sp-note">Балл одинаковый на всех дашбордах: среднее из Системной, Чистой, СТТ точек, Категорий (одно число — среднее) и Задач СВ. Нагрузка — плановых визитов у агента по сравнению со средним по команде, в балл не входит.</div>';
+const SCORE_NOTE = '<div class="sp-note">Балл — среднее этих показателей, одинаковое на всех дашбордах.<br><b>Нагрузка визитов</b> — плановых визитов на агента к среднему по компании. Входит в балл полной цифрой: меньше среднего — балл ниже, больше — выше.</div>';
 function catChipsBlockA(categories) {
   const items = Object.entries(categories || {}).sort((a, b) => b[1] - a[1]);
   const chip = ([name, v]) => {
@@ -675,14 +674,13 @@ function buildSttScreen(data) {
     const color = r.avg_score >= 75 ? 'var(--green-bright)' : r.avg_score >= 50 ? 'var(--yellow-bright)' : 'var(--red-bright)';
     const chips = catChipsBlockA(r.categories);   // 04.10.2026: шкала категорий 90/80, худшие сначала
     // 15.10.2026: «Задачи СВ» — плитка в частях балла
-    const parts = scoreParts({ sys: r.sys, clean: r.net, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, avg: r.avg_score });
+    const parts = scoreParts({ sys: r.sys, clean: r.net, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, load: r.load_score, loadRaw: r.load_pct, avg: r.avg_score });
     return `<div style="border:${isMe ? '2px solid var(--text)' : '1px solid var(--border)'};border-radius:12px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
         <span style="font-size:12px;font-weight:700;color:var(--muted);">#${r.rank}</span>
         <span style="font-size:16px;font-weight:800;color:${color}">${r.avg_score}%</span>
       </div>
       <div style="font-size:13.5px;font-weight:700;margin-bottom:6px;">${r.agent}${isMe ? ' <span style="font-size:11px;font-weight:600;color:var(--muted)">(вы)</span>' : ''}</div>
-      ${r.load_pct != null ? `<div class="sp-load">Нагрузка <b>${r.load_pct}%</b> от среднего</div>` : ''}
       ${parts}
       <div style="display:flex;gap:5px;flex-wrap:wrap;">${chips}</div>
     </div>`;
