@@ -131,7 +131,7 @@
   .rate-n.top { background: var(--green-bg); color: var(--green); }
   .rate-name { flex: 1; min-width: 0; }
   .rate-sub { font-size: 10px; color: var(--ink-soft); font-weight: 600; }
-  .rate-pct { font-size: 14px; font-weight: 800; width: 42px; text-align: right; }
+  .rate-pct { font-size: 14px; font-weight: 800; width: 50px; text-align: right; }   /* 15.10.2026: один знак — шире */
   .loader { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; gap: 12px; color: var(--ink-soft); }
   .spinner { width: 32px; height: 32px; border: 3px solid var(--line); border-top-color: var(--amber); border-radius: 50%; animation: spin .7s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -237,7 +237,7 @@ function delta(d, unit) {
   if (!d) return '<span class="rating-delta neutral">без изменений</span>';
   return `<span class="rating-delta ${d > 0 ? 'up' : 'down'}">${d > 0 ? '▲ +' : '▼ '}${d}${unit}</span>`;
 }
-const dif = (a, b) => (a == null || b == null) ? null : a - b;
+const dif = (a, b) => (a == null || b == null) ? null : Math.round((a - b) * 10) / 10;   // 15.10.2026: один знак
 
 function barRow(nameHtml, pct, colorFn, right, goal) {
   const w = Math.max(0, Math.min(100, pct || 0));
@@ -263,7 +263,8 @@ function catChips(catPct, key) {
 function compBlock(c, p, key, dynName) {
   const pc = c.pct, pp = (p && p.pct) || {};
   const tiles = COMP.map(([k, lbl]) => `<div class="day-tile"><div class="val" style="color:${colorOf(k)(pc[k])}">${pc[k] == null ? '—' : pc[k] + '%'}</div><div class="lbl">${lbl}</div><div class="tile-d">${delta(dif(pc[k], pp[k]), '')}</div></div>`).join('');
-  const used = COMP.filter(([k]) => pc[k] != null).map(([k]) => pc[k]);
+  // 15.10.2026: ТОП-5 входит в балл только у ТМ и выше (pct.top5_in_avg с сервера)
+  const used = COMP.filter(([k]) => pc[k] != null && (k !== 'top5' || pc.top5_in_avg !== false)).map(([k]) => pc[k]);
   return `<div class="comp">
     <div class="tiles3">${tiles}</div>
     ${used.length ? `<div class="formula">(${used.join(' + ')}) ÷ ${used.length} = <b>${pc.avg}%</b></div>` : ''}
@@ -284,12 +285,13 @@ function avgGroups(gs) {
     const pct = {};
     ['sys', 'clean', 'stt', 'cats', 'tasks', 'top5', 'avg'].forEach(k => {
       const v = ps.map(p => p.pct[k]).filter(x => x != null);
-      pct[k] = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null;
+      pct[k] = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null;
     });
+    pct.top5_in_avg = ps[0].pct.top5_in_avg;
     const cats = {};
     ps.forEach(p => Object.entries(p.cat_pct || {}).forEach(([c, v]) => { if (v != null) (cats[c] = cats[c] || []).push(v); }));
     const cp = {};
-    Object.entries(cats).forEach(([c, v]) => cp[c] = Math.round(v.reduce((a, b) => a + b, 0) / v.length));
+    Object.entries(cats).forEach(([c, v]) => cp[c] = Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10);
     return { pct, cat_pct: cp };
   };
   const names = new Set();
@@ -540,7 +542,7 @@ function valOf(g, k) { return k === 'cats' ? (g.cat_pct || {})[S.cat] ?? null : 
 function vsAvg(v) {
   if (v.length < 2) return null;
   const last = v[v.length - 1], prev = v.slice(-5, -1), avg = prev.reduce((a, b) => a + b, 0) / prev.length;
-  return { last, avg: Math.round(avg * 10) / 10, d: Math.round(last - avg), n: prev.length };
+  return { last, avg: Math.round(avg * 10) / 10, d: Math.round((last - avg) * 10) / 10, n: prev.length };
 }
 const f1 = x => String(x).replace('.', ',');
 function screenDynamics() {
@@ -656,10 +658,10 @@ function screenMonth() {
     `<div class="day-card"><h3>Рейтинг по среднему</h3>
       <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';S.rShow=5;render()">${esc(l.name)}</button>`).join('')}</div>
       ${rl.length ? rl.slice(0, S.rShow).map((r, i) => `<div class="rate-row"><span class="rate-n ${i < 3 ? 'top' : ''}">${i + 1}</span>
-        <div class="rate-name"><b>${esc(r.name)}</b>${r.parent ? `<div class="rate-sub">${esc(r.parent)}</div>` : ''}</div>
+        <div class="rate-name"><b>${esc(r.name)}</b>${(r.parent || r.load != null) ? `<div class="rate-sub">${r.parent ? esc(r.parent) : ''}${r.parent && r.load != null ? ' · ' : ''}${r.load != null ? `нагрузка ${r.load}%` : ''}</div>` : ''}</div>
         ${delta(r.delta)}<span class="rate-pct" style="color:${sysColor(r.avg)}">${r.avg}%</span></div>`).join('') : '<div class="empty" style="padding:12px">Нет данных</div>'}
       ${rl.length > S.rShow ? `<button class="show-more-btn" onclick="S.rShow+=5;render()">+5 · показать ещё (${rl.length - S.rShow})</button>` : ''}
-      <p class="card-note">По среднему за месяц, лучший сверху: сначала 5, «+5» показывает следующих. Изменение — к прошлому месяцу. Одна шкала для всех одного уровня.</p></div>`;
+      <p class="card-note">По среднему за месяц, лучший сверху: сначала 5, «+5» показывает следующих. Изменение — к прошлому месяцу. Балл одинаковый на всех дашбордах: Системная, Чистая, СТТ точек, Категории (среднее) и Задачи СВ; у ТМ и выше — ещё ТОП-5. Нагрузка — плановых визитов на агента к среднему, в балл не входит.</p></div>`;
 }
 function monthNav(m) {
   const t = new Date(S.sum ? S.sum.today + 'T00:00:00' : Date.now());
