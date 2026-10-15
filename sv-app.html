@@ -306,6 +306,17 @@
   #screen-training .coach-sv-cap { font-size: 10.5px; color: #99694F; line-height: 1.4; margin-bottom: 4px; }
   #screen-training .coach-feedback-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
   #screen-training .coach-fb-btn { background: rgba(255,255,255,0.6); border: 1px solid #F1C9C2; border-radius: 8px; padding: 5px 10px; font-size: 14px; cursor: pointer; }
+  /* 15.10.2026: единый балл — части и формула */
+  .sp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 6px; }
+  .sp-tile { background: rgba(240,234,220,.75); border-radius: 10px; padding: 7px 4px; text-align: center; }
+  .sp-tile.off { opacity: .45; }
+  .sp-v { font-size: 14px; font-weight: 800; }
+  .sp-l { font-size: 9.5px; color: var(--ink-soft); font-weight: 600; margin-top: 2px; }
+  .sp-formula { font-size: 11px; color: var(--ink-soft); margin: 2px 0 8px; line-height: 1.4; }
+  .sp-formula b { color: var(--ink); }
+  .sp-load { font-size: 11px; color: var(--ink-soft); font-weight: 600; margin-top: 3px; }
+  .sp-load b { color: var(--ink); }
+  .sp-note { font-size: 10.5px; color: var(--ink-soft); line-height: 1.4; margin-top: 8px; padding: 9px 10px; background: rgba(240,234,220,.75); border-radius: 10px; }
 </style>
 </head>
 <body>
@@ -344,6 +355,21 @@ function catLevel(v) { return v >= 90 ? 'green' : v >= 80 ? 'yellow' : 'red'; }
 function sysLevel(v) { return v >= 75 ? 'green' : v >= 50 ? 'yellow' : 'red'; }
 function catColor(v) { return 'var(--' + catLevel(v) + ')'; }
 function sysColor(v) { return 'var(--' + sysLevel(v) + ')'; }
+// 15.10.2026: ЕДИНЫЙ БАЛЛ — одинаковый на всех дашбордах (СВ, ТМ, руководитель).
+// Балл = среднее: Системная, Чистая, СТТ точек, Категории (одно число — среднее),
+// Задачи СВ; у ТМ и выше ещё ТОП-5. Нагрузка в балл не входит.
+function scoreParts(p) {
+  const f = v => (Math.round(v * 10) / 10).toFixed(1);
+  const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1]];
+  if (p.top5In) parts.push(['ТОП-5', p.top5, 0]);
+  const used = parts.filter(x => x[1] != null);
+  const tiles = parts.map(([l, v, c]) => `<div class="sp-tile"><div class="sp-v" style="color:${v == null ? 'var(--ink-soft)' : (c ? catColor(v) : sysColor(v))}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('')
+    + (p.top5In ? '' : '<div class="sp-tile off"><div class="sp-v">—</div><div class="sp-l">ТОП-5 (у ТМ)</div></div>');
+  return `<div class="sp-grid">${tiles}</div>${used.length ? `<div class="sp-formula">Балл = (${used.map(x => f(x[1])).join(' + ')}) ÷ ${used.length} = <b>${f(p.avg)}%</b></div>` : ''}`;
+}
+function loadLine(v) { return v == null ? '' : `<div class="sp-load">Нагрузка <b>${v}%</b> от среднего</div>`; }
+const SCORE_NOTE = '<div class="sp-note">Балл одинаковый на всех дашбордах: среднее из Системной, Чистой, СТТ точек, Категорий (одно число — среднее) и Задач СВ. У ТМ и выше добавляется ТОП-5. Нагрузка в балл не входит — показывает, сколько плановых визитов на агента по сравнению со средним.</div>';
+
 // Плашки категорий: от большего % к меньшему (14.10.2026); в свёрнутом виде
 // видны 3 самые слабые, остальные (выше) — «ещё N»; длинные
 // названия обрезаются до 16 знаков, полное — по нажатию. onGreen — плашки
@@ -970,9 +996,8 @@ function renderStt(data) {
     const chips = catChipsBlock(r.categories, { onGreen: isBest });   // 04.10.2026
     // 04.09.2026: "Задачи СВ" — отдельный чип, тем же принципом, что и
     // категории, если есть данные за этот период (только прошлый месяц).
-    const focusChip = (r.focus_pct !== null && r.focus_pct !== undefined)
-      ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:#EDE0C9;color:#7A5C1E">🎯 Задачи СВ ${r.focus_pct}%</span>`
-      : '';
+    // 15.10.2026: «Задачи СВ» — теперь плитка в частях балла (scoreParts)
+    const parts = scoreParts({ sys: r.sys, clean: r.net, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5In: false, avg: r.avg_score });
     let deltaHtml = '';
     if (r.delta !== null && r.delta !== undefined) {
       const up = r.delta >= 0;
@@ -983,11 +1008,11 @@ function renderStt(data) {
     return `<div class="card" style="padding:16px;margin-bottom:10px;${isBest?'background:var(--green-bg)':''}">
       ${isBest ? `<p style="font-size:10px;font-weight:700;color:var(--green);text-transform:uppercase;margin:0 0 8px">Лучший результат — ${data.month || ''}</p>` : `<p style="font-size:11px;font-weight:700;color:var(--ink-soft);margin:0 0 8px">#${rank}</p>`}
       <div style="display:flex;justify-content:space-between;align-items:baseline">
-        <span style="font-size:${isBest?16:15}px;font-weight:800">${r.agent}</span>
+        <div><span style="font-size:${isBest?16:15}px;font-weight:800">${r.agent}</span>${loadLine(r.load_pct)}</div>
         <div style="text-align:right"><span style="display:block;font-size:${isBest?22:18}px;font-weight:800;color:${isBest?'var(--green)':'var(--ink)'}">${r.avg_score}%</span>${deltaHtml}</div>
       </div>
-      <p style="font-size:13px;color:var(--ink-soft);margin:8px 0">Системная ${r.sys}% · Чистая ${r.net}%</p>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}${focusChip}</div>
+      ${parts}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
       ${tmFocusBlock(r.tm_focus)}
       ${pakbMiniBar(r.pakb)}
     </div>`;
@@ -1000,7 +1025,7 @@ function renderStt(data) {
     const showMore = visible < rows.length
       ? `<button onclick="showMoreSvRating()" style="display:block;width:100%;font-size:13px;font-weight:700;padding:12px;border-radius:12px;border:1px dashed var(--ink-soft);background:transparent;color:var(--ink-soft);cursor:pointer;font-family:inherit;margin-top:4px">+5 (ещё ${rows.length - visible})</button>`
       : '';
-    return (cards || '<div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px">Нет данных</div>') + showMore;
+    return (cards || '<div style="text-align:center;padding:20px;color:var(--ink-soft);font-size:13px">Нет данных</div>') + showMore + (rows.length ? SCORE_NOTE : '');
   }
   window.renderSvRatingCards = renderSvRatingCards;
 
@@ -1300,7 +1325,7 @@ async function loadSvRating() {
     _svRatingLoaded = true;
 
     const rows = data.rows || [];
-    _ratingTop.svs = rows.length ? rows[0].avg_score : null;
+    _ratingTop.svs = rows.length ? rows[0].avg : null;   // 15.10.2026: было avg_score (поля нет)
     _setRatingTop();
 
     if (!rows.length) {
@@ -1338,10 +1363,9 @@ async function loadSvRating() {
             </div>
             <span style="font-size:20px;font-weight:700;color:var(--green);">${r.avg.toFixed(1)}%</span>
           </div>
-          <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">
-            Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false, r === top3[0])}${r.focus_pct != null ? `<span style="font-size:11px;background:#EDE0C9;color:#7A5C1E;padding:4px 9px;border-radius:8px;font-weight:600;">🎯 Задачи СВ ${r.focus_pct}%</span>` : ''}</div>
+          ${loadLine(r.load_pct)}
+          ${scoreParts({ sys: r.system_stt, clean: r.clean_stt, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5: r.top5_pct, top5In: !!r.top5_in_avg, avg: r.avg })}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, false, r === top3[0])}</div>
           ${pakbMiniBar(r.pakb)}
         </div>`;
     }).join('');
@@ -1366,10 +1390,9 @@ async function loadSvRating() {
                 </div>
                 <span style="font-size:15px;font-weight:700;color:var(--ink-soft);">${r.avg.toFixed(1)}%</span>
               </div>
-              <div style="font-size:12px;color:var(--ink-soft);margin-bottom:9px;">
-                Системная ${r.system_stt.toFixed(1)}% · Чистая ${r.clean_stt.toFixed(1)}%
-              </div>
-              <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}${r.focus_pct != null ? `<span style="font-size:11px;background:#F5F0E6;color:var(--ink-soft);padding:4px 9px;border-radius:8px;font-weight:600;">🎯 Задачи СВ ${r.focus_pct}%</span>` : ''}</div>
+              ${loadLine(r.load_pct)}
+              ${scoreParts({ sys: r.system_stt, clean: r.clean_stt, stt: r.stt_pct, cats: r.cats_pct, tasks: r.focus_pct, top5: r.top5_pct, top5In: !!r.top5_in_avg, avg: r.avg })}
+              <div style="display:flex;gap:6px;flex-wrap:wrap;">${catChipsHtml(r.categories, true)}</div>
               ${pakbMiniBar(r.pakb)}
             </div>`;
         }).join('')}
