@@ -248,7 +248,7 @@ function barRow(nameHtml, pct, colorFn, right, goal) {
 }
 
 // ---------- Раскладка среднего ----------
-const COMP = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['top5', 'ТОП-5']];
+const COMP = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['load', 'нагрузка визитов от среднего по компании'], ['top5', 'ТОП-5']];
 function catChips(catPct, key) {
   // 14.10.2026: категории — от большего % к меньшему. В свёрнутом виде
   // по-прежнему видны 3 самые слабые (ради них и смотрят), тоже по убыванию.
@@ -283,7 +283,7 @@ function avgGroups(gs) {
     ps = ps.filter(Boolean);
     if (!ps.length) return null;
     const pct = {};
-    ['sys', 'clean', 'stt', 'cats', 'tasks', 'top5', 'avg'].forEach(k => {
+    ['sys', 'clean', 'stt', 'cats', 'tasks', 'load', 'top5', 'avg'].forEach(k => {
       const v = ps.map(p => p.pct[k]).filter(x => x != null);
       pct[k] = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length * 10) / 10 : null;
     });
@@ -460,7 +460,7 @@ function screenSummary() {
       `Начало месяца: новый месяц ещё мало что показывает, поэтому сначала — закрытый ${MONTHS[m.month - 1]}. ▲ / ▼ — к предыдущему месяцу.`, 'sm');
   }
   html += heroBlock(d.role === 'director' ? 'Среднее по компании' : 'Среднее по вашей зоне', b.now, b.prev,
-    `Цифра — оценка из 6 показателей: системная, чистая, СТТ точек, категории, задачи СВ, ТОП-5. Цель — 75%. Нажмите на строку — увидите, из чего сложилась цифра.`, 'sum', b);
+    `Цифра — среднее показателей: системная, чистая, СТТ точек, категории, задачи СВ, нагрузка визитов, ТОП-5. Цель — 75%. Нажмите на строку — увидите расчёт.`, 'sum', b);
   return html + stabilityBlock() + alertsCard();
 }
 
@@ -653,15 +653,15 @@ function screenMonth() {
         ${ch.filter(([, c]) => c.cat_pct[S.mcat] != null).map(([n, c]) => barRow(esc(n), c.cat_pct[S.mcat], catColor, delta(dif(c.cat_pct[S.mcat], prev && prev.children[n] ? prev.children[n].cat_pct[S.mcat] : null)), 90)).join('')}`,
       'Доля заказов с категорией. Считаются только те, за кем категория закреплена. Цель — 90%.', t.pct.cats) : '') +
     mCard('tasks', 'Задачи СВ', rows('tasks', catColor), 'Точки с 2+ пропусками подряд, где СВ добился заказа в следующий плановый день. Цель — 90%.', t.pct.tasks) +
-    mCard('top5', 'ТОП-5', rows('top5', sysColor), `Выполнение нормы маршрутами из ТОП-5 по дефициту (${t.top5_routes} маршрутов). Норма маршрута — 75% от плана визитов (не меньше 75% от среднего по команде). Факт — чистые заказы (без вне маршрута и призраков), не больше нормы. Цель — 75% нормы.`, t.pct.top5) +
+    mCard('top5', 'ТОП-5', rows('top5', sysColor), `${t.top5_routes} самых отстающих маршрутов (по 5 у каждого ТМ). Чистые заказы ÷ норма (75% плана визитов). Цель — 75%.`, t.pct.top5) +
     stabMonthCard(m) +
     `<div class="day-card"><h3>Рейтинг по среднему</h3>
       <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';S.rShow=5;render()">${esc(l.name)}</button>`).join('')}</div>
       ${rl.length ? rl.slice(0, S.rShow).map((r, i) => `<div class="rate-row"><span class="rate-n ${i < 3 ? 'top' : ''}">${i + 1}</span>
-        <div class="rate-name"><b>${esc(r.name)}</b>${(r.parent || r.load != null) ? `<div class="rate-sub">${r.parent ? esc(r.parent) : ''}${r.parent && r.load != null ? ' · ' : ''}${r.load != null ? `нагрузка ${r.load}%` : ''}</div>` : ''}</div>
+        <div class="rate-name"><b>${esc(r.name)}</b>${r.parent ? `<div class="rate-sub">${esc(r.parent)}</div>` : ''}</div>
         ${delta(r.delta)}<span class="rate-pct" style="color:${sysColor(r.avg)}">${r.avg}%</span></div>`).join('') : '<div class="empty" style="padding:12px">Нет данных</div>'}
       ${rl.length > S.rShow ? `<button class="show-more-btn" onclick="S.rShow+=5;render()">+5 · показать ещё (${rl.length - S.rShow})</button>` : ''}
-      <p class="card-note">По среднему за месяц, лучший сверху: сначала 5, «+5» показывает следующих. Изменение — к прошлому месяцу. Балл одинаковый на всех дашбордах: Системная, Чистая, СТТ точек, Категории (среднее) и Задачи СВ; у ТМ и выше — ещё ТОП-5. Нагрузка — плановых визитов на агента к среднему, в балл не входит.</p></div>`;
+      <p class="card-note">Лучший сверху. Изменение — к прошлому месяцу.<br><b>Нагрузка визитов</b> — плановых визитов на агента к среднему по компании. Входит в балл полной цифрой: меньше среднего — балл ниже, больше — выше.</p></div>`;
 }
 function monthNav(m) {
   const t = new Date(S.sum ? S.sum.today + 'T00:00:00' : Date.now());
