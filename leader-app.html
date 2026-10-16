@@ -335,6 +335,7 @@ function loadDetails(r) {
     if (!r || r.min == null) return '';
   // 16.10.2026: два отдельных блока; у агента — его руководитель, должность под именем
   const boss = v => esc(String(v || '').replace(/\s*Супервайзер\s*$/i, ''));
+  const ROLE_LBL = { rf: 'руководитель филиала', nto: 'руководитель продаж', tm: 'территориальный менеджер', sv: 'супервайзер' };
   // сколько визитов не хватает до нормы (ниже 80%) / лишних сверх нормы (выше 120%), в месяц
   const gap = (x, cls) => {
     const v = x.month != null ? x.month : null;
@@ -344,7 +345,7 @@ function loadDetails(r) {
   };
   const ag = (list, title, cls) => list && list.length ? `<div class="load-box ${cls}"><div class="load-box-h">${title}</div>${list.map(x =>
     `<div class="load-ag"><div class="load-ag-top"><span>${esc(x.agent)}</span><b>${num(x.month != null ? x.month : x.plan)} <small>виз.</small></b></div>
-      <div class="load-ag-sub"><span>${x.sv ? `${boss(x.sv)}<i>супервайзер</i>` : ''}</span><em>${x.pct}% от типичного${gap(x, cls)}</em></div></div>`).join('')}</div>` : '';
+      <div class="load-ag-sub"><span>${x.boss ? `${boss(x.boss)}<i>${ROLE_LBL[x.boss_role] || ''}</i>` : x.sv ? `${boss(x.sv)}<i>супервайзер</i>` : ''}</span><em>${x.pct}% от типичного${gap(x, cls)}</em></div></div>`).join('')}</div>` : '';
   const more = (r.low && r.low.length) || (r.high && r.high.length);
   const pv = r.prev, bm = r.base_month;
   // текущий и прошлый месяц — от «сегодня» сводки (в 1-е число — ещё прошлый, как ТОП-5 месяца)
@@ -372,7 +373,7 @@ function loadDetails(r) {
       ${row('Выше 120%', bm ? `больше ${num(Math.round(bm * 1.2))} визитов` : '', r.above, pv && pv.above, 'var(--amber)', false)}</table>` : ''}
     ${ag(r.low, '▼ Меньше всего визитов', 'lo')}${ag(r.high, '▲ Больше всего визитов', 'hi')}</div>`;
 }
-function loadBlock(c, pc, pp, p) {
+function loadBlock(c, pc, pp, p, top) {
   const r = c.load_range, pr = p && p.load_range;
   if (pc.load_in_avg === false) {
     // 16.10.2026: у директора нагрузка не в балле — строка-ссылка на вкладку «Маршруты»
@@ -382,7 +383,8 @@ function loadBlock(c, pc, pp, p) {
   }
   if (pc.load == null) return '';
   const lf = pc.load_full ?? pc.load, pf = pp.load_full ?? pp.load;
-  return `<div class="load-line"><span>${LOAD_LBL}</span><b>${lf}% ${delta(dif(lf, pf), '')}</b></div>`;
+  // 16.10.2026: своя строка нагрузки (не подчинённого) — ссылка на вкладку «Маршруты», как у директора
+  return `<div class="load-line${top ? ' load-link' : ''}"${top ? ` onclick="event.stopPropagation();go('routes')"` : ''}><span>${LOAD_LBL}${top ? ' <span class="br-arrow">›</span>' : ''}</span><b>${lf}% ${delta(dif(lf, pf), '')}</b></div>`;
 }
 function compBlock(c, p, key, dynName) {
   const pc = c.pct, pp = (p && p.pct) || {};
@@ -392,7 +394,7 @@ function compBlock(c, p, key, dynName) {
   const loadIn = pc.load_in_avg !== false && pc.load != null;
   // 16.10.2026: в балл нагрузка — не больше 120 (полная цифра — в строке)
   if (loadIn) used.push(`<span class="fl">нагрузка ${pc.load}${(pc.load_full ?? 0) > 120 ? ` (${Math.round(pc.load_full)}%, засчитываем до 120)` : ''}</span>`);
-  const lb = loadBlock(c, pc, pp, p), top = pc.load_in_avg === false;
+  const lb = loadBlock(c, pc, pp, p, /:all$/.test(key)), top = pc.load_in_avg === false;
   return `<div class="comp">
     ${top ? lb : ''}<div class="tiles3">${tiles}</div>${top ? '' : lb}
     ${used.length ? `<div class="formula">(${used.join(' + ')}) ÷ ${used.length} = <b>${pc.avg}%</b></div>` : ''}
