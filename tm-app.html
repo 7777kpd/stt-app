@@ -320,7 +320,7 @@ function scoreParts(p) {
   if (p.load != null) used.push(`<span style="color:var(--blue)">нагрузка ${f(p.load)}${lf != null && lf > 120 ? ` (${Math.round(lf)}%, засчитываем до 120)` : ''}</span>`);
   const span = parts.length === 5 ? i => i < 3 ? 2 : 3 : () => 2;
   const tiles = parts.map(([l, v, c], i) => `<div class="sp-tile" style="grid-column:span ${span(i)}"><div class="sp-v" style="color:${v == null ? 'var(--ink-soft)' : (c ? catColor(v) : sysColor(v))}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('');
-  return `<div class="sp-grid">${tiles}</div>${p.load != null ? `<div class="sp-loadline"><span>Нагрузка визитов от среднего по компании</span><b>${p.loadRaw != null ? Math.round(p.loadRaw) : f(p.load)}%</b></div>` : ''}${used.length ? `<div class="sp-formula">Балл = (${used.join(' + ')}) ÷ ${used.length} = <b>${f(p.avg)}%</b></div>` : ''}`;
+  return `<div class="sp-grid">${tiles}</div>${p.load != null ? `<div class="sp-loadline"><span>Нагрузка визитов за месяц<small style="display:block;font-size:9.5px;opacity:.85">к типичному агенту компании</small></span><b>${p.loadRaw != null ? Math.round(p.loadRaw) : f(p.load)}%</b></div>` : ''}${used.length ? `<div class="sp-formula">Балл = (${used.join(' + ')}) ÷ ${used.length} = <b>${f(p.avg)}%</b></div>` : ''}`;
 }
 function loadLine(v) { return v == null ? '' : `<div class="sp-load">Нагрузка плановых визитов <b>${v}%</b> от среднего</div>`; }
 const SCORE_NOTE = '';   // 16.10.2026: пояснение убрано — формула под плашками показывает, из чего балл

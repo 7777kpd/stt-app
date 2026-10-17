@@ -309,7 +309,8 @@ function catChips(catPct, key) {
 // 16.10.2026: нагрузка — не плашка, а строка. Входит в балл (pct.load_in_avg) — строка под
 // плашками и подписанное слагаемое в формуле. Не входит (директор: компания к себе всегда 100%) —
 // сверху диапазон по агентам компании (load_range: min/max) и сигнал, если «от» упало к среднему за 4 прошлые недели.
-const LOAD_LBL = 'Нагрузка визитов от среднего по компании';
+// 17.10.2026: цифра — по команде руководителя; компания — только база сравнения (типичный агент)
+const LOAD_SUB = '<small style="display:block;font-size:11px;color:var(--ink-soft);font-weight:600">к типичному агенту компании</small>';
 // 16.10.2026: распределение агентов по нагрузке — столбики по 10%, зона нормы и линия типичного агента (100%)
 const NORM = r => [r && r.lo || 90, r && r.hi || 110];   // 17.10.2026: норма 90–110% (с сервера: lo/hi)
 function loadHist(r, bm) {
@@ -366,7 +367,7 @@ function loadDetails(r) {
   // свёрнуто — одна строка; всё остальное — по нажатию
   // 17.10.2026: в заголовке — нагрузка зоны самого руководителя; у директора (зона = компания, ≈100%) — диапазон агентов
   const own = r.role !== 'director' && r.zone_pct != null;
-  return `<div class="day-card"><div class="load-line" style="font-size:15px"><span><b>Нагрузка визитов на ${MONTHS[cm]}</b>${own ? '<small style="display:block;font-size:11px;color:var(--ink-soft);font-weight:600">ваша зона к типичному агенту компании</small>' : ''}</span><b>${own ? r.zone_pct + '%' : r.min + '–' + r.max + '%'}</b></div>
+  return `<div class="day-card"><div class="load-line" style="font-size:15px"><span><b style="white-space:normal;font-size:15px">Нагрузка визитов ${own ? 'вашей команды ' : ''}на ${MONTHS[cm]}</b>${own ? LOAD_SUB : ''}</span><b>${own ? r.zone_pct + '%' : r.min + '–' + r.max + '%'}</b></div>
     ${own ? `<div class="load-base">У агентов от <b>${r.min}%</b> до <b>${r.max}%</b> · ${num(r.n)} агентов</div>` : ''}
     ${bm ? `<div class="load-base" style="margin-top:6px">Норма — <b>${num(Math.round(bm * LO / 100))}–${num(Math.round(bm * HI / 100))}</b> визитов в месяц (${LO}–${HI}% от типичного агента, ${num(bm)})</div>` : ''}
     ${r.n ? `<div class="load-base">Ниже нормы <b>${num(r.below)}</b> агентов ${tri(r.below, pv && pv.below, false)}${pv ? ` <span style="font-size:11px">к ${MONTHS_DAT[pm]}</span>` : ''}</div>` : ''}
@@ -387,8 +388,12 @@ function loadBlock(c, pc, pp, p, top) {
   }
   if (pc.load == null) return '';
   const lf = pc.load_full ?? pc.load, pf = pp.load_full ?? pp.load;
+  // 17.10.2026: в «Сводке» и «Динамике» нагрузка — по Плану месяца (load_month), та же цифра, что во вкладке
+  // «Маршруты»; в течение месяца не меняется — без стрелки. В «Итогах месяца» — со сравнением к прошлому месяцу.
+  const m = pc.load_month;
+  const lbl = `Нагрузка визитов ${top ? 'вашей команды' : 'команды'}${m ? ' на ' + MONTHS[m - 1] : ''}`;
   // 16.10.2026: своя строка нагрузки (не подчинённого) — ссылка на вкладку «Маршруты», как у директора
-  return `<div class="load-line${top ? ' load-link' : ''}"${top ? ` onclick="event.stopPropagation();go('routes')"` : ''}><span>${LOAD_LBL}${top ? ' <span class="br-arrow">›</span>' : ''}</span><b>${lf}% ${delta(dif(lf, pf), '')}</b></div>`;
+  return `<div class="load-line${top ? ' load-link' : ''}"${top ? ` onclick="event.stopPropagation();go('routes')"` : ''}><span>${lbl}${top ? ' <span class="br-arrow">›</span>' : ''}${LOAD_SUB}</span><b>${lf}%${m ? '' : ' ' + delta(dif(lf, pf), '')}</b></div>`;
 }
 function compBlock(c, p, key, dynName) {
   const pc = c.pct, pp = (p && p.pct) || {};
@@ -423,6 +428,7 @@ function avgGroups(gs) {
     });
     pct.top5_in_avg = ps[0].pct.top5_in_avg;
     pct.load_in_avg = ps[0].pct.load_in_avg;
+    pct.load_month = ps[0].pct.load_month;
     const lr = ps.map(p => p.load_range).filter(Boolean);
     const cats = {};
     ps.forEach(p => Object.entries(p.cat_pct || {}).forEach(([c, v]) => { if (v != null) (cats[c] = cats[c] || []).push(v); }));
