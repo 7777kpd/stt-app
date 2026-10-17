@@ -364,7 +364,10 @@ function loadDetails(r) {
   const norm = r.n - r.below - r.above, pnorm = pv ? pv.n - pv.below - pv.above : null;
   const out = r.below + r.above, pout = pv ? pv.below + pv.above : null;
   // свёрнуто — одна строка; всё остальное — по нажатию
-  return `<div class="day-card"><div class="load-line" style="font-size:15px"><span><b>Нагрузка визитов на ${MONTHS[cm]}</b></span><b>${r.min}–${r.max}%</b></div>
+  // 17.10.2026: в заголовке — нагрузка зоны самого руководителя; у директора (зона = компания, ≈100%) — диапазон агентов
+  const own = r.role !== 'director' && r.zone_pct != null;
+  return `<div class="day-card"><div class="load-line" style="font-size:15px"><span><b>Нагрузка визитов на ${MONTHS[cm]}</b>${own ? '<small style="display:block;font-size:11px;color:var(--ink-soft);font-weight:600">ваша зона к типичному агенту компании</small>' : ''}</span><b>${own ? r.zone_pct + '%' : r.min + '–' + r.max + '%'}</b></div>
+    ${own ? `<div class="load-base">У агентов от <b>${r.min}%</b> до <b>${r.max}%</b> · ${num(r.n)} агентов</div>` : ''}
     ${bm ? `<div class="load-base" style="margin-top:6px">Норма — <b>${num(Math.round(bm * LO / 100))}–${num(Math.round(bm * HI / 100))}</b> визитов в месяц (${LO}–${HI}% от типичного агента, ${num(bm)})</div>` : ''}
     ${r.n ? `<div class="load-base">Ниже нормы <b>${num(r.below)}</b> агентов ${tri(r.below, pv && pv.below, false)}${pv ? ` <span style="font-size:11px">к ${MONTHS_DAT[pm]}</span>` : ''}</div>` : ''}
     ${loadHist(r, bm)}
