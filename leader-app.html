@@ -126,9 +126,9 @@
   .load-top .load-line { background: none; padding: 0; margin: 0; }
   .load-top summary { list-style: none; cursor: pointer; }
   .load-box { background: var(--card); border-radius: 10px; padding: 8px 10px 4px; margin-top: 10px; border-left: 3px solid var(--red); }
-  .load-box.hi { border-left-color: var(--amber); }
+  .load-box.hi { border-left-color: var(--green); }
   .load-box-h { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--red); margin-bottom: 2px; }
-  .load-box.hi .load-box-h { color: var(--amber); }
+  .load-box.hi .load-box-h { color: var(--green); }
   .load-ag-sub em { text-align: right; }
   .gap { display: block; font-size: 11.5px; color: var(--ink); }
 
@@ -310,25 +310,26 @@ function catChips(catPct, key) {
 // плашками и подписанное слагаемое в формуле. Не входит (директор: компания к себе всегда 100%) —
 // сверху диапазон по агентам компании (load_range: min/max) и сигнал, если «от» упало к среднему за 4 прошлые недели.
 const LOAD_LBL = 'Нагрузка визитов от среднего по компании';
-// 16.10.2026: распределение агентов по нагрузке — столбики по 20%, зона нормы 80–120% и линия типичного агента (100%)
+// 16.10.2026: распределение агентов по нагрузке — столбики по 10%, зона нормы и линия типичного агента (100%)
+const NORM = r => [r && r.lo || 90, r && r.hi || 110];   // 17.10.2026: норма 90–110% (с сервера: lo/hi)
 function loadHist(r, bm) {
-  const h = r.hist;
+  const h = r.hist, [LO, HI] = NORM(r), step = h && h.length > 1 ? h[1].lo - h[0].lo : 10;
   if (!h || !h.length) return '';
   const W = 300, H = 104, B = 18, T = 28, n = h.length, bw = W / n, mx = Math.max(...h.map(x => x.n), 1);
-  const x = p => Math.min(p, n * 20) / (n * 20) * W;
+  const x = p => Math.min(p, n * step) / (n * step) * W;
   const bars = h.map((b, i) => {
-    const bh = b.n / mx * (H - B - T), col = b.lo < 80 ? 'var(--red)' : b.lo >= 120 ? 'var(--amber)' : 'var(--green)';
+    const bh = b.n / mx * (H - B - T), col = b.lo < LO ? 'var(--red)' : b.lo >= HI ? 'var(--green)' : 'var(--yellow)';
     return `<rect x="${i * bw + 1.5}" y="${H - B - bh}" width="${bw - 3}" height="${bh}" rx="2" fill="${col}" opacity=".75"/>` +
       (b.n ? `<text x="${i * bw + bw / 2}" y="${H - B - bh - 3}" text-anchor="middle" font-size="8" fill="#8B8578">${b.n}</text>` : '');
   }).join('');
-  const ticks = [0, 50, 100, 150, 200].filter(t => t <= n * 20).map(t => `<text x="${Math.min(W - 8, Math.max(8, x(t)))}" y="${H - 5}" text-anchor="middle" font-size="8.5" fill="#8B8578">${t === n * 20 ? t + '+' : t}%</text>`).join('');
+  const ticks = [0, 50, 100, 150, 200].filter(t => t <= n * step).map(t => `<text x="${Math.min(W - 8, Math.max(8, x(t)))}" y="${H - 5}" text-anchor="middle" font-size="8.5" fill="#8B8578">${t === n * step ? t + '+' : t}%</text>`).join('');
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="margin-top:10px">
-    <rect x="${x(80)}" y="${T - 4}" width="${x(120) - x(80)}" height="${H - B - T + 4}" fill="var(--green)" opacity=".08"/>
+    <rect x="${x(LO)}" y="${T - 4}" width="${x(HI) - x(LO)}" height="${H - B - T + 4}" fill="var(--yellow)" opacity=".12"/>
     ${bars}
     <line x1="${x(100)}" x2="${x(100)}" y1="13" y2="${H - B}" stroke="#2C2A26" stroke-width="1.3" stroke-dasharray="3 2"/>
     <text x="${x(100)}" y="9" text-anchor="middle" font-size="8.5" font-weight="700" fill="#2C2A26">типичный агент${bm ? ' · ' + num(bm) : ''}</text>
     ${ticks}</svg>
-    <div class="load-legend"><span style="color:var(--red)">■</span> ниже нормы · <span style="color:var(--green)">■</span> норма 80–120% · <span style="color:var(--amber)">■</span> выше · по оси — % от типичного агента</div>`;
+    <div class="load-legend"><span style="color:var(--red)">■</span> ниже нормы · <span style="color:var(--yellow)">■</span> норма ${LO}–${HI}% · <span style="color:var(--green)">■</span> профи, выше ${HI}% · по оси — % от типичного агента</div>`;
 }
 // 16.10.2026: вкладка «Маршруты» — нагрузка визитов на месяц по зоне руководителя (План месяца на сегодня)
 function loadDetails(r) {
@@ -336,11 +337,11 @@ function loadDetails(r) {
   // 16.10.2026: два отдельных блока; у агента — его руководитель, должность под именем
   const boss = v => esc(String(v || '').replace(/\s*Супервайзер\s*$/i, ''));
   const ROLE_LBL = { rf: 'руководитель филиала', nto: 'руководитель продаж', tm: 'территориальный менеджер', sv: 'супервайзер' };
-  // сколько визитов не хватает до нормы (ниже 80%) / лишних сверх нормы (выше 120%), в месяц
+  const [LO, HI] = NORM(r);
   const gap = (x, cls) => {
     const v = x.month != null ? x.month : null;
     if (v == null || !bm) return '';
-    const d = cls === 'lo' ? Math.round(bm * 0.8) - v : v - Math.round(bm * 1.2);
+    const d = cls === 'lo' ? Math.round(bm * LO / 100) - v : v - Math.round(bm * HI / 100);
     return d > 0 ? `<b class="gap">${cls === 'lo' ? 'меньше нормы на ' : 'больше нормы на '}${num(d)}</b>` : '';
   };
   const ag = (list, title, cls) => list && list.length ? `<div class="load-box ${cls}"><div class="load-box-h">${title}</div>${list.map(x =>
@@ -364,13 +365,13 @@ function loadDetails(r) {
   const out = r.below + r.above, pout = pv ? pv.below + pv.above : null;
   // свёрнуто — одна строка; всё остальное — по нажатию
   return `<div class="day-card"><div class="load-line" style="font-size:15px"><span><b>Нагрузка визитов на ${MONTHS[cm]}</b></span><b>${r.min}–${r.max}%</b></div>
-    ${bm ? `<div class="load-base" style="margin-top:6px">Норма — <b>${num(Math.round(bm * 0.8))}–${num(Math.round(bm * 1.2))}</b> визитов в месяц (±20% от типичного агента, ${num(bm)})</div>` : ''}
+    ${bm ? `<div class="load-base" style="margin-top:6px">Норма — <b>${num(Math.round(bm * LO / 100))}–${num(Math.round(bm * HI / 100))}</b> визитов в месяц (${LO}–${HI}% от типичного агента, ${num(bm)})</div>` : ''}
     ${r.n ? `<div class="load-base">Ниже нормы <b>${num(r.below)}</b> агентов ${tri(r.below, pv && pv.below, false)}${pv ? ` <span style="font-size:11px">к ${MONTHS_DAT[pm]}</span>` : ''}</div>` : ''}
     ${loadHist(r, bm)}
     ${r.n ? `<table class="load-tab"><tr><th>Агентов</th><th>сейчас</th>${pv ? `<th>к ${MONTHS_DAT[pm]}</th>` : '<th></th>'}</tr>
-      ${row('Ниже 80%', bm ? `меньше ${num(Math.round(bm * 0.8))} визитов` : '', r.below, pv && pv.below, 'var(--red)', false)}
-      ${row('Норма 80–120%', bm ? `${num(Math.round(bm * 0.8))}–${num(Math.round(bm * 1.2))} визитов` : '', norm, pnorm, 'var(--ink)', true)}
-      ${row('Выше 120%', bm ? `больше ${num(Math.round(bm * 1.2))} визитов` : '', r.above, pv && pv.above, 'var(--amber)', false)}</table>` : ''}
+      ${row(`Ниже нормы · до ${LO}%`, bm ? `меньше ${num(Math.round(bm * LO / 100))} визитов` : '', r.below, pv && pv.below, 'var(--red)', false)}
+      ${row(`Норма · ${LO}–${HI}%`, bm ? `${num(Math.round(bm * LO / 100))}–${num(Math.round(bm * HI / 100))} визитов` : '', norm, pnorm, 'var(--yellow)', true)}
+      ${row(`Профи · выше ${HI}%`, bm ? `больше ${num(Math.round(bm * HI / 100))} визитов` : '', r.above, pv && pv.above, 'var(--green)', true)}</table>` : ''}
     ${ag(r.low, '▼ Меньше всего визитов', 'lo')}${ag(r.high, '▲ Больше всего визитов', 'hi')}</div>`;
 }
 function loadBlock(c, pc, pp, p, top) {
@@ -876,7 +877,7 @@ function screenRoutes() {
   const r = R.load, pv = r && r.prev;
   // 16.10.2026: сигнал — агентов НИЖЕ нормы стало больше, чем в прошлом месяце (недогруженные маршруты)
   if (r && pv && r.n && pv.n && r.below > pv.below)
-    html += `<div class="alert-card" style="margin-bottom:10px"><b>Агентов ниже нормы стало больше</b><div class="alert-why">В прошлом месяце ${num(pv.below)}, сейчас ${num(r.below)} ▲ +${num(r.below - pv.below)} — у них меньше ${r.base_month ? num(Math.round(r.base_month * 0.8)) + ' визитов в месяц' : '80% визитов типичного агента'}. Кто именно — ниже, «Меньше всего визитов».</div></div>`;
+    html += `<div class="alert-card" style="margin-bottom:10px"><b>Агентов ниже нормы стало больше</b><div class="alert-why">В прошлом месяце ${num(pv.below)}, сейчас ${num(r.below)} ▲ +${num(r.below - pv.below)} — у них меньше ${r.base_month ? num(Math.round(r.base_month * NORM(r)[0] / 100)) + ' визитов в месяц' : NORM(r)[0] + '% визитов типичного агента'}. Кто именно — ниже, «Меньше всего визитов».</div></div>`;
   if (r && r.min != null) html += loadDetails(r);
   return html || '<div class="empty">По маршрутам пока нет данных.</div>';
 }
