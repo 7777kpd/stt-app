@@ -262,7 +262,9 @@
   .check-yes { color: var(--green); font-weight: 800; }
   .check-no { color: var(--red-dark); font-weight: 800; }
   /* 15.10.2026: единый балл — части и формула */
-  .sp-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 8px 0 6px; }
+  .sp-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin: 8px 0 6px; }
+  .sp-loadline { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 10.5px; font-weight: 600; color: var(--ink-soft); background: rgba(240,234,220,.75); border-radius: 10px; padding: 7px 10px; margin: 0 0 6px; }
+  .sp-loadline b { font-size: 13px; color: var(--ink); white-space: nowrap; }
   .sp-tile { background: rgba(240,234,220,.75); border-radius: 10px; padding: 7px 4px; text-align: center; }
   .sp-tile.off { opacity: .45; }
   .sp-v { font-size: 14px; font-weight: 800; }
@@ -306,17 +308,22 @@ function catColor(v) { return v >= 90 ? 'var(--green)' : v >= 80 ? 'var(--yellow
 function sysColor(v) { return v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--amber)' : 'var(--red-dark)'; }
 // 15.10.2026: ЕДИНЫЙ БАЛЛ — одинаковый на всех дашбордах (СВ, ТМ, руководитель).
 // Балл = среднее: Системная, Чистая, СТТ точек, Категории (одно число — среднее),
-// Задачи СВ; у ТМ и выше ещё ТОП-5. Нагрузка в балл не входит.
+// Задачи СВ, Нагрузка визитов (строкой под плашками); у ТМ и выше ещё ТОП-5.
 function scoreParts(p) {
   const f = v => (Math.round(v * 10) / 10).toFixed(1);
-  const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1], ['Нагрузка визитов от среднего по компании', p.load, 0]];
+  const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1]];
   if (p.top5In) parts.push(['ТОП-5', p.top5, 0]);
-  const used = parts.filter(x => x[1] != null);
-  const tiles = parts.map(([l, v, c]) => `<div class="sp-tile"><div class="sp-v" style="color:${v == null ? 'var(--ink-soft)' : (c ? catColor(v) : sysColor(v))}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('');
-  return `<div class="sp-grid">${tiles}</div>${used.length ? `<div class="sp-formula">Балл = (${used.map(x => f(x[1])).join(' + ')}) ÷ ${used.length} = <b>${f(p.avg)}%</b></div>` : ''}`;
+  const used = parts.filter(x => x[1] != null).map(x => f(x[1]));
+  // 16.10.2026: нагрузка — строкой под плашками и подписанным слагаемым в формуле
+  // 16.10.2026: в балл нагрузка — не больше 120 (полная цифра — в строке)
+  const lf = p.loadRaw != null ? p.loadRaw : p.load;
+  if (p.load != null) used.push(`<span style="color:var(--blue)">нагрузка ${f(p.load)}${lf != null && lf > 120 ? ` (${Math.round(lf)}%, засчитываем до 120)` : ''}</span>`);
+  const span = parts.length === 5 ? i => i < 3 ? 2 : 3 : () => 2;
+  const tiles = parts.map(([l, v, c], i) => `<div class="sp-tile" style="grid-column:span ${span(i)}"><div class="sp-v" style="color:${v == null ? 'var(--ink-soft)' : (c ? catColor(v) : sysColor(v))}">${v == null ? '—' : f(v) + '%'}</div><div class="sp-l">${l}</div></div>`).join('');
+  return `<div class="sp-grid">${tiles}</div>${p.load != null ? `<div class="sp-loadline"><span>Нагрузка визитов от среднего по компании</span><b>${p.loadRaw != null ? Math.round(p.loadRaw) : f(p.load)}%</b></div>` : ''}${used.length ? `<div class="sp-formula">Балл = (${used.join(' + ')}) ÷ ${used.length} = <b>${f(p.avg)}%</b></div>` : ''}`;
 }
 function loadLine(v) { return v == null ? '' : `<div class="sp-load">Нагрузка плановых визитов <b>${v}%</b> от среднего</div>`; }
-const SCORE_NOTE = '<div class="sp-note">Балл — среднее этих показателей, одинаковое на всех дашбордах.<br><b>Нагрузка визитов</b> — плановых визитов на агента к среднему по компании. Входит в балл полной цифрой: меньше среднего — балл ниже, больше — выше.</div>';
+const SCORE_NOTE = '';   // 16.10.2026: пояснение убрано — формула под плашками показывает, из чего балл
 
 
 const API = new URLSearchParams(window.location.search).get('dev') === '1'
