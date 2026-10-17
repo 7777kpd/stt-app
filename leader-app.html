@@ -130,8 +130,8 @@
   .load-box-h { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--red); margin-bottom: 2px; }
   .load-box.hi .load-box-h { color: var(--amber); }
   .load-ag-sub em { text-align: right; }
-  .gap { display: block; font-size: 11.5px; color: var(--red); }
-  .load-box.hi .gap { color: var(--amber); }
+  .gap { display: block; font-size: 11.5px; color: var(--ink); }
+
   .load-ag { display: block; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
   .load-ag:last-child { border-bottom: none; }
   .load-ag-top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
@@ -345,7 +345,7 @@ function loadDetails(r) {
   };
   const ag = (list, title, cls) => list && list.length ? `<div class="load-box ${cls}"><div class="load-box-h">${title}</div>${list.map(x =>
     `<div class="load-ag"><div class="load-ag-top"><span>${esc(x.agent)}</span><b>${num(x.month != null ? x.month : x.plan)} <small>виз.</small></b></div>
-      <div class="load-ag-sub"><span>${x.boss ? `${boss(x.boss)}<i>${ROLE_LBL[x.boss_role] || ''}</i>` : x.sv ? `${boss(x.sv)}<i>супервайзер</i>` : ''}</span><em>${x.pct}% от типичного${gap(x, cls)}</em></div></div>`).join('')}</div>` : '';
+      <div class="load-ag-sub"><span>${x.boss ? `${boss(x.boss)}<i>${ROLE_LBL[x.boss_role] || ''}</i>` : x.sv ? `${boss(x.sv)}<i>супервайзер</i>` : ''}</span><em>${x.pct}% от типичного${x.sys != null ? `<b class="gap">сист. <span style="color:${sysColor(x.sys)}">${x.sys}%</span> · чист. <span style="color:${sysColor(x.clean)}">${x.clean}%</span></b>` : ''}</em></div></div>`).join('')}</div>` : '';
   const more = (r.low && r.low.length) || (r.high && r.high.length);
   const pv = r.prev, bm = r.base_month;
   // текущий и прошлый месяц — от «сегодня» сводки (в 1-е число — ещё прошлый, как ТОП-5 месяца)
