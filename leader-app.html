@@ -294,7 +294,7 @@ function barRow(nameHtml, pct, colorFn, right, goal) {
 }
 
 // ---------- Раскладка среднего ----------
-const COMP = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['top5', 'ТОП-5']];
+const COMP = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['top5', 'ТОП-5 отстающих']];
 function catChips(catPct, key) {
   // 14.10.2026: категории — от большего % к меньшему. В свёрнутом виде
   // по-прежнему видны 3 самые слабые (ради них и смотрят), тоже по убыванию.
@@ -481,7 +481,7 @@ function sortedChildren(group) {
 // 16.10.2026: «Требует решения» — только «Падает» к среднему за 4 прошлые недели (те же дни):
 // по каждому подчинённому (уровень ниже) — какие из показателей балла упали. Нагрузка визитов
 // сюда не входит: план визитов за неделю почти не меняется — она во вкладке «Маршруты».
-const FALL = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['top5', 'ТОП-5']];   // 16.10.2026: нагрузку не сравниваем по неделям — план визитов статичен
+const FALL = [['sys', 'системная'], ['clean', 'чистая'], ['stt', 'СТТ точек'], ['cats', 'категории'], ['tasks', 'задачи СВ'], ['top5', 'ТОП-5 отстающих']];   // 16.10.2026: нагрузку не сравниваем по неделям — план визитов статичен
 const FALL_MIN = 2;   // падение меньше 2 п. — шум, не показываем
 function alertsCard() {
   const b = basis();
@@ -808,8 +808,8 @@ function top5Card(open) {
   const light = pts.map((p, i) => p.partial && !p.current ? i : -1).filter(i => i >= 0);
   const kids = Object.entries(T.now.children).sort((a, b) => (a[1].pct.top5 ?? 999) - (b[1].pct.top5 ?? 999));
   return `<details class="day-card collapsible-card" ${open === 'top5' ? 'open' : ''} ontoggle="if(this.open)S.open.dyn='top5'">
-    <summary><h3>ТОП-5 ${mGen}</h3><span class="sum-right">${delta(dif(now, prev))}<span class="sum-val" style="color:${sysColor(now)}">${now == null ? '—' : now + '%'}</span></span></summary>
-    <details class="how-box" ${S.open.t5what ? 'open' : ''} ontoggle="S.open.t5what=this.open"><summary>Что такое ТОП-5 ›</summary>
+    <summary><h3>ТОП-5 отстающих · ${mGen}</h3><span class="sum-right">${delta(dif(now, prev))}<span class="sum-val" style="color:${sysColor(now)}">${now == null ? '—' : now + '%'}</span></span></summary>
+    <details class="how-box" ${S.open.t5what ? 'open' : ''} ontoggle="S.open.t5what=this.open"><summary>Что такое ТОП-5 отстающих ›</summary>
       <div class="explain-in"><b>ТОП-5</b> — 5 самых отстающих маршрутов у каждого ТМ. Выбираем <b>1-го числа</b> по итогам прошлого месяца и считаем <b>с 1-го по последнее число</b>. Итог закрывается вместе с месяцем.<br><br>
       <b>Норма маршрута</b> — 75% от плана визитов (если план меньше среднего по команде — от среднего). Засчитываем чистые заказы, но не больше нормы.</div></details>
     <div class="period">За период <b>${d1}–${d2} ${mGen}</b> маршруты ТОП-5 ${mGen} сделали ${now ?? '—'}% нормы чистыми заказами.<br>${prev != null ? `Итог ${MONTHS_GEN[(T.prev_month || 12) - 1]} (пятёрка ${MONTHS_GEN[(T.prev_month || 12) - 1]}) — ${prev}%.` : 'Итога прошлого месяца пока нет.'}</div>
@@ -858,7 +858,7 @@ function screenMonth() {
         ${ch.filter(([, c]) => c.cat_pct[S.mcat] != null).map(([n, c]) => barRow(esc(n), c.cat_pct[S.mcat], catColor, delta(dif(c.cat_pct[S.mcat], prev && prev.children[n] ? prev.children[n].cat_pct[S.mcat] : null)), 90)).join('')}`,
       'Доля заказов с категорией. Считаются только те, за кем категория закреплена. Цель — 90%.', t.pct.cats) : '') +
     mCard('tasks', 'Задачи СВ', rows('tasks', catColor), 'Точки с 2+ пропусками подряд, где СВ добился заказа в следующий плановый день. Цель — 90%.', t.pct.tasks) +
-    mCard('top5', 'ТОП-5', rows('top5', sysColor), `${t.top5_routes} самых отстающих маршрутов (по 5 у каждого ТМ). Чистые заказы ÷ норма (75% плана визитов). Цель — 75%.`, t.pct.top5) +
+    mCard('top5', 'ТОП-5 отстающих', rows('top5', sysColor), `${t.top5_routes} самых отстающих маршрутов (по 5 у каждого ТМ). Чистые заказы ÷ норма (75% плана визитов). Цель — 75%.`, t.pct.top5) +
     stabMonthCard(m) +
     `<div class="day-card"><h3>Рейтинг по среднему</h3>
       <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';S.rShow=5;render()">${esc(l.name)}</button>`).join('')}</div>
