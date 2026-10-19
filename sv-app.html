@@ -599,9 +599,11 @@ function renderRoute(data) {
     // Таблица точек
     html += `<div class="grid-head"><span>Точка</span><span>2</span><span>3+</span><span>Вне</span></div>`;
     points.forEach(pt => {
+      // 19.10.2026: нажатие на точку — карточка точки (календарь за прошлый и этот месяц)
+      const ptOpen = pt.tt_code ? ` onclick="vgOpenPoint(${_vgReg(pt.agent || agent.name, pt)})" style="cursor:pointer"` : '';
       html += `
-        <div class="grid-row">
-          <span class="point-name">${pt.client ? `<span style="font-weight:700">${pt.client}</span><br><span style="font-size:11px;font-weight:400;color:var(--ink-soft)">${pt.name}</span>` : pt.name}${pt.streak_start ? `<br><span style="font-size:10px;font-weight:400;color:var(--ink-soft)">серия с ${pt.streak_start}${pt.missed_streak ? ` · ${pt.missed_streak} пропусков` : ''}</span>` : ''}</span>
+        <div class="grid-row"${ptOpen}>
+          <span class="point-name">${pt.client ? `<span style="font-weight:700">${pt.client}</span>${pt.tt_code ? ' <span style="color:var(--ink-soft)">›</span>' : ''}<br><span style="font-size:11px;font-weight:400;color:var(--ink-soft)">${pt.name}</span>` : pt.name + (pt.tt_code ? ' <span style="color:var(--ink-soft)">›</span>' : '')}${pt.streak_start ? `<br><span style="font-size:10px;font-weight:400;color:var(--ink-soft)">серия с ${pt.streak_start}${pt.missed_streak ? ` · ${pt.missed_streak} пропусков` : ''}</span>` : ''}</span>
           <span class="mark">${pt.missed_2 ? '<span class="mark-dot two"></span>' : ''}</span>
           <span class="mark">${pt.missed_3plus ? '<span class="mark-dot three"></span>' : ''}</span>
           <span class="mark" style="font-size:13px;font-weight:700;color:${pt.off_route > 0 ? 'var(--red)' : 'var(--ink-soft)'}">${pt.off_route || 0}</span>
@@ -1975,12 +1977,21 @@ function vgPluralPts(n) { const a = n % 10, b = n % 100; return n + ' ' + (a ===
   .vg-mon span { text-transform:none; letter-spacing:0; font-weight:600; text-align:right; }
   .vg-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; }
   .vg-wd { font-size:9.5px; color:#6b7280; padding:2px 0; border-radius:5px; }
-  .vg-wd.pl { background:${VG_FUT}; color:#1a1a1a; font-weight:700; }
-  .vg-c { height:30px; border-radius:6px; font-size:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#6b7280; background:#FAF7F3; line-height:1.05; }
-  .vg-c em { font-style:normal; font-size:10px; height:11px; }
+  .vg-wd.pl { background:#1f2937; color:#fff; font-weight:800; }
+  .vg-c { height:32px; border-radius:7px; font-size:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#b7b0a4; background:#FAF7F3; line-height:1.05; position:relative; }
+  .vg-c em { font-style:normal; font-size:11px; height:12px; font-weight:700; }
+  /* 19.10.2026: плановый день — толстая тёмная рамка (заказ есть / нет / впереди) */
+  .vg-c.p { box-shadow:inset 0 0 0 2.5px #1f2937; color:#1f2937; font-weight:700; }
   .vg-c.ok { background:${VG_OK}; color:#fff; } .vg-c.miss { background:${VG_MISS}; color:#fff; }
   .vg-c.off { background:${VG_BLUE}; color:#fff; } .vg-c.ghost { background:${VG_GHOST}; color:#fff; }
-  .vg-c.fut { background:${VG_FUT}; } .vg-c.today { background:${VG_FUT}; box-shadow:inset 0 0 0 2px #A39C87; } .vg-c.e { background:none; }
+  .vg-c.fut, .vg-c.today { background:#fff; }
+  .vg-c.fut::after { content:''; position:absolute; inset:5px; border:1.5px dashed #9ca3af; border-radius:4px; }
+  .vg-c.today::before { content:'сегодня'; position:absolute; top:1px; font-size:7px; font-weight:800; color:#1f2937; }
+  .vg-c.e { background:none; }
+  .vg-plan { display:inline-block; background:#1f2937; color:#fff; border-radius:8px; padding:5px 9px; font-size:12px; font-weight:700; margin:6px 0 2px; line-height:1.35; }
+  .vg-leg2 { display:grid; grid-template-columns:1fr 1fr; gap:6px 10px; font-size:11px; color:#4b5563; margin:10px 0 4px; }
+  .vg-leg2 span { display:flex; align-items:center; gap:6px; }
+  .vg-sw { width:18px; height:16px; border-radius:4px; display:inline-block; flex-shrink:0; }
   .vg-sum { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:12px; }
   .vg-sum div { background:var(--bg, #F5F0EB); border-radius:10px; padding:7px 4px; text-align:center; font-size:10px; color:#6b7280; }
   .vg-sum b { display:block; font-size:16px; }
@@ -2086,27 +2097,38 @@ function vgPointCard(d) {
   const ghost = !d.in_plan;
   const pd = new Set(d.plan_days || []);
   const cell = (x, y, m) => {
-    const cls = { ok: 'ok', miss: 'miss', off: 'off', ghost: 'ghost', fut: 'fut', today: 'today' }[x.s] || '';
+    const cls = { ok: 'ok p', miss: 'miss p', off: 'off', ghost: 'ghost', fut: 'fut p', today: 'today p' }[x.s] || '';
     const ic = x.s === 'ok' ? '✓' : x.s === 'miss' ? '✕' : x.s === 'off' ? vgPin('#fff', '10px') : x.s === 'ghost' ? '👻' : '';
     return `<div class="vg-c ${cls}"><em>${ic}</em>${x.d}</div>`;
   };
   const months = (d.months || []).map(mo => {
     const first = (new Date(mo.year, mo.month - 1, 1).getDay() + 6) % 7;
-    const stat = `${mo.in_plan ? `по плану ${mo.planned} · ` : 'нет в плане · '}заказов ${mo.orders}${mo.off ? `, из них не по плану ${mo.off}` : ''}`;
+    const stat = mo.in_plan ? `план ${mo.planned} · по плану ${mo.orders - mo.off} · вне ${mo.off}` : `нет в плане${mo.orders ? ` · заказов ${mo.orders}` : ''}`;
     return `<div class="vg-mon">${VG_MONTHS[mo.month - 1]}<span>${stat}</span></div><div class="vg-cal">
-      ${VG_WD.map((w, i) => `<div class="vg-wd${pd.has(i) ? ' pl' : ''}">${w}</div>`).join('')}
+      ${VG_WD.map((w, i) => `<div class="vg-wd${(mo.plan_wd ? mo.plan_wd.includes(i) : pd.has(i)) ? ' pl' : ''}">${w}</div>`).join('')}
       ${'<div class="vg-c e"></div>'.repeat(first)}${mo.days.map(x => cell(x, mo.year, mo.month)).join('')}</div>`;
   }).join('');
   const t = d.totals || {};
   const wdFull = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресенье'];
   const v = d.verdict;
+  // плашка «В плане: пн, нед. 1, 2 · добавлена 20.10 / закрыта с 03.10»
+  const ddmm = s => s ? s.slice(8, 10) + '.' + s.slice(5, 7) : '';
+  const sp = d.plan_spec || [];
+  const planTxt = sp.length ? sp.map(x => VG_WD[x.wd] + (x.weeks ? ` (нед. ${x.weeks.join(', ')})` : '')).join(', ')
+    + (sp.every(x => !x.weeks) ? ', каждую неделю' : '') : '';
+  const extra = [d.since ? `добавлена ${ddmm(d.since)}` : '', d.until ? `закрыта с ${ddmm(d.until)}` : ''].filter(Boolean).join(' · ');
+  const planLine = ghost ? `<div class="vg-plan" style="background:${VG_GHOST}">👻 Точки нет в плане агента</div>`
+    : planTxt ? `<div class="vg-plan">🗓 В плане: ${planTxt}${extra ? ' · ' + extra : ''}</div>` : '';
   const verdict = v ? `<div class="vg-verdict">${vgPin(VG_BLUE)}<span>${v.off} из ${v.total} заказов — не в свой день, чаще всего в ${wdFull[v.weekday]}. Возможно, точку стоит перенести на ${wdFull[v.weekday]}.</span></div>`
     : ghost && t.off ? `<div class="vg-verdict" style="background:#EDE9F7;color:${VG_GHOST}">👻<span>Точки нет в плане агента, а заказы есть (${t.off}). Возможно, её стоит добавить в маршрут.</span></div>` : '';
   return `<div class="vg-card${ghost ? ' ghost' : ''}">
     <div class="vg-pt">${vgEsc(d.name)}</div>
     <div class="vg-pts">${d.address && d.address !== d.name ? vgEsc(d.address) + ' · ' : ''}код ${vgEsc(d.tt_code)}<br>${vgEsc(d.agent)}</div>
-    <div class="vg-leg">${ghost ? '' : `<span><i style="background:${VG_FUT}"></i>плановый день недели</span><span><i style="background:${VG_OK}"></i>заказ по плану</span>`}
-      <span><i style="background:${ghost ? VG_GHOST : VG_BLUE}"></i>${ghost ? 'заказ, точки нет в плане' : 'вне маршрута'}</span>${ghost ? '' : `<span><i style="background:${VG_MISS}"></i>визит без заказа</span><span><i style="background:${VG_FUT};box-shadow:inset 0 0 0 1px #c9bfa8"></i>визит впереди</span>`}</div>
+    ${planLine}
+    <div class="vg-leg2">${ghost ? '' : `<span><i class="vg-sw" style="background:${VG_OK};box-shadow:inset 0 0 0 2.5px #1f2937"></i>плановый день · заказ есть</span>
+      <span><i class="vg-sw" style="background:${VG_MISS};box-shadow:inset 0 0 0 2.5px #1f2937"></i>плановый день · заказа нет</span>
+      <span><i class="vg-sw" style="background:#fff;box-shadow:inset 0 0 0 2.5px #1f2937;outline:1px dashed #9ca3af;outline-offset:-5px"></i>плановый день · впереди</span>`}
+      <span><i class="vg-sw" style="background:${ghost ? VG_GHOST : VG_BLUE}"></i>${ghost ? 'заказ, точки нет в плане' : 'заказ не в плановый день'}</span></div>
     ${months}
     <div class="vg-sum"><div><b style="color:${VG_OK}">${t.ok || 0}</b>по плану</div><div><b style="color:${ghost ? VG_GHOST : VG_BLUE}">${t.off || 0}</b>${ghost ? 'призрак' : 'вне'}</div><div><b style="color:${VG_MISS}">${t.miss || 0}</b>без заказа</div><div><b>${t.fut || 0}</b>впереди</div></div>
     ${verdict}
