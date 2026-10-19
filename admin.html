@@ -885,11 +885,16 @@ function tabPay(c){
     <td>${p.kind === 'lic' ? `Лицензии: ${p.seats} мест × ${p.months} мес.` : `Консалтинг: ${esc(p.work)}`}</td><td>${eur(p.amount)}</td>
     <td>${esc(p.method)}${p.comment ? `<br><span class="meta">${esc(p.comment)}</span>` : ''}</td><td>${esc(p.manager_name || '—')}</td>${isOwner() ? `<td><button style="padding:4px 8px" title="Удалить ошибочную оплату" onclick="deletePayment(${p.id},'${esc(c.company_id)}')">✕</button></td>` : ''}</tr>`).join('');
   setTimeout(payCalc, 0);
-  return `<div class="grid3">
+  // 19.10.2026: «Лицензии входят в консалтинг» — места не сверяются с оплатой, предупреждения о местах нет
+  const consult = b.billing_mode === 'consult';
+  const modeBox = `<div class="note" style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px">
+    <input type="checkbox" id="p_consult" ${consult ? 'checked' : ''} onchange="setBillingMode('${esc(c.company_id)}', this.checked)" style="width:18px;height:18px;margin-top:2px;flex:none">
+    <label for="p_consult" style="cursor:pointer"><b>Лицензии входят в консалтинг</b><br><span class="small">Места не сверяются с оплатой, предупреждения «мест больше, чем оплачено» нет. Число людей, открывающих приложение, видно в «Состоянии компании».</span></label></div>`;
+  return `${modeBox}<div class="grid3">
     <div class="box"><p class="lbl">Оплачено до</p><p class="val" style="font-size:20px">${untilTxt}</p><p class="small">${leftTxt}</p></div>
     <div class="box"><p class="lbl">Мест оплачено</p><p class="val" style="font-size:20px">${b.seats_paid || 0}</p><p class="small">открывали в этом месяце: ${used}</p></div>
     <div class="box"><p class="lbl">По тарифу в месяц</p><p class="val" style="font-size:20px">${eur(b.tariff_month)}</p><p class="small">мин. ${eur(s.min_price)} · ${eur(s.seat_price)} за место</p></div></div>
-  ${b.used_seats && b.seats_paid && b.used_seats > b.seats_paid ? `<div class="note warn">Приложение открывали ${b.used_seats} человек — больше, чем оплачено (${b.seats_paid}). При следующей оплате учтите реальное число мест.</div>` : ''}
+  ${!consult && b.used_seats && b.seats_paid && b.used_seats > b.seats_paid ? `<div class="note warn">Приложение открывали ${b.used_seats} человек — больше, чем оплачено (${b.seats_paid}). При следующей оплате учтите реальное число мест.</div>` : ''}
   ${form}
   <div class="sec"><h3>История оплат</h3>${hist ? `<div class="tw"><table><tr><th>Дата</th><th>Что</th><th>Сумма</th><th>Способ</th><th>Менеджер</th>${isOwner() ? '<th></th>' : ''}</tr>${hist}</table></div>` : '<p class="small">Оплат ещё не было.</p>'}</div>
   ${c.stage !== 'off' ? `<div class="sec"><div class="note"><b>Клиент отказался от СТТ?</b> Отключите компанию: все сообщения остановятся в течение 10 минут, дашборды закроются, данные сохранятся — если клиент вернётся, всё включается обратно.<div class="acts"><button class="danger" onclick="refuseCompany('${esc(c.company_id)}')">Клиент отказался</button></div></div></div>` : ''}`;
@@ -902,6 +907,14 @@ function payCalc(){
   $('p_sum').textContent = eur(tariffOf(b.settings, seats) * months);
   const base = b.paid_until && b.days_left >= 0 ? b.paid_until.slice(0,10) : b.today;
   $('p_until').textContent = 'Оплачено до станет: ' + addMonthsIso(base, months).toLocaleDateString('ru-RU');
+}
+async function setBillingMode(id, on){
+  try {
+    await api('/companies/' + encodeURIComponent(id) + '/billing-mode', {method: 'POST', body: {consult: !!on}});
+    if(S.bill[id]) S.bill[id].billing_mode = on ? 'consult' : '';
+    delete S.health[id];              // «Состояние компании» пересчитается
+    render();
+  } catch(e){ alert(e.message); render(); }
 }
 async function savePayment(id){
   const err = t => { $('p_err').textContent = t; };
