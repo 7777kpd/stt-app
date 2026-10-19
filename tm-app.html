@@ -312,7 +312,7 @@ function sysColor(v) { return v >= 75 ? 'var(--green)' : v >= 50 ? 'var(--amber)
 function scoreParts(p) {
   const f = v => (Math.round(v * 10) / 10).toFixed(1);
   const parts = [['Системная', p.sys, 0], ['Чистая', p.clean, 0], ['СТТ точек', p.stt, 0], ['Категории', p.cats, 1], ['Задачи СВ', p.tasks, 1]];
-  if (p.top5In) parts.push(['ТОП-5', p.top5, 0]);
+  if (p.top5In) parts.push(['ТОП-5 отстающих', p.top5, 0]);
   const used = parts.filter(x => x[1] != null).map(x => f(x[1]));
   // 16.10.2026: нагрузка — строкой под плашками и подписанным слагаемым в формуле
   // 16.10.2026: в балл нагрузка — не больше 120 (полная цифра — в строке)
