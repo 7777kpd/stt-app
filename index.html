@@ -437,7 +437,7 @@ function renderVisits(pt) {
   const STYLE = {
     ok:   { bg: '#639922', icon: '✓' },
     miss: { bg: '#E24B4A', icon: '✗' },
-    off:  { bg: '#378ADD', icon: '📍' },
+    off:  { bg: '#378ADD', icon: vgPin('#fff','13px') },
   };
 
   let html = '<div class="visits-cells">';
@@ -851,7 +851,7 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
   // строка расчёта по новой формуле «(по маршруту − вне) ÷ план».
   if (!pointCards.length) return '';
   const TYPE_NAME = ['ok', 'miss', 'off'];
-  const ICON = { ok: '✓', miss: '✗', off: '📍' };
+  const ICON = { ok: '✓', miss: '✗', off: vgPin('#fff','13px') };
   const COLOR = { ok: '#22C55E', miss: '#EF4444', off: '#378ADD' };
   const LV = ['green', 'amber', 'red'];
   const lvColor = { green: '#2D6A45', amber: '#B7791F', red: '#A93B30' };
@@ -906,8 +906,8 @@ function _pointAnalysisHtml(pointCards, monthNum, yearNum) {
       <div style="display:flex;justify-content:space-between;font-size:11.5px;font-weight:700;"><span style="color:${lvColor.green}">СТТ ${c.green} · ${pct(c.green)}%</span><span style="color:${lvColor.amber}">АКБ ${c.amber} · ${pct(c.amber)}%</span><span style="color:${lvColor.red}">Не АКБ ${c.red} · ${pct(c.red)}%</span></div>
       <div style="border-top:1px solid var(--border);margin:12px 0 8px;"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;">Плановые визиты: ${totals.ok + totals.miss}</div>
-      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--text);align-items:center;"><span>${ic('#22C55E','✓')} ${totals.ok}</span><span>${ic('#EF4444','✗')} ${totals.miss}</span><span>${ic('#378ADD','📍')} ${totals.off}</span>${c.ghost ? `<span style="color:var(--muted)">👻 ${c.ghost} точек</span>` : ''}</div>
-      <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.35;">✓ заказ в плановый день · ✗ планового заказа нет · 📍 заказ не в плановый день — вычитается из СТТ точки</div>
+      <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--text);align-items:center;"><span>${ic('#22C55E','✓')} ${totals.ok}</span><span>${ic('#EF4444','✗')} ${totals.miss}</span><span>${ic('#378ADD',vgPin('#fff','12px'))} ${totals.off}</span>${c.ghost ? `<span style="color:var(--muted)">👻 ${c.ghost} точек</span>` : ''}</div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.35;">✓ заказ в плановый день · ✗ планового заказа нет · ${vgPin()} заказ не в плановый день — вычитается из СТТ точки</div>
     </div>
     <div style="display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px;">${chips}</div>
     <div id="att-points-agent" style="display:flex;flex-direction:column;gap:8px;">${cards}<div data-att-empty style="display:none;font-size:12px;color:var(--muted);padding:6px 0;">Нет точек под этот фильтр</div></div>`;
@@ -1178,13 +1178,14 @@ function buildDayScreen(data) {
   const myTotalOrdersToday = data.total_orders_today || 0;
 
   const tileStyle = 'background:var(--bg);border-radius:10px;padding:10px 12px;';
-  const myHtml = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${my.planned}</div><div style="font-size:10px;color:var(--muted);margin-top:2px">плановых</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700">${my.orders} <span style="font-size:13px;color:var(--red);font-weight:700">−${my.off} вне</span></div><div style="font-size:10px;color:var(--muted);margin-top:2px">заказов</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.sys_stt))}">${my.sys_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">системная</div></div>
-      <div style="${tileStyle}"><div style="font-size:20px;font-weight:700;color:${colorOf(levelOf(my.clean_stt))}">${my.clean_stt}%</div><div style="font-size:10px;color:var(--muted);margin-top:2px">чистая</div></div>
-    </div>`;
+  // 19.10.2026: две строки по три — «плановых визитов · заказов по маршруту = системная»,
+  // «вне маршрута · призраки = чистая»; вне и призраки нажимаются — список точек → карточка точки
+  const myHtml = vgTiles({
+    key: 'me', planned: my.planned, orders: my.orders, sys: my.sys_stt, clean: my.clean_stt,
+    sysColor: colorOf(levelOf(my.sys_stt)), cleanColor: colorOf(levelOf(my.clean_stt)),
+    off: my.off_sched != null ? my.off_sched : my.off, ghost: my.ghost || 0,
+    offHtml: vgAgentList(data.agent, my.off_list, 'off'), ghostHtml: vgAgentList(data.agent, my.ghost_list, 'ghost'),
+  });
 
   const myCatEntries = Object.entries(myCatShares).sort((a, b) => (b[1].pct ?? -1) - (a[1].pct ?? -1));   // 14.10.2026: по убыванию
   const myCatPcts = myCatEntries.map(([,v]) => v.pct);
@@ -1552,6 +1553,209 @@ async function main() {
 }
 
 main();
+
+// ============================================================
+// 19.10.2026: «Вне маршрута» и «Призраки» в «Итогах дня» — плитки нажимаются,
+// списки точек, карточка точки (календарь за прошлый и этот месяц).
+// Общий код — одинаковый в index.html (агент), sv-app.html (СВ), tm-app.html (ТМ).
+// Вне маршрута — синяя метка (своя картинка, не эмодзи 📍: эмодзи телефон рисует красным).
+// ============================================================
+const VG_BLUE = '#378ADD', VG_GHOST = '#5B4B8A', VG_OK = '#639922', VG_MISS = '#E24B4A', VG_FUT = '#E4DCC8';
+const VG_WD = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+const VG_MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+// function, без const внутри: вызывается и из кода выше по файлу (иконки ряда визитов)
+function vgPin(color, size) {
+  const s = size || '1em';
+  return `<svg viewBox="0 0 24 24" width="${s}" height="${s}" style="vertical-align:-0.12em;flex-shrink:0"><path fill="${color || '#378ADD'}" d="M12 2C8.1 2 5 5.1 5 9c0 5.2 7 13 7 13s7-7.8 7-13c0-3.9-3.1-7-7-7zm0 9.5A2.5 2.5 0 1 1 12 6.5a2.5 2.5 0 0 1 0 5z"/></svg>`;
+}
+function vgEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function vgId() {
+  try { if (typeof _telegramId !== 'undefined' && _telegramId) return _telegramId; } catch (e) {}
+  try { if (typeof currentTelegramId !== 'undefined' && currentTelegramId) return currentTelegramId; } catch (e) {}
+  return null;
+}
+function vgPluralPts(n) { const a = n % 10, b = n % 100; return n + ' ' + (a === 1 && b !== 11 ? 'точка' : a >= 2 && a <= 4 && (b < 10 || b >= 20) ? 'точки' : 'точек'); }
+
+(function vgCss() {
+  if (document.getElementById('vg-css')) return;
+  const st = document.createElement('style');
+  st.id = 'vg-css';
+  st.textContent = `
+  .vg-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; }
+  .vg-grid + .vg-grid { margin-top:6px; }
+  .vg-t { background:var(--bg); border-radius:10px; padding:9px 8px; min-width:0; }
+  .vg-t .vg-v { font-size:19px; font-weight:700; display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .vg-t .vg-l { font-size:10px; color:#6b7280; margin-top:2px; line-height:1.2; }
+  .vg-t.res { background:none; box-shadow:inset 0 0 0 1.5px #e5e7eb; }
+  .vg-t.res .vg-v::before { content:'= '; color:#9ca3af; font-weight:500; margin-right:2px; }
+  .vg-t.btn { cursor:pointer; -webkit-tap-highlight-color:transparent; }
+  .vg-t.off { background:#E8F0FE; box-shadow:inset 0 0 0 1.5px ${VG_BLUE}; } .vg-t.off .vg-v, .vg-t.off .vg-l { color:#1a56db; font-weight:700; }
+  .vg-t.gh { background:#EDE9F7; box-shadow:inset 0 0 0 1.5px ${VG_GHOST}; } .vg-t.gh .vg-v, .vg-t.gh .vg-l { color:${VG_GHOST}; font-weight:700; }
+  .vg-t.zero { opacity:.55; cursor:default; }
+  .vg-t.off.on { box-shadow:inset 0 0 0 2.5px #1a56db; } .vg-t.gh.on { box-shadow:inset 0 0 0 2.5px ${VG_GHOST}; }
+  .vg-list { margin-top:10px; border-top:1px solid #ece6d8; }
+  .vg-list-h { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; padding:9px 0 2px; display:flex; align-items:center; gap:5px; }
+  .vg-list-s { font-size:11px; color:#6b7280; margin-bottom:4px; }
+  .vg-row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 0; border-bottom:1px solid #f0ebe4; cursor:pointer; font-size:13px; }
+  .vg-row:last-child { border-bottom:none; }
+  .vg-row small { display:block; font-size:11px; color:#6b7280; margin-top:1px; }
+  .vg-row .ar { color:#9ca3af; font-size:15px; }
+  .vg-grp > summary { list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #f0ebe4; font-size:13px; font-weight:700; }
+  .vg-grp > summary::-webkit-details-marker { display:none; }
+  .vg-grp > summary small { display:block; font-weight:500; font-size:11px; color:#6b7280; }
+  .vg-grp > div { padding-left:12px; }
+  .vg-cnt { white-space:nowrap; font-weight:700; }
+  .vg-ov { position:fixed; inset:0; z-index:9999; background:var(--bg, #F5F0EB); overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .vg-ov-in { max-width:520px; margin:0 auto; padding:14px 14px 40px; }
+  .vg-back { font-size:14px; color:#1a56db; font-weight:600; cursor:pointer; padding:6px 0 10px; }
+  .vg-card { background:#fff; border-radius:14px; padding:14px; border-left:3px solid ${VG_BLUE}; box-shadow:0 1px 3px rgba(0,0,0,.06); }
+  .vg-card.ghost { border-left-color:${VG_GHOST}; }
+  .vg-pt { font-size:16px; font-weight:700; }
+  .vg-pts { font-size:12px; color:#6b7280; margin:3px 0 4px; line-height:1.4; }
+  .vg-leg { display:flex; flex-wrap:wrap; gap:6px 10px; font-size:11px; color:#6b7280; margin:8px 0 2px; }
+  .vg-leg i { display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-2px; margin-right:4px; }
+  .vg-mon { font-size:11px; font-weight:700; color:#6b7280; text-transform:uppercase; letter-spacing:.04em; margin:12px 0 6px; display:flex; justify-content:space-between; gap:8px; }
+  .vg-mon span { text-transform:none; letter-spacing:0; font-weight:600; text-align:right; }
+  .vg-cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; }
+  .vg-wd { font-size:9.5px; color:#6b7280; padding:2px 0; border-radius:5px; }
+  .vg-wd.pl { background:${VG_FUT}; color:#1a1a1a; font-weight:700; }
+  .vg-c { height:30px; border-radius:6px; font-size:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#6b7280; background:#FAF7F3; line-height:1.05; }
+  .vg-c em { font-style:normal; font-size:10px; height:11px; }
+  .vg-c.ok { background:${VG_OK}; color:#fff; } .vg-c.miss { background:${VG_MISS}; color:#fff; }
+  .vg-c.off { background:${VG_BLUE}; color:#fff; } .vg-c.ghost { background:${VG_GHOST}; color:#fff; }
+  .vg-c.fut { background:${VG_FUT}; } .vg-c.today { background:${VG_FUT}; box-shadow:inset 0 0 0 2px #A39C87; } .vg-c.e { background:none; }
+  .vg-sum { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin-top:12px; }
+  .vg-sum div { background:var(--bg, #F5F0EB); border-radius:10px; padding:7px 4px; text-align:center; font-size:10px; color:#6b7280; }
+  .vg-sum b { display:block; font-size:16px; }
+  .vg-verdict { background:#E8F0FE; color:#1a56db; border-radius:10px; padding:9px 11px; font-size:12.5px; font-weight:600; margin-top:10px; line-height:1.4; display:flex; gap:6px; }
+  `;
+  document.head.appendChild(st);
+})();
+
+// Точки списков — в реестре по номеру: имена с кавычками не ломают onclick
+const _vgPts = [];
+function _vgReg(agent, p) { _vgPts.push({ agent, tt: p.tt_code }); return _vgPts.length - 1; }
+const _vgOpen = {};      // какая плитка открыта (переживает перерисовку экрана)
+
+// o: {key, planned, orders, sys, clean, sysColor, cleanColor, off, ghost, offHtml, ghostHtml}
+function vgTiles(o) {
+  const open = _vgOpen[o.key];
+  const tile = (kind, n, lbl, cls, icon) => `<div class="vg-t btn ${cls}${n ? '' : ' zero'}${open === kind ? ' on' : ''}" ${n ? `onclick="event.stopPropagation();vgToggle('${o.key}','${kind}')"` : ''}><div class="vg-v">${n} ${icon}</div><div class="vg-l">${lbl}${n ? ' ›' : ''}</div></div>`;
+  return `<div class="vg-grid">
+      <div class="vg-t"><div class="vg-v">${o.planned}</div><div class="vg-l">плановых визитов</div></div>
+      <div class="vg-t"><div class="vg-v">${o.orders}</div><div class="vg-l">заказов по маршруту</div></div>
+      <div class="vg-t res"><div class="vg-v" style="color:${o.sysColor || 'inherit'}">${o.sys}%</div><div class="vg-l">системная</div></div>
+    </div>
+    <div class="vg-grid">
+      ${tile('off', o.off, 'вне маршрута', 'off', vgPin(VG_BLUE))}
+      ${tile('ghost', o.ghost, 'призраки', 'gh', '👻')}
+      <div class="vg-t res"><div class="vg-v" style="color:${o.cleanColor || 'inherit'}">${o.clean}%</div><div class="vg-l">чистая</div></div>
+    </div>
+    <div id="vg-${o.key}-off" style="display:${open === 'off' ? 'block' : 'none'}">${o.offHtml || ''}</div>
+    <div id="vg-${o.key}-ghost" style="display:${open === 'ghost' ? 'block' : 'none'}">${o.ghostHtml || ''}</div>`;
+}
+function vgToggle(key, kind) {
+  _vgOpen[key] = _vgOpen[key] === kind ? null : kind;
+  ['off', 'ghost'].forEach(k => {
+    const el = document.getElementById(`vg-${key}-${k}`);
+    if (el) el.style.display = _vgOpen[key] === k ? 'block' : 'none';
+  });
+  const box = document.getElementById(`vg-${key}-off`);
+  if (box && box.parentElement) box.parentElement.querySelectorAll('.vg-t.btn').forEach(t => {
+    const k = t.classList.contains('off') ? 'off' : 'ghost';
+    t.classList.toggle('on', _vgOpen[key] === k);
+  });
+}
+function _vgHead(kind, n) {
+  return kind === 'off'
+    ? `<div class="vg-list-h" style="color:#1a56db">${vgPin(VG_BLUE)} Вне маршрута · ${n}</div><div class="vg-list-s">Точка в плане, заказ — не в её день</div>`
+    : `<div class="vg-list-h" style="color:${VG_GHOST}">👻 Призраки · ${n}</div><div class="vg-list-s">Точки нет в плане агента</div>`;
+}
+function _vgRow(agent, p, kind, withIcon) {
+  const i = _vgReg(agent, p);
+  const icon = withIcon ? (kind === 'off' ? vgPin(VG_BLUE) + ' ' : '👻 ') : '';
+  return `<div class="vg-row" onclick="vgOpenPoint(${i})"><div>${icon}${vgEsc(p.name)}${p.address && p.address !== p.name ? `<small>${vgEsc(p.address)}</small>` : ''}</div><span class="ar">›</span></div>`;
+}
+// Агент: список своих точек
+function vgAgentList(agent, list, kind) {
+  if (!list || !list.length) return '';
+  return `<div class="vg-list">${_vgHead(kind, list.length)}${list.map(p => _vgRow(agent, p, kind)).join('')}<div class="vg-list-s" style="margin-top:6px">Нажмите на точку — история за прошлый и этот месяц.</div></div>`;
+}
+// СВ: агенты → точки. agents: [{name, off_list, ghost_list}]
+function vgTeamList(agents, kind) {
+  const key = kind === 'off' ? 'off_list' : 'ghost_list';
+  const rows = (agents || []).filter(a => (a[key] || []).length).sort((a, b) => b[key].length - a[key].length);
+  if (!rows.length) return '';
+  const total = rows.reduce((s, a) => s + a[key].length, 0);
+  const col = kind === 'off' ? '#1a56db' : VG_GHOST;
+  return `<div class="vg-list">${_vgHead(kind, total)}${rows.map(a => `<details class="vg-grp"><summary><span>${vgEsc(a.name.split(' ').slice(0, 2).join(' '))}<small>${vgPluralPts(a[key].length)}</small></span><span class="vg-cnt" style="color:${col}">${a[key].length} ▾</span></summary><div>${a[key].map(p => _vgRow(a.name, p, kind)).join('')}</div></details>`).join('')}</div>`;
+}
+// ТМ: СВ → агенты → точки. svs: [{sv, agents_off:[{name, off_list, ghost_list}]}]
+function vgTerrList(svs, kind) {
+  const key = kind === 'off' ? 'off_list' : 'ghost_list';
+  const rows = (svs || []).map(s => ({ sv: s.sv, agents: (s.agents_off || []).filter(a => (a[key] || []).length) }))
+    .map(s => ({ ...s, n: s.agents.reduce((t, a) => t + a[key].length, 0) })).filter(s => s.n).sort((a, b) => b.n - a.n);
+  if (!rows.length) return '';
+  const total = rows.reduce((t, s) => t + s.n, 0);
+  const col = kind === 'off' ? '#1a56db' : VG_GHOST;
+  return `<div class="vg-list">${_vgHead(kind, total)}${rows.map(s => `<details class="vg-grp"><summary><span>${vgEsc(s.sv)}<small>агентов: ${s.agents.length}</small></span><span class="vg-cnt" style="color:${col}">${s.n} ▾</span></summary><div>${s.agents.map(a => `<details class="vg-grp"><summary><span style="font-weight:600">${vgEsc(a.name.split(' ').slice(0, 2).join(' '))}<small>${vgPluralPts(a[key].length)}</small></span><span class="vg-cnt" style="color:${col}">${a[key].length} ▾</span></summary><div>${a[key].map(p => _vgRow(a.name, p, kind)).join('')}</div></details>`).join('')}</div></details>`).join('')}</div>`;
+}
+
+// ---------- Карточка точки ----------
+async function vgOpenPoint(i) {
+  const p = _vgPts[i];
+  if (!p) return;
+  let ov = document.getElementById('vg-ov');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'vg-ov'; ov.className = 'vg-ov'; document.body.appendChild(ov); }
+  const back = `<div class="vg-back" onclick="vgClosePoint()">‹ Назад</div>`;
+  ov.innerHTML = `<div class="vg-ov-in">${back}<div class="vg-card"><div class="vg-pts">Загрузка…</div></div></div>`;
+  ov.style.display = 'block';
+  document.body.style.overflow = 'hidden';
+  try {
+    const r = await fetch(`${API}/api/point/${vgId()}?agent=${encodeURIComponent(p.agent)}&tt=${encodeURIComponent(p.tt)}`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    ov.innerHTML = `<div class="vg-ov-in">${back}${vgPointCard(d)}</div>`;
+  } catch (e) {
+    ov.innerHTML = `<div class="vg-ov-in">${back}<div class="vg-card"><div class="vg-pts">Не удалось загрузить точку. Попробуйте ещё раз.</div></div></div>`;
+  }
+}
+function vgClosePoint() {
+  const ov = document.getElementById('vg-ov');
+  if (ov) ov.style.display = 'none';
+  document.body.style.overflow = '';
+}
+function vgPointCard(d) {
+  const ghost = !d.in_plan;
+  const pd = new Set(d.plan_days || []);
+  const cell = (x, y, m) => {
+    const cls = { ok: 'ok', miss: 'miss', off: 'off', ghost: 'ghost', fut: 'fut', today: 'today' }[x.s] || '';
+    const ic = x.s === 'ok' ? '✓' : x.s === 'miss' ? '✕' : x.s === 'off' ? vgPin('#fff', '10px') : x.s === 'ghost' ? '👻' : '';
+    return `<div class="vg-c ${cls}"><em>${ic}</em>${x.d}</div>`;
+  };
+  const months = (d.months || []).map(mo => {
+    const first = (new Date(mo.year, mo.month - 1, 1).getDay() + 6) % 7;
+    const stat = `${mo.in_plan ? `по плану ${mo.planned} · ` : 'нет в плане · '}заказов ${mo.orders}${mo.off ? `, из них не по плану ${mo.off}` : ''}`;
+    return `<div class="vg-mon">${VG_MONTHS[mo.month - 1]}<span>${stat}</span></div><div class="vg-cal">
+      ${VG_WD.map((w, i) => `<div class="vg-wd${pd.has(i) ? ' pl' : ''}">${w}</div>`).join('')}
+      ${'<div class="vg-c e"></div>'.repeat(first)}${mo.days.map(x => cell(x, mo.year, mo.month)).join('')}</div>`;
+  }).join('');
+  const t = d.totals || {};
+  const wdFull = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресенье'];
+  const v = d.verdict;
+  const verdict = v ? `<div class="vg-verdict">${vgPin(VG_BLUE)}<span>${v.off} из ${v.total} заказов — не в свой день, чаще всего в ${wdFull[v.weekday]}. Возможно, точку стоит перенести на ${wdFull[v.weekday]}.</span></div>`
+    : ghost && t.off ? `<div class="vg-verdict" style="background:#EDE9F7;color:${VG_GHOST}">👻<span>Точки нет в плане агента, а заказы есть (${t.off}). Возможно, её стоит добавить в маршрут.</span></div>` : '';
+  return `<div class="vg-card${ghost ? ' ghost' : ''}">
+    <div class="vg-pt">${vgEsc(d.name)}</div>
+    <div class="vg-pts">${d.address && d.address !== d.name ? vgEsc(d.address) + ' · ' : ''}код ${vgEsc(d.tt_code)}<br>${vgEsc(d.agent)}</div>
+    <div class="vg-leg">${ghost ? '' : `<span><i style="background:${VG_FUT}"></i>плановый день недели</span><span><i style="background:${VG_OK}"></i>заказ по плану</span>`}
+      <span><i style="background:${ghost ? VG_GHOST : VG_BLUE}"></i>${ghost ? 'заказ, точки нет в плане' : 'вне маршрута'}</span>${ghost ? '' : `<span><i style="background:${VG_MISS}"></i>визит без заказа</span><span><i style="background:${VG_FUT};box-shadow:inset 0 0 0 1px #c9bfa8"></i>визит впереди</span>`}</div>
+    ${months}
+    <div class="vg-sum"><div><b style="color:${VG_OK}">${t.ok || 0}</b>по плану</div><div><b style="color:${ghost ? VG_GHOST : VG_BLUE}">${t.off || 0}</b>${ghost ? 'призрак' : 'вне'}</div><div><b style="color:${VG_MISS}">${t.miss || 0}</b>без заказа</div><div><b>${t.fut || 0}</b>впереди</div></div>
+    ${verdict}
+  </div>`;
+}
+
 </script>
 </body>
 </html>
