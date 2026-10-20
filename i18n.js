@@ -9,7 +9,7 @@
    применяется сразу, без мигания. */
 (function () {
   'use strict';
-  var VER = '2';                                   // поднять при изменении словарей
+  var VER = '3';                                   // поднять при изменении словарей
   var LANGS = [['ru', 'RU', 'Русский'], ['uk', 'UA', 'Українська'], ['uz', 'UZ', 'Oʻzbekcha']];
   var DEV = new URLSearchParams(location.search).get('dev') === '1';
   var API = DEV ? 'https://develop-production-0a2d.up.railway.app' : 'https://worker-production-1dfb.up.railway.app';
@@ -94,23 +94,35 @@
     placeSwitch();
   }
 
+  function ours(n) { var e = n && (n.nodeType === 1 ? n : n.parentElement); return !!(e && e.closest && e.closest('[data-noi18n]')); }
   var obs = new MutationObserver(function (ms) {
     if (lang === 'ru' && !info['switch']) return;
+    var real = false;
     for (var i = 0; i < ms.length; i++) {
       var m = ms[i];
+      if (ours(m.target)) continue;                 // свои изменения (кнопка 🌐, меню) не обрабатываем
+      real = true;
       if (m.type === 'characterData') { if (!skip(m.target.parentElement)) doText(m.target); }
-      else for (var j = 0; j < m.addedNodes.length; j++) walk(m.addedNodes[j]);
+      else for (var j = 0; j < m.addedNodes.length; j++) if (!ours(m.addedNodes[j])) walk(m.addedNodes[j]);
     }
-    placeSwitch();
+    if (real) placeSwitch();
   });
 
   function loadDict(l, cb) {
     if (l === 'ru') { compile(null); return cb(); }
-    var key = 'stt_dict_' + l + '_' + VER, cached = ls.get(key);
-    if (cached) { try { compile(JSON.parse(cached)); return cb(); } catch (e) {} }
-    fetch(BASE + 'i18n/' + l + '.json?v=' + VER).then(function (r) { return r.json(); })
-      .then(function (d) { ls.set(key, JSON.stringify(d)); compile(d); cb(); })
-      .catch(function () { compile(null); cb(); });
+    // Словарь из телефона — сразу; раз в 6 часов тихо подтягиваем свежий с сайта
+    // (правки словаря доходят до людей без выпуска новой версии модуля).
+    var key = 'stt_dict_' + l + '_' + VER, cached = ls.get(key), at = +(ls.get(key + '_at') || 0);
+    var fresh = Date.now() - at < 6 * 3600 * 1000;
+    if (cached) { try { compile(JSON.parse(cached)); cb(); } catch (e) { cached = null; } }
+    if (cached && fresh) return;
+    fetch(BASE + 'i18n/' + l + '.json?t=' + Math.floor(Date.now() / 3600000)).then(function (r) { return r.json(); })
+      .then(function (d) {
+        var txt = JSON.stringify(d);
+        ls.set(key, txt); ls.set(key + '_at', String(Date.now()));
+        if (txt !== cached && l === lang) { compile(d); cb(); }
+      })
+      .catch(function () { if (!cached) { compile(null); cb(); } });
   }
   function setLang(l, save) {
     lang = l;
@@ -133,7 +145,8 @@
       chip.style.cssText = 'font:700 11px -apple-system,sans-serif;background:#E8F0FE;color:#1a56db;border-radius:10px;padding:3px 8px;cursor:pointer;white-space:nowrap;flex:none';
       chip.onclick = openMenu;
     }
-    chip.textContent = '🌐 ' + (LANGS.filter(function (x) { return x[0] === lang; })[0] || LANGS[0])[1] + ' ▾';
+    var label = '🌐 ' + (LANGS.filter(function (x) { return x[0] === lang; })[0] || LANGS[0])[1] + ' ▾';
+    if (chip.textContent !== label) chip.textContent = label;   // без лишних изменений — иначе наблюдатель зациклится
     var host = document.querySelector('.header-top, .topbar');
     if (host) {
       if (chip.parentNode !== host) { chip.style.position = ''; chip.style.marginLeft = '8px'; host.appendChild(chip); }
