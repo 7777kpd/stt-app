@@ -12,7 +12,7 @@
   var VER = '3';                                   // поднять при изменении словарей
   var LANGS = [['ru', 'RU', 'Русский'], ['uk', 'UA', 'Українська'], ['uz', 'UZ', 'Oʻzbekcha']];
   var DEV = new URLSearchParams(location.search).get('dev') === '1';
-  var API = DEV ? 'https://develop-production-0a2d.up.railway.app' : 'https://upload.stt-navigator.com';
+  var API = DEV ? 'https://develop-production-0a2d.up.railway.app' : 'https://worker-production-1dfb.up.railway.app';
   var BASE = (document.currentScript && document.currentScript.src || '').replace(/[^/]*$/, '');
   // Где данные клиента — не переводим
   var SKIP = '.card-client,.card-addr,.cat-name,.vg-name,.vg-addr,[data-noi18n],script,style,textarea,input,select,code';
@@ -27,7 +27,10 @@
   if (urlLang && /^(ru|uk|uz)$/.test(urlLang)) ls.set('stt_lang_own', urlLang);
   // stt_lang_own — личный выбор на этом устройстве (кнопка 🌐), главнее языка компании
   var own = ls.get('stt_lang_own');
-  var lang = own || ls.get('stt_lang') || 'ru';
+  // Язык компании запоминаем отдельно для каждого человека (?id=): через /dashboard один и тот же
+  // телефон открывает разные компании — язык одной не должен «прилипать» к другой.
+  var pid = new URLSearchParams(location.search).get('id') || '';
+  var lang = own || (pid && ls.get('stt_lang_' + pid)) || 'ru';
   var dict = null, rx = null, rules = [];
   var orig = new WeakMap(), done = new WeakMap();
   var info = {lang: lang, 'switch': false};
@@ -128,7 +131,7 @@
   }
   function setLang(l, save) {
     lang = l;
-    ls.set('stt_lang', l);
+    if (pid) ls.set('stt_lang_' + pid, l);
     if (save) { own = l; ls.set('stt_lang_own', l); }
     loadDict(l, function () { document.documentElement.lang = l; all(); });
     if (save) {
