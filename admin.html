@@ -327,7 +327,9 @@ function tabCfg(c){
   const off = (c.days_off || '').split(',').map(s => s.trim()).filter(Boolean);
   return `<div class="sec" style="margin-top:0"><h3>Основное</h3>
     <div class="grid2"><div><p class="lbl">Название</p><input id="f_name" value="${esc(c.name)}" ${dis(e)}></div>
-    <div><p class="lbl">Код компании</p><input value="${esc(c.company_id)}" disabled title="Код не меняется — к нему привязаны данные"></div></div></div>
+    <div><p class="lbl">Код компании</p><input value="${esc(c.company_id)}" disabled title="Код не меняется — к нему привязаны данные"></div></div>
+    <div style="margin-top:12px"><p class="lbl">Язык приложения и бота</p><select id="f_lang" ${dis(e)} onchange="setCompanyLang('${esc(c.company_id)}', this.value)">${[['ru','Русский'],['uk','Українська'],['uz','Oʻzbekcha (lotin)']].map(([k,n]) => `<option value="${k}" ${(c.lang||'ru')===k?'selected':''}>${n}</option>`).join('')}</select>
+      <p class="small">Язык по умолчанию для всех сотрудников компании. Каждый может сменить его для себя кнопкой 🌐 в приложении. Данные клиента (точки, адреса, категории) не переводятся.</p></div></div>
   <div class="sec"><h3>Расписание</h3>
     <div class="grid3"><div><p class="lbl">Часовой пояс</p><select id="f_tz" ${dis(e)} onchange="cfgPreview()">${opts(tzs, c.timezone)}</select></div>
     <div><p class="lbl">Утренний отчёт</p><select id="f_m" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.morning_hour, hh)}</select></div>
@@ -935,6 +937,13 @@ function payCalc(){
   $('p_sum').textContent = eur(tariffOf(b.settings, seats) * months);
   const base = b.paid_until && b.days_left >= 0 ? b.paid_until.slice(0,10) : b.today;
   $('p_until').textContent = 'Оплачено до станет: ' + addMonthsIso(base, months).toLocaleDateString('ru-RU');
+}
+async function setCompanyLang(id, lang){
+  try {
+    await api('/companies/' + encodeURIComponent(id) + '/lang', {method: 'POST', body: {lang}});
+    const c = S.companies.find(x => x.company_id === id); if(c) c.lang = lang;
+    toast('Язык сохранён — применится при следующем открытии приложения');
+  } catch(e){ alert(e.message); render(); }
 }
 async function setBillingMode(id, on){
   try {
