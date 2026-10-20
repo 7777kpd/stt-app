@@ -125,7 +125,7 @@ const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia
 const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
-           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}, routes:{}, rstat:{}, nd:{}};
+           filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}, routes:{}, rstat:{}, nd:{}, ob:{}};
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -183,8 +183,13 @@ const co = id => S.companies.find(c => c.company_id === id);
 const VIEWS = () => isOwner() ? [['companies','Компании'],['tasks','Задачи'],['sales','Продажи'],['team','Команда'],['log','Журнал изменений'],['tariff','Тариф']]
   : role() === 'manager' ? [['companies','Мои компании'],['tasks','Задачи'],['sales','Мои продажи'],['log','Журнал изменений']]
   : [['companies','Компании'],['tasks','Задачи'],['log','Журнал изменений']];
-const TABS = () => role() === 'tech' ? [['data','Данные'],['ctasks','Задачи'],['clog','Журнал']]
-  : [['overview','Обзор'],['cfg','Настройки'],['data','Данные'],['pay','Оплата'],['ctasks','Задачи'],['clog','Журнал']];
+const TABS = c => {
+  // 20.10.2026: «Подключение» — пошаговая проверка; на этапах «Тест»/«Подключение» — первая вкладка
+  const onb = c && ['test','conn'].includes(c.stage) ? [['onb','Подключение']] : [['onb','Проверка']];
+  const rest = role() === 'tech' ? [['data','Данные'],['ctasks','Задачи'],['clog','Журнал']]
+    : [['overview','Обзор'],['cfg','Настройки'],['data','Данные'],['pay','Оплата'],['ctasks','Задачи'],['clog','Журнал']];
+  return c && ['test','conn'].includes(c.stage) ? onb.concat(rest) : rest.concat(onb);
+};
 
 async function go(v){
   S.view = v; S.newOpen = false; S.addOpen = false;
@@ -197,7 +202,7 @@ async function go(v){
   } catch(e){ toast(e.message); }
   render();
 }
-async function pick(id){ S.srcDraft = null; S.sel = id; S.tab = TABS()[0][0]; S.showDet = true; render(); window.scrollTo(0,0); }
+async function pick(id){ S.srcDraft = null; S.sel = id; S.tab = TABS(co(id))[0][0]; S.showDet = true; render(); window.scrollTo(0,0); }
 async function setTab(t){
   S.tab = t; S.srcDraft = null;
   if(t === 'clog'){ try { S.clog = await api('/log?company_id=' + encodeURIComponent(S.sel)); } catch(e){ toast(e.message); } }
@@ -257,8 +262,8 @@ function renderCompanies(){
 }
 
 function renderDetail(c){
-  const tabs = TABS(); if(!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
-  const body = S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : tabLog();
+  const tabs = TABS(c); if(!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
+  const body = S.tab === 'onb' ? tabOnb(c) : S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : tabLog();
   return `<button class="back" onclick="S.showDet=false;render()">← Все компании</button>
   <div class="dhead"><div><h2>${esc(c.name || c.company_id)}</h2><div class="meta">${esc(c.company_id)} · ${esc(c.timezone)}</div></div>
   <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></div>
@@ -784,6 +789,63 @@ async function planApplyNow(id){
   catch(e){ toast(e.message); if(b){ b.disabled = false; b.textContent = 'Применить План сейчас'; } }
 }
 
+/* ---------- Подключение: пошаговая проверка (20.10.2026) ---------- */
+const OB_TAG = {ok:['s-work','Готово'], warn:['s-test','Проверить'], bad:['s-pause','Исправить'], wait:['s-conn','Ждём']};
+async function loadOb(id){
+  S.ob[id] = 'loading'; if(S.sel === id) render();
+  try { S.ob[id] = await api('/companies/' + encodeURIComponent(id) + '/onboarding'); }
+  catch(e){ S.ob[id] = {error: e.message}; }
+  if(S.sel === id) render();
+}
+function tabOnb(c){
+  const id = c.company_id, o = S.ob[id], cid = esc(id);
+  if(!o){ loadOb(id); return '<p class="small">Проверяю данные компании…</p>'; }
+  if(o === 'loading') return '<p class="small">Проверяю данные компании… до 10 секунд.</p>';
+  if(o.error) return `<div class="note bad">${esc(o.error)}</div><div class="acts"><button onclick="loadOb('${cid}')">Проверить ещё раз</button></div>`;
+  const steps = o.steps.map((st, i) => {
+    const [cls, lab] = OB_TAG[st.status] || OB_TAG.warn;
+    const items = st.items.length ? `<details style="margin-top:6px"><summary class="small" style="cursor:pointer">Подробно (${st.items.length})</summary>${st.items.map(x => `<div class="small" style="padding:2px 0">• ${esc(x)}</div>`).join('')}</details>` : '';
+    const acts = st.actions.length ? `<div class="acts" style="margin-top:8px">${st.actions.map(a =>
+      `<button class="${a.primary ? 'pri' : a.danger ? 'danger' : ''}" ${a.disabled ? 'disabled' : ''} id="ob_${i}_${esc(a.id)}" onclick="obAct('${cid}', ${i}, '${esc(a.id)}')">${esc(a.label)}</button>`).join('')}</div>` : '';
+    return `<div class="panel" style="padding:12px 16px;margin-top:10px"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+      <div><strong style="font-weight:600">${i + 1}. ${esc(st.title)}</strong><div class="small" style="margin-top:4px">${st.text}</div></div>
+      <span class="tag ${cls}">${lab}</span></div>${items}${acts}<div id="ob_out_${i}"></div></div>`;
+  }).join('');
+  const conn = ['test','conn'].includes(c.stage);
+  const foot = conn ? (o.can_work
+      ? `<div class="note" style="margin-top:14px">Красных шагов нет — компанию можно перевести в «Работает».${canMgr() ? `<div class="acts"><button class="pri" onclick="obWork('${cid}')">Перевести в «Работает»</button></div>` : ''}</div>`
+      : `<div class="note warn" style="margin-top:14px">Пока есть шаги «Исправить», перевести в «Работает» нельзя — иначе клиент увидит неверные цифры.</div>`) : '';
+  return `<p class="small" style="margin:0 0 4px">${conn ? 'Шаги сверху вниз. После каждой загрузки файла нажмите «Проверить ещё раз».' : 'Те же проверки, что при подключении, — на случай, если цифры выглядят странно.'}</p>
+    <div class="acts" style="margin:0"><button onclick="loadOb('${cid}')">Проверить ещё раз</button></div>${steps}${foot}`;
+}
+async function obAct(id, i, act){
+  const o = S.ob[id], st = o.steps[i], out = $('ob_out_' + i);
+  if(act === 'copy'){
+    try { await navigator.clipboard.writeText(st.copy); toast('Текст скопирован'); }
+    catch(e){ out.innerHTML = `<div class="note" style="margin-top:8px;white-space:pre-wrap">${esc(st.copy)}</div>`; }
+    return;
+  }
+  if(act === 'close_prev'){
+    if(!confirm(`Закрыть ${MONTHS_RU[o.prev_month - 1]} ${o.prev_year}? Итоги месяца и его недели пересчитаются.`)) return;
+    out.innerHTML = '<div class="note" style="margin-top:8px">Считаю… до минуты.</div>';
+    try { const r = await api('/companies/' + encodeURIComponent(id) + '/close-period', {method:'POST', body:{month:o.prev_month, year:o.prev_year}});
+      out.innerHTML = periodResult(r); delete S.health[id]; setTimeout(() => loadOb(id), 1500); }
+    catch(e){ out.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+    return;
+  }
+  if(act === 'wipe' && !confirm('Стереть ВСЕ данные компании (Структура, План, Факт, итоги, недели)? Компания и настройки останутся. Потом нужно загрузить файл заново.')) return;
+  if(act === 'plan_base' && !confirm('Сделать План исходным? Останется последний загруженный План — целиком, на все месяцы; агенты, которых нет в Структуре, уберутся. После этого закройте прошлый месяц заново.')) return;
+  const b = $(`ob_${i}_${act}`); if(b){ b.disabled = true; b.textContent = 'Выполняю…'; }
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/onboarding/' + act, {method:'POST'});
+    toast('Готово'); delete S.health[id]; delete S.plan[id]; await loadOb(id); const o2 = $('ob_out_' + i); if(o2) o2.innerHTML = `<div class="note" style="margin-top:8px">${esc(r.message)}</div>`; }
+  catch(e){ out.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; if(b) b.disabled = false; }
+}
+async function obWork(id){
+  try { const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body:{stage:'work'}});
+    Object.assign(co(id), r.company); S.tab = 'overview'; toast('Компания переведена в «Работает»'); render(); }
+  catch(e){ toast(e.message); }
+}
+
 /* ---------- Задачи ---------- */
 const T_STATUS = [['new','Новая'],['work','В работе'],['wait','Ждём клиента'],['done','Решена']];
 const T_KINDS = [['connect','Подключение'],['data','Данные'],['dashboard','Дашборд'],['payment','Оплата'],['other','Другое']];
@@ -850,7 +912,7 @@ function taskDetail(t){
     <div class="acts"><button onclick="commentTask(${t.id})">Добавить комментарий</button></div></div>
   ${done ? '' : `<div class="sec"><p class="lbl">Решение — обязательно для закрытия</p><textarea id="td_r" rows="2" style="width:100%;font:inherit;border:1px solid var(--line);border-radius:6px;padding:8px;background:var(--surface);color:var(--ink)" placeholder="Что сделали, чтобы проблема не повторилась"></textarea>
     <p class="err" id="td_err"></p><div class="acts"><button class="pri" onclick="closeTask(${t.id})">Закрыть как решённую</button></div></div>`}
-  <div class="acts"><button onclick="S.view='companies';S.sel='${esc(t.company_id)}';S.tab=TABS()[0][0];S.showDet=true;render()">Открыть компанию</button></div>`;
+  <div class="acts"><button onclick="S.view='companies';S.sel='${esc(t.company_id)}';S.tab=TABS(co('${esc(t.company_id)}'))[0][0];S.showDet=true;render()">Открыть компанию</button></div>`;
 }
 async function afterTaskChange(id){ await loadTasks(); await refreshTaskCount(); if(S.tDetail) delete S.ctasks[S.tDetail.company_id]; await openTask(id); }
 async function setTStatus(id, st){ try { await api('/tasks/' + id + '/status', {method:'POST', body:{status:st}}); toast('Статус изменён'); await afterTaskChange(id); } catch(e){ toast(e.message); } }
