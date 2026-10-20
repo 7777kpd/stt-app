@@ -9,7 +9,7 @@
    применяется сразу, без мигания. */
 (function () {
   'use strict';
-  var VER = '1';                                   // поднять при изменении словарей
+  var VER = '2';                                   // поднять при изменении словарей
   var LANGS = [['ru', 'RU', 'Русский'], ['uk', 'UA', 'Українська'], ['uz', 'UZ', 'Oʻzbekcha']];
   var DEV = new URLSearchParams(location.search).get('dev') === '1';
   var API = DEV ? 'https://develop-production-0a2d.up.railway.app' : 'https://worker-production-1dfb.up.railway.app';
@@ -134,7 +134,7 @@
       chip.onclick = openMenu;
     }
     chip.textContent = '🌐 ' + (LANGS.filter(function (x) { return x[0] === lang; })[0] || LANGS[0])[1] + ' ▾';
-    var host = document.querySelector('.header-top');
+    var host = document.querySelector('.header-top, .topbar');
     if (host) {
       if (chip.parentNode !== host) { chip.style.position = ''; chip.style.marginLeft = '8px'; host.appendChild(chip); }
     } else if (chip.parentNode !== document.body) {
