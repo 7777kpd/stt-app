@@ -24,8 +24,10 @@
   };
   // ?lang=uk / ?lang=uz в адресе — для проверки перевода в браузере (демо-режим)
   var urlLang = new URLSearchParams(location.search).get('lang');
-  if (urlLang && /^(ru|uk|uz)$/.test(urlLang)) ls.set('stt_lang', urlLang);
-  var lang = ls.get('stt_lang') || 'ru';
+  if (urlLang && /^(ru|uk|uz)$/.test(urlLang)) ls.set('stt_lang_own', urlLang);
+  // stt_lang_own — личный выбор на этом устройстве (кнопка 🌐), главнее языка компании
+  var own = ls.get('stt_lang_own');
+  var lang = own || ls.get('stt_lang') || 'ru';
   var dict = null, rx = null, rules = [];
   var orig = new WeakMap(), done = new WeakMap();
   var info = {lang: lang, 'switch': false};
@@ -127,6 +129,7 @@
   function setLang(l, save) {
     lang = l;
     ls.set('stt_lang', l);
+    if (save) { own = l; ls.set('stt_lang_own', l); }
     loadDict(l, function () { document.documentElement.lang = l; all(); });
     if (save) {
       var init = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData;
@@ -177,14 +180,20 @@
   function start() {
     obs.observe(document.body, {childList: true, subtree: true, characterData: true});
     if (lang !== 'ru') loadDict(lang, all);
-    var init = window.Telegram && Telegram.WebApp && Telegram.WebApp.initData;
-    if (!init) return;
-    fetch(API + '/api/admin/lang/me', {headers: {'X-Telegram-Init-Data': init}})
+    if (own) { info['switch'] = true; placeSwitch(); }
+    // Кто смотрит: ?id= из ссылки (так открывают кнопки бота и /dashboard), иначе — сам пользователь Telegram
+    var tw = window.Telegram && Telegram.WebApp;
+    var id = new URLSearchParams(location.search).get('id') ||
+             (tw && tw.initDataUnsafe && tw.initDataUnsafe.user && String(tw.initDataUnsafe.user.id)) || '';
+    if (!/^\d+$/.test(id)) return;
+    fetch(API + '/api/admin/lang/id/' + id)
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (d) {
         if (!d) return;
         info = d;
-        if (d.lang && d.lang !== lang) setLang(d.lang, false); else placeSwitch();
+        if (own) info['switch'] = true;
+        var want = own || d.lang || 'ru';
+        if (want !== lang) setLang(want, false); else placeSwitch();
       }).catch(function () {});
   }
   window.sttI18n = {tr: function (s) { return lang === 'ru' ? s : tr(s); }, lang: function () { return lang; }, set: setLang};
