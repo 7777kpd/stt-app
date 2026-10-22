@@ -296,7 +296,7 @@ function tabOverview(c){
 
 /* ---------- Состояние компании ---------- */
 const HEALTH_ICON = {ok:['✓','var(--ok)'], warn:['!','var(--warn)'], bad:['✕','var(--bad)'], info:['i','var(--ink-3)']};
-const HEALTH_ACTION = {excel:['Загрузить Excel','data'], close_month:['Закрыть период','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data'], payment:['Открыть оплату','pay'], tasks:['К задачам','ctasks'], plan:['К Плану','data']};
+const HEALTH_ACTION = {excel:['Загрузить файл','data'], close_month:['Закрыть период','data'], settings:['Открыть настройки','cfg'], reload:['К данным','data'], payment:['Открыть оплату','pay'], tasks:['К задачам','ctasks'], plan:['К Плану','data']};
 async function loadHealth(id, force){
   if(!force && S.health[id]) return;
   S.health[id] = 'loading';
@@ -498,6 +498,77 @@ async function claim(id){
 }
 
 /* ---------- Данные: источник и действия ---------- */
+/* ---------- 22.10.2026: когда обновляются данные — по времени компании ---------- */
+const TZ_RU = {Kiev:'Киев', Kyiv:'Киев', Moscow:'Москва', Tashkent:'Ташкент', Samarkand:'Самарканд', Vienna:'Вена', Almaty:'Алматы',
+  Simferopol:'Симферополь', Minsk:'Минск', Warsaw:'Варшава', Berlin:'Берлин', Bishkek:'Бишкек', Tbilisi:'Тбилиси', Baku:'Баку', Yerevan:'Ереван', Chisinau:'Кишинёв', Riga:'Рига'};
+function tzCity(tz){ const k = String(tz || '').split('/').pop(); return TZ_RU[k] || k.replace(/_/g,' ') || 'время компании'; }
+function hm(h, m){ h = ((h % 24) + 24) % 24; return String(h).padStart(2,'0') + ':' + String(m || 0).padStart(2,'0'); }
+function shiftHM(h, m, d){ const t = ((h * 60 + m + d) % 1440 + 1440) % 1440; return [Math.floor(t / 60), t % 60]; }
+function nowHM(tz){ try { const p = new Intl.DateTimeFormat('en-GB',{timeZone:tz, hour:'2-digit', minute:'2-digit', hour12:false}).format(new Date()).split(':'); return [+p[0] % 24, +p[1]]; } catch(e){ const d = new Date(); return [d.getHours(), d.getMinutes()]; } }
+function nextAt(tz, h, m){ const [nh, nm] = nowHM(tz); return (nh * 60 + nm < h * 60 + m ? 'сегодня ' : 'завтра ') + hm(h, m); }
+// время события в часовом поясе компании (журнал, последние обновления)
+const fdtz = (iso, tz) => { if(!iso) return '—'; try { return new Date(iso).toLocaleString('ru-RU',{timeZone:tz || undefined, day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}).replace(',', ''); } catch(e){ return fdt(iso); } };
+function scheduleBlock(c){
+  const tz = c.timezone, city = tzCity(tz), src = srcKey(c), id = esc(c.company_id);
+  // 22.10.2026: есть проблема — нужное пояснение раскрыто сразу и сверху красная строка
+  if(!S.health[c.company_id]) loadHealth(c.company_id);
+  const hl = Array.isArray(S.health[c.company_id]) ? S.health[c.company_id] : [];
+  const dataBad = hl.filter(x => /^Факт за вчера не|^Последний файл по ссылке не принят|^По ссылке ещё не пришло/.test(x.title || ''));
+  const bqLast = src === 'bigquery' && S.bq[c.company_id] && S.bq[c.company_id] !== 'loading' && (S.bq[c.company_id].last || [])[0];
+  const spBad = bqLast && bqLast.action.includes('ошибка');
+  const noTg = hl.filter(x => /^Люди без Telegram ID/.test(x.title || ''));
+  const alerts = [...dataBad.map(x => `${x.title}${x.hint ? ' — ' + x.hint : ''}`),
+                  ...(spBad ? [`Последний забор Структуры и Плана из BigQuery — с ошибкой: ${bqLast.details || ''}`] : [])];
+  const mh = +c.morning_hour || 8, eh = +c.evening_hour || 19;
+  const btn = (label, js) => `<button style="white-space:nowrap" onclick="${js}">${label}</button>`;
+  const toLoad = btn('К загрузке ↓', "document.getElementById('xl_cards').scrollIntoView({behavior:'smooth'})");
+  const rows = [];   // [что, время, следующий раз, пояснение, как сделать сейчас]
+  const add = (what, hmArr, note, now) => rows.push([what, hm(...hmArr), nextAt(tz, ...hmArr), note || '', now || '']);
+  const auto = '<span class="small">только по расписанию</span>';
+  const spAt = shiftHM(mh, 0, -60);
+  if(src === 'bigquery'){
+    const b = S.bq[c.company_id], last = b && b !== 'loading' && (b.last || [])[0];
+    add('Структура и План из BigQuery — новые люди, Telegram ID, маршруты', spAt,
+        last ? `последний раз: ${fdtz(last.at, tz)}${last.action.includes('ошибка') ? ' — с ошибкой' : ''}` : 'ещё не забирали',
+        btn('Загрузить сейчас', `bqSync('${id}', false)`));
+  }
+  add('Утренний отчёт людям', [mh, 0], '', auto);
+  if(src === 'bigquery' || src === 'api')
+    add('Заказы (Факт) из ' + (src === 'api' ? 'API' : 'BigQuery') + ' за сегодня', shiftHM(eh, 0, -15), '',
+        btn('Загрузить сейчас', `reload('${id}')`));
+  if(src === 'file')
+    add('Проверка: пришёл ли файл по ссылке', shiftHM(eh, 0, -20), 'файл записывается сразу при получении — в любое время',
+        '<span class="small">попросите IT клиента отправить файл по ссылке</span> ' + toLoad);
+  add('Вечерний отчёт людям', [eh, 0], '', auto);
+  if(src === 'bigquery' || src === 'api')
+    add('Повтор загрузки заказов, если был сбой', shiftHM(eh, 40, 0), 'молчит, если всё пришло', btn('Загрузить сейчас', `reload('${id}')`));
+  if(src === 'file')
+    add('Повторная проверка файла', shiftHM(eh, 40, 0), 'файла нет — сообщение техконтакту', toLoad);
+  if(src === 'excel') rows.push(['Структура, План, Факт', '—', 'вручную', 'обновляются только когда вы загружаете файл', toLoad]);
+  rows.push(['Закрытие прошлого месяца (итоги)', '02:00', '1-го числа', 'автоматически', btn('Закрыть заново ↓', "document.getElementById('xl_cards').scrollIntoView({behavior:'smooth'})")]);
+
+  const howNew = src === 'bigquery'
+    ? `<li>IT клиента вписывает Telegram ID человека в свою таблицу Структуры в BigQuery (колонка telegram_id). Свой ID человек узнаёт, написав /start боту @CTTCMK_bot (или боту @userinfobot).</li>
+       <li>Бот заберёт Структуру сам — ${esc(nextAt(tz, ...spAt))}. Если нужно сейчас — нажмите «Загрузить сейчас» в первой строке.</li>
+       <li>Человек пишет боту /start → получает кнопку своего дашборда. Если бот его не узнаёт — ID в BigQuery не вписан или вписан с ошибкой.</li>`
+    : src === 'api'
+    ? `<li>Telegram ID вписывается в Структуру компании (файлом через «Добавить структуру» ниже).</li><li>Сразу после записи человек пишет боту /start и получает свой дашборд.</li>`
+    : `<li>Внесите человека с его Telegram ID в лист «Структура» и загрузите файл кнопкой «Добавить структуру» ниже или по секретной ссылке. Перед записью проверка покажет, кто добавится и кто останется.</li>
+       <li>Свой ID человек узнаёт, написав /start боту @CTTCMK_bot (или боту @userinfobot).</li>
+       <li>Сразу после записи человек пишет боту /start и получает кнопку своего дашборда.</li>`;
+  const howData = src === 'bigquery' || src === 'api'
+    ? `Заказы не пришли или пришли не все — нажмите «Загрузить сейчас» в строке «Заказы». Если источник отвечает ошибкой — она будет в журнале и в задачах; это сторона клиента.`
+    : src === 'file'
+    ? `Файл не пришёл — попросите IT клиента отправить его по ссылке (запишется сразу) или загрузите файл сами кнопкой ниже. Файл Факта — всегда с 1-го числа месяца по вчера, тогда ничего не потеряется.`
+    : `Данные обновляются только когда вы загружаете файл ниже.`;
+  return `<div class="panel" style="padding:12px 16px;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong style="font-weight:600">Когда обновляются данные</strong><span class="small">всё время — ${esc(city)} (${esc(tz || '')}), сейчас там ${hm(...nowHM(tz))}</span></div>
+    ${alerts.map(a => `<div class="note bad" style="margin-top:8px">⚠️ ${esc(a)}</div>`).join('')}
+    <div class="tw"><table style="margin-top:6px"><tr><th>Что</th><th>Каждый день</th><th>Следующий раз</th><th></th><th>Сделать сейчас</th></tr>
+    ${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="mono" style="white-space:nowrap">${r[1]}</td><td style="white-space:nowrap">${esc(r[2])}</td><td class="small">${esc(r[3])}</td><td>${r[4]}</td></tr>`).join('')}</table></div>
+    ${c.days_off ? `<p class="small">Выходные компании (${esc(c.days_off)}) — отчётов и загрузок по расписанию нет.</p>` : ''}
+    <details style="margin-top:8px"${spBad || noTg.length ? ' open' : ''}><summary style="cursor:pointer;font-weight:500">Новый сотрудник не видит дашборд — что сделать</summary>${noTg.length ? `<p class="small" style="margin:6px 0 0;color:var(--warn)">${esc(noTg[0].title)}${noTg[0].hint ? ': ' + esc(noTg[0].hint) : ''}</p>` : ''}<ol class="small" style="margin:6px 0 0;padding-left:20px">${howNew}</ol></details>
+    <details style="margin-top:6px"${dataBad.length ? ' open' : ''}><summary style="cursor:pointer;font-weight:500">Данные за сегодня не появились — что сделать</summary><p class="small" style="margin:6px 0 0">${howData} Дашборды показывают данные с 1-го числа по вчера; сегодняшние заказы видны с завтрашнего утра.</p></details></div>`;
+}
 function srcKey(c){ return c.connection_type === 'bigquery' ? 'bigquery' : c.connection_type === 'rest_api' ? 'api' : (c.spreadsheet_id ? 'google' : (c.file_mode ? 'file' : 'excel')); }
 function sourceName(c){ return {excel:'Excel', file:'Секретная ссылка', bigquery:'BigQuery', api:'API', google:'Google (переход)'}[srcKey(c)]; }
 function tabData(c){
@@ -543,10 +614,14 @@ function tabData(c){
   const src = srcKey(c);
   const months = lastMonths(12);
   const card = (btn, text, warn) => `<div class="box">${btn}<p class="small" style="margin-top:8px">${text}</p>${warn ? `<p class="small" style="color:var(--bad);margin-top:6px">${warn}</p>` : ''}</div>`;
+  // 22.10.2026: две кнопки — «Добавить структуру» (меняются только люди из файла) и «Заменить всю компанию»
+  const xlBtn = (mode, label, pri) => `<label class="${pri ? 'pri' : ''}" style="display:block;text-align:center;padding:8px 12px;border-radius:6px;cursor:pointer;${pri ? 'background:var(--accent);color:var(--on-accent);font-weight:500' : 'border:1px solid var(--line);background:var(--surface)'}">${label}<input type="file" accept=".xlsx" style="display:none" onchange="excelPick(this,'${esc(c.company_id)}','${mode}')"></label>`;
   const excelCard = (src !== 'google') ? card(
-    `<label class="pri" style="display:block;text-align:center;padding:8px 12px;border-radius:6px;background:var(--accent);color:var(--on-accent);font-weight:500;cursor:pointer">Загрузить Excel<input type="file" accept=".xlsx" style="display:none" onchange="excelPick(this,'${esc(c.company_id)}')"></label>`,
-    'Файл .xlsx с листами «Структура», «План посещений», «Факт посещений» (можно только нужные). Сначала покажем проверку, запишем только после «Записать».',
-    'Если «агент не найден» — имя в Факте или Плане отличается от Структуры. Исправьте файл и загрузите снова.') : '';
+    xlBtn('add', 'Добавить структуру', true),
+    'Новый филиал, команда, группа СВ и агентов — или исправление их данных. Меняются <b>только люди из файла</b>: их Структура, План и Факт. Остальные остаются как есть. Сначала покажем проверку, запишем после подтверждения.',
+    'Если «агент не найден» — имя в Факте или Плане отличается от Структуры. Исправьте файл и загрузите снова.') +
+    card(xlBtn('replace', 'Заменить всю компанию', false),
+    'Файл = вся компания (листы «Структура», «План посещений», «Факт посещений», можно только нужные). Кого нет в файле — удаляются вместе с Планом. Для полной перезагрузки и чистки уволенных.') : '';
   const loadCard = (src === 'bigquery' || src === 'api') ? card(
     `<button class="pri" style="width:100%" id="rl" onclick="reload('${esc(c.company_id)}')">Загрузить данные сейчас</button>`,
     'Заберёт заказы из источника клиента прямо сейчас, не дожидаясь вечера.' + (role()==='manager' ? ' Для менеджера — ограниченное число запусков в сутки.' : ''),
@@ -558,7 +633,8 @@ function tabData(c){
     'Если после закрытия нет категорий — загрузите Факт с колонкой «Категория» и закройте снова.');
   const cacheCard = card(`<button style="width:100%" onclick="reload('${esc(c.company_id)}', true)">Сбросить кеш</button>`,
     'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
-  return `${srcBlock}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
+  if(src === 'bigquery' && !S.bq[c.company_id]) loadBq(c.company_id);   // для «последний раз» в расписании
+  return `${src !== 'google' ? scheduleBlock(c) : ''}${srcBlock}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" id="xl_cards" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
     <div id="xl_out"></div>`;
 }
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -656,12 +732,12 @@ function bqSpBlock(c){
   const b = S.bq[c.company_id];
   if(!b || b === 'loading'){ if(!b) loadBq(c.company_id); return '<div class="panel" style="padding:12px 16px;margin-top:12px"><p class="small">Загружаю…</p></div>'; }
   const t = canTech() || canMgr(), r = b.refs || {};
-  const last = (b.last || []).map(x => `<div style="padding:6px 0;border-top:1px solid var(--line)"><span class="tag ${x.action.includes('ошибка') ? 's-pause' : 's-work'}">${x.action.includes('ошибка') ? 'не обновлено' : 'обновлено'}</span> <span class="small">${fdt(x.at)} · ${esc(x.actor_name)} · ${esc(x.details)}</span></div>`).join('');
+  const last = (b.last || []).map(x => `<div style="padding:6px 0;border-top:1px solid var(--line)"><span class="tag ${x.action.includes('ошибка') ? 's-pause' : 's-work'}">${x.action.includes('ошибка') ? 'не обновлено' : 'обновлено'}</span> <span class="small">${fdtz(x.at, c.timezone)} (${esc(tzCity(c.timezone))}) · ${esc(x.actor_name)} · ${esc(x.details)}</span></div>`).join('');
   const chk = b.check ? `<div class="note ${b.check.warning ? 'warn' : ''}" style="margin-top:10px">${esc(b.check.summary)}${b.check.warning ? '<br><b>' + esc(b.check.warning) + '</b>' : ''}</div>
       <details style="margin-top:6px"><summary style="cursor:pointer">Полный отчёт проверки</summary><pre style="white-space:pre-wrap;font:13px/1.5 var(--sans)">${esc(b.check.report)}</pre></details>` : '';
   const blocked = b.blocked && isOwner() ? `<div class="note bad" style="margin-top:10px">${esc(b.blocked)}<div class="acts"><button class="danger" onclick="bqSync('${esc(c.company_id)}', true)">Всё равно записать (я проверил)</button></div></div>` : (b.blocked ? `<div class="note bad" style="margin-top:10px">${esc(b.blocked)} Записать принудительно может только владелец.</div>` : '');
   return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">Структура и План из BigQuery</strong>
-    <p class="small" style="margin:4px 0 10px">Бот забирает их каждый день за час до утреннего отчёта. Если изменений нет — ничего не пишет. Telegram ID сотрудников сохраняются. Первая успешная загрузка переключает Структуру и План компании на базу.</p>
+    <p class="small" style="margin:4px 0 10px">Бот забирает их каждый день в ${hm(...shiftHM(+c.morning_hour || 8, 0, -60))} (${esc(tzCity(c.timezone))}) — за час до утреннего отчёта; следующий раз — ${nextAt(c.timezone, ...shiftHM(+c.morning_hour || 8, 0, -60))}. Если изменений нет — ничего не пишет. Telegram ID сотрудников сохраняются. Первая успешная загрузка переключает Структуру и План компании на базу.</p>
     <div class="grid2"><div><p class="lbl">Представление «Структура»</p><input id="bq_s" class="mono" value="${esc(r.structure)}" placeholder="проект.датасет.представление" ${t?'':'disabled'}></div>
     <div><p class="lbl">Представление «План посещений»</p><input id="bq_p" class="mono" value="${esc(r.plan)}" placeholder="проект.датасет.представление" ${t?'':'disabled'}></div></div>
     <div class="acts">${t ? `<button onclick="bqSave('${esc(c.company_id)}')">Сохранить адреса</button>` : ''}
@@ -712,7 +788,7 @@ function archiveBlock(c){
   if(!ready){
     const left = [!c.structure_on_db && 'Структура', !c.plan_on_db && 'План посещений', 'Итоги месяца'].filter(Boolean).join(', ');
     const how = srcKey(c) === 'bigquery' ? 'загрузите Структуру и План из BigQuery (блок выше)'
-      : 'загрузите Структуру и План Excel-файлом (кнопка «Загрузить Excel» ниже) или по секретной ссылке';
+      : 'загрузите Структуру и План Excel-файлом (кнопка «Добавить структуру» ниже) или по секретной ссылке';
     return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">Google-таблица ещё нужна</strong>
       <p class="small" style="margin:4px 0 0">Заказы уже в базе. В Google остались: ${left}. Чтобы отключить Google, ${how} — после этого здесь появится перенос архива итогов месяца.</p></div>`;
   }
@@ -1246,31 +1322,82 @@ async function rotateLink(id){
   catch(e){ toast(e.message); }
 }
 
-function excelPick(input, id){
+function excelPick(input, id, mode){
   const f = input.files && input.files[0]; if(!f) return;
   if(!/\.xlsx$/i.test(f.name)){ toast('Нужен файл .xlsx'); return; }
   if(f.size > 10*1024*1024){ toast('Файл больше 10 МБ'); return; }
-  const out = $('xl_out'); out.innerHTML = '<div class="note">Проверяю файл…</div>';
   const r = new FileReader();
-  r.onload = async () => {
-    const b64 = String(r.result).split(',')[1] || '';
-    try {
-      const res = await api('/companies/' + encodeURIComponent(id) + '/excel/check', {method:'POST', body:{filename:f.name, data:b64}});
-      out.innerHTML = `<div class="panel" style="padding:12px 16px;margin-top:14px"><p class="lbl">Проверка файла ${esc(f.name)}</p>
-        <pre style="white-space:pre-wrap;font:13px/1.5 var(--sans);margin:0">${esc(res.report)}</pre>
-        <div class="acts"><button class="pri" id="xl_w" onclick="excelWrite('${esc(id)}','${esc(res.token)}')">Записать</button><button onclick="$('xl_out').innerHTML=''">Отмена</button></div>
-        <p class="small">Запись заменит Структуру целиком, План — по правилу маршрутов (что именно изменится — в конце отчёта), а Факт — за месяцы, которые есть в файле.</p></div>`;
-    } catch(e){ out.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
-    input.value = '';
-  };
-  r.onerror = () => { out.innerHTML = '<div class="note bad">Файл не прочитался. Выберите его ещё раз.</div>'; };
+  r.onload = () => { S.xl = {id, name:f.name, b64:String(r.result).split(',')[1] || ''}; excelCheck(mode || 'add'); };
+  r.onerror = () => { $('xl_out').innerHTML = '<div class="note bad">Файл не прочитался. Выберите его ещё раз.</div>'; };
   r.readAsDataURL(f);
+  input.value = '';
+}
+// 22.10.2026: проверка в выбранном режиме; переключатель в отчёте проверяет тот же файл заново
+async function excelCheck(mode){
+  const x = S.xl; if(!x) return;
+  const out = $('xl_out'); out.innerHTML = '<div class="note">Проверяю файл…</div>';
+  try {
+    const res = await api('/companies/' + encodeURIComponent(x.id) + '/excel/check', {method:'POST', body:{filename:x.name, data:x.b64, mode}});
+    // Старый сервер (до выкладки stt-bot v57) режим не знает и всегда заменяет компанию целиком —
+    // тогда честно показываем это и не даём нажать «Добавить».
+    const legacy = !res.mode;
+    const add = !legacy && res.mode === 'add';
+    out.innerHTML = `<div class="panel" style="padding:14px 16px;margin-top:14px">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+        <div><p class="lbl">Проверка файла</p><p class="val">${esc(x.name)}</p></div>
+        ${legacy ? '' : `<div class="chips"><span class="chip ${add?'on':''}" onclick="${add?'':"excelCheck('add')"}">Добавить структуру</span><span class="chip ${add?'':'on'}" onclick="${add?"excelCheck('replace')":''}">Заменить всю компанию</span></div>`}
+      </div>
+      ${legacy ? `<div class="note bad"><b>Сервер ещё не обновлён</b> (деплои Railway на паузе), поэтому «Добавить структуру» пока не работает: запись этого файла <b>заменит всю компанию</b> — кого нет в файле, удалится. Чтобы добавить филиал или команду сейчас, загрузите один общий файл со всеми людьми.</div>` : ''}
+      ${peopleBlock(res.people, add)}
+      <details style="margin-top:12px"${res.people ? '' : ' open'}><summary class="small" style="cursor:pointer">Полный отчёт проверки</summary>
+      <pre style="white-space:pre-wrap;font:13px/1.5 var(--sans);margin:8px 0 0">${esc(res.report)}</pre></details>
+      <div class="acts"><button class="${add ? 'pri' : 'danger'}" id="xl_w" onclick="excelWrite('${esc(x.id)}','${esc(res.token)}')">${add ? 'Добавить' : 'Заменить всю компанию'}</button><button onclick="S.xl=null;$('xl_out').innerHTML=''">Отмена</button></div>
+      <p class="small">${add
+        ? 'Меняются только люди и агенты из файла: их строки Структуры, их точки Плана, их Факт за дни файла. Остальные не тронуты. Уволенные так не удаляются — для этого «Заменить всю компанию».'
+        : 'Структура заменится целиком, План — по правилу маршрутов, Факт — за дни файла. Кого нет в файле — удалится.'}</p></div>`;
+  } catch(e){ out.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+}
+const ROLE_RU_N = {director:'Директор', rf:'РФ', nto:'Рук. продаж', tm:'ТМ', sv:'СВ', agent:'агенты'};
+function rolesTxt(br){ return Object.entries(br || {}).map(([r,n]) => `${ROLE_RU_N[r] || r} ${n}`).join(' · ') || '—'; }
+function peopleBlock(p, add){
+  if(!p) return '';
+  const box = (lbl, n, sub, cls, bg) => `<div class="box"${bg ? ` style="background:${bg}"` : ''}><p class="lbl">${lbl}</p><p style="font-size:26px;font-weight:600;margin:0;line-height:1.2"${cls ? ` class="${cls}"` : ''}>${n}</p><p class="small">${sub}</p></div>`;
+  let h = '';
+  if(p.added){
+    const upd = p.updated.total + (p.moved || []).length;
+    h += `<div class="grid3" style="margin-top:12px">${box('Добавятся', p.added.total, rolesTxt(p.added.by_role), 'c-work')}${box('Обновятся', upd, 'уже есть в базе', 'c-test')}${
+      add ? box('Не тронуты', p.kept.total, rolesTxt(p.kept.by_role))
+          : box('Удалятся', p.removed.total, p.removed.total ? 'нет в файле — уйдут с Планом' : 'никто', p.removed.total ? 'c-pause' : '', p.removed.total ? 'var(--bad-bg)' : '')}</div>`;
+  }
+  const rows = [];
+  const pl = p.plan, f = p.fact;
+  if(pl) rows.push(['План посещений', add
+    ? `${pl.file_points} точек у ${pl.file_agents} агентов файла${pl.replaced_points ? ` (вместо прежних ${pl.replaced_points})` : ''}; у остальных ${pl.other_points} — без изменений`
+    : `${pl.file_points} точек — весь План${pl.other_points ? `; удалятся точки других агентов: ${pl.other_points}` : ''}`]);
+  if(f && f.rows) rows.push(['Факт посещений', `${f.rows} строк, ${f.agents} агентов, ${f.from}–${f.to}` + (add ? ' — только у них' : ' — у всех агентов за эти дни')]);
+  if(rows.length) h += `<div class="sec" style="margin-top:14px">${rows.map(([a,b]) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px"><span>${a}</span><span style="text-align:right">${esc(b)}</span></div>`).join('')}</div>`;
+  const tr = (v, what, cls) => `<tr><td>${esc(v.name)}</td><td>${esc(v.role_ru)}</td><td>${esc(v.was !== undefined ? `было: ${v.was || '—'} → в файле: ${v.boss || '—'}` : (v.boss || '—'))}</td><td><span class="tag ${cls}">${what}</span></td></tr>`;
+  if(p.added){
+    const list = [...(p.moved || []).map(v => tr(v, 'переедет', 's-test')),
+                  ...p.added.list.filter(v => v.role !== 'agent').map(v => tr(v, 'добавится', 's-work')),
+                  ...p.updated.list.filter(v => v.role !== 'agent').map(v => tr(v, 'обновится', 's-test'))];
+    const ag = p.added.list.filter(v => v.role === 'agent').length, agu = p.updated.list.filter(v => v.role === 'agent').length;
+    if(ag) list.push(`<tr><td>${ag} агентов</td><td>агенты</td><td>${esc([...new Set(p.added.list.filter(v => v.role === 'agent').map(v => v.boss))].slice(0,5).join(', '))}</td><td><span class="tag s-work">добавятся</span></td></tr>`);
+    if(agu) list.push(`<tr><td>${agu} агентов</td><td>агенты</td><td></td><td><span class="tag s-test">обновятся</span></td></tr>`);
+    const rest = add ? p.kept : p.removed;
+    if(rest.total) list.push(`<tr><td>${rest.total} человек не из файла</td><td>${esc(rolesTxt(rest.by_role))}</td><td></td><td><span class="tag ${add ? 's-off' : 's-pause'}">${add ? 'не тронуты' : 'удалятся'}</span></td></tr>`);
+    if(list.length) h += `<div class="sec"><h3>Люди</h3><div class="tw"><table><tr><th>Кто</th><th>Роль</th><th>Подчинение</th><th>Что будет</th></tr>${list.join('')}</table></div></div>`;
+    if((p.moved || []).length) h += `<div class="note warn">${(p.moved || []).length} чел. уже есть в базе у другого руководителя. Если это <b>тот же человек</b> — он переедет вместе со своими точками. Если это <b>однофамилец</b> — исправьте имя в файле (например, добавьте «Ф2») и загрузите снова.</div>`;
+  }
+  if(pl && pl.shared_codes) h += `<div class="note">${pl.shared_codes} точек файла уже есть в Плане у других агентов. Это нормально, если в магазин ходят разные команды: визиты считаются каждому агенту отдельно.</div>`;
+  if(!add && p.removed && p.removed.total) h += `<div class="note bad">Всех, кого нет в файле (${p.removed.total} чел.), удалим вместе с их Планом. Если вы добавляете филиал или команду — переключите на «Добавить структуру».</div>`;
+  return h;
 }
 async function excelWrite(id, token){
   const b = $('xl_w'); b.disabled = true; b.textContent = 'Записываю…';
   try {
     const r = await api('/companies/' + encodeURIComponent(id) + '/excel/write', {method:'POST', body:{token}});
-    $('xl_out').innerHTML = `<div class="note">${esc(r.message)}</div>`; delete S.health[id]; delete S.plan[id];
+    S.xl = null; $('xl_out').innerHTML = `<div class="note">${esc(r.message)}</div>`; delete S.health[id]; delete S.plan[id];
     await loadCompanies(); toast('Данные записаны');
   } catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
 }
