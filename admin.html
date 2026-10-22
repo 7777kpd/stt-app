@@ -510,7 +510,7 @@ function nextAt(tz, h, m){ const [nh, nm] = nowHM(tz); return (nh * 60 + nm < h 
 const fdtz = (iso, tz) => { if(!iso) return '—'; try { return new Date(iso).toLocaleString('ru-RU',{timeZone:tz || undefined, day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}).replace(',', ''); } catch(e){ return fdt(iso); } };
 function scheduleBlock(c){
   const tz = c.timezone, city = tzCity(tz), src = srcKey(c), id = esc(c.company_id);
-  // 22.10.2026: есть проблема — нужное пояснение раскрыто сразу и сверху красная строка
+  // 22.10.2026: есть проблема — сверху красная строка; пояснения всегда свёрнуты (раскрываются по нажатию)
   if(!S.health[c.company_id]) loadHealth(c.company_id);
   const hl = Array.isArray(S.health[c.company_id]) ? S.health[c.company_id] : [];
   const dataBad = hl.filter(x => /^Факт за вчера не|^Последний файл по ссылке не принят|^По ссылке ещё не пришло/.test(x.title || ''));
@@ -566,8 +566,8 @@ function scheduleBlock(c){
     <div class="tw"><table style="margin-top:6px"><tr><th>Что</th><th>Каждый день</th><th>Следующий раз</th><th></th><th>Сделать сейчас</th></tr>
     ${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="mono" style="white-space:nowrap">${r[1]}</td><td style="white-space:nowrap">${esc(r[2])}</td><td class="small">${esc(r[3])}</td><td>${r[4]}</td></tr>`).join('')}</table></div>
     ${c.days_off ? `<p class="small">Выходные компании (${esc(c.days_off)}) — отчётов и загрузок по расписанию нет.</p>` : ''}
-    <details style="margin-top:8px"${spBad || noTg.length ? ' open' : ''}><summary style="cursor:pointer;font-weight:500">Новый сотрудник не видит дашборд — что сделать</summary>${noTg.length ? `<p class="small" style="margin:6px 0 0;color:var(--warn)">${esc(noTg[0].title)}${noTg[0].hint ? ': ' + esc(noTg[0].hint) : ''}</p>` : ''}<ol class="small" style="margin:6px 0 0;padding-left:20px">${howNew}</ol></details>
-    <details style="margin-top:6px"${dataBad.length ? ' open' : ''}><summary style="cursor:pointer;font-weight:500">Данные за сегодня не появились — что сделать</summary><p class="small" style="margin:6px 0 0">${howData} Дашборды показывают данные с 1-го числа по вчера; сегодняшние заказы видны с завтрашнего утра.</p></details></div>`;
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:500">Новый сотрудник не видит дашборд — что сделать</summary>${noTg.length ? `<p class="small" style="margin:6px 0 0;color:var(--warn)">${esc(noTg[0].title)}${noTg[0].hint ? ': ' + esc(noTg[0].hint) : ''}</p>` : ''}<ol class="small" style="margin:6px 0 0;padding-left:20px">${howNew}</ol></details>
+    <details style="margin-top:6px"><summary style="cursor:pointer;font-weight:500">Данные за сегодня не появились — что сделать</summary><p class="small" style="margin:6px 0 0">${howData} Дашборды показывают данные с 1-го числа по вчера; сегодняшние заказы видны с завтрашнего утра.</p></details></div>`;
 }
 function srcKey(c){ return c.connection_type === 'bigquery' ? 'bigquery' : c.connection_type === 'rest_api' ? 'api' : (c.spreadsheet_id ? 'google' : (c.file_mode ? 'file' : 'excel')); }
 function sourceName(c){ return {excel:'Excel', file:'Секретная ссылка', bigquery:'BigQuery', api:'API', google:'Google (переход)'}[srcKey(c)]; }
@@ -1349,7 +1349,7 @@ async function excelCheck(mode){
       </div>
       ${legacy ? `<div class="note bad"><b>Сервер ещё не обновлён</b> (деплои Railway на паузе), поэтому «Добавить структуру» пока не работает: запись этого файла <b>заменит всю компанию</b> — кого нет в файле, удалится. Чтобы добавить филиал или команду сейчас, загрузите один общий файл со всеми людьми.</div>` : ''}
       ${peopleBlock(res.people, add)}
-      <details style="margin-top:12px"${res.people ? '' : ' open'}><summary class="small" style="cursor:pointer">Полный отчёт проверки</summary>
+      <details style="margin-top:12px"><summary class="small" style="cursor:pointer">Полный отчёт проверки</summary>
       <pre style="white-space:pre-wrap;font:13px/1.5 var(--sans);margin:8px 0 0">${esc(res.report)}</pre></details>
       <div class="acts"><button class="${add ? 'pri' : 'danger'}" id="xl_w" onclick="excelWrite('${esc(x.id)}','${esc(res.token)}')">${add ? 'Добавить' : 'Заменить всю компанию'}</button><button onclick="S.xl=null;$('xl_out').innerHTML=''">Отмена</button></div>
       <p class="small">${add
