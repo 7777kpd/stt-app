@@ -525,12 +525,13 @@ function scheduleBlock(c){
   const rows = [];   // [что, время, следующий раз, пояснение, как сделать сейчас]
   const add = (what, hmArr, note, now) => rows.push([what, hm(...hmArr), nextAt(tz, ...hmArr), note || '', now || '']);
   const auto = '<span class="small">только по расписанию</span>';
-  const spAt = shiftHM(mh, 0, -60);
+  const spAt = shiftHM(mh, 0, -60), spPm = shiftHM(eh, 0, -60);
+  const nextSp = () => { const [nh, nn] = nowHM(tz), n = nh * 60 + nn; return n < spAt[0] * 60 ? spAt : n < spPm[0] * 60 ? spPm : spAt; };
   if(src === 'bigquery'){
     const b = S.bq[c.company_id], last = b && b !== 'loading' && (b.last || [])[0];
-    add('Структура и План из BigQuery — новые люди, Telegram ID, маршруты', spAt,
+    rows.push(['Структура и План из BigQuery — новые люди, Telegram ID, маршруты', hm(...spAt) + ' и ' + hm(...spPm), nextAt(tz, ...nextSp()),
         last ? `последний раз: ${fdtz(last.at, tz)}${last.action.includes('ошибка') ? ' — с ошибкой' : ''}` : 'ещё не забирали',
-        btn('Загрузить сейчас', `bqSync('${id}', false)`));
+        btn('Загрузить сейчас', `bqSync('${id}', false)`)]);
   }
   add('Утренний отчёт людям', [mh, 0], '', auto);
   if(src === 'bigquery' || src === 'api')
@@ -549,7 +550,7 @@ function scheduleBlock(c){
 
   const howNew = src === 'bigquery'
     ? `<li>IT клиента вписывает Telegram ID человека в свою таблицу Структуры в BigQuery (колонка telegram_id). Свой ID человек узнаёт, написав /start боту @CTTCMK_bot (или боту @userinfobot).</li>
-       <li>Бот заберёт Структуру сам — ${esc(nextAt(tz, ...spAt))}. Если нужно сейчас — нажмите «Загрузить сейчас» в первой строке.</li>
+       <li>Бот заберёт Структуру сам — ${esc(nextAt(tz, ...nextSp()))} (дважды в день: за час до утреннего и за час до вечернего отчёта). Если нужно сейчас — нажмите «Загрузить сейчас» в первой строке.</li>
        <li>Человек пишет боту /start → получает кнопку своего дашборда. Если бот его не узнаёт — ID в BigQuery не вписан или вписан с ошибкой.</li>`
     : src === 'api'
     ? `<li>Telegram ID вписывается в Структуру компании (файлом через «Добавить структуру» ниже).</li><li>Сразу после записи человек пишет боту /start и получает свой дашборд.</li>`
@@ -737,7 +738,7 @@ function bqSpBlock(c){
       <details style="margin-top:6px"><summary style="cursor:pointer">Полный отчёт проверки</summary><pre style="white-space:pre-wrap;font:13px/1.5 var(--sans)">${esc(b.check.report)}</pre></details>` : '';
   const blocked = b.blocked && isOwner() ? `<div class="note bad" style="margin-top:10px">${esc(b.blocked)}<div class="acts"><button class="danger" onclick="bqSync('${esc(c.company_id)}', true)">Всё равно записать (я проверил)</button></div></div>` : (b.blocked ? `<div class="note bad" style="margin-top:10px">${esc(b.blocked)} Записать принудительно может только владелец.</div>` : '');
   return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">Структура и План из BigQuery</strong>
-    <p class="small" style="margin:4px 0 10px">Бот забирает их каждый день в ${hm(...shiftHM(+c.morning_hour || 8, 0, -60))} (${esc(tzCity(c.timezone))}) — за час до утреннего отчёта; следующий раз — ${nextAt(c.timezone, ...shiftHM(+c.morning_hour || 8, 0, -60))}. Если изменений нет — ничего не пишет. Telegram ID сотрудников сохраняются. Первая успешная загрузка переключает Структуру и План компании на базу.</p>
+    <p class="small" style="margin:4px 0 10px">Бот забирает их дважды в день — в ${hm(...shiftHM(+c.morning_hour || 8, 0, -60))} и ${hm(...shiftHM(+c.evening_hour || 19, 0, -60))} (${esc(tzCity(c.timezone))}), за час до утреннего и вечернего отчётов. Если изменений нет — ничего не пишет. Telegram ID сотрудников сохраняются. Первая успешная загрузка переключает Структуру и План компании на базу.</p>
     <div class="grid2"><div><p class="lbl">Представление «Структура»</p><input id="bq_s" class="mono" value="${esc(r.structure)}" placeholder="проект.датасет.представление" ${t?'':'disabled'}></div>
     <div><p class="lbl">Представление «План посещений»</p><input id="bq_p" class="mono" value="${esc(r.plan)}" placeholder="проект.датасет.представление" ${t?'':'disabled'}></div></div>
     <div class="acts">${t ? `<button onclick="bqSave('${esc(c.company_id)}')">Сохранить адреса</button>` : ''}
