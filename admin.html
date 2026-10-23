@@ -1364,11 +1364,12 @@ function peopleBlock(p, add){
   if(!p) return '';
   const box = (lbl, n, sub, cls, bg) => `<div class="box"${bg ? ` style="background:${bg}"` : ''}><p class="lbl">${lbl}</p><p style="font-size:26px;font-weight:600;margin:0;line-height:1.2"${cls ? ` class="${cls}"` : ''}>${n}</p><p class="small">${sub}</p></div>`;
   let h = '';
+  const none = {total:0, by_role:{}, list:[]}, kp = p.kept || none, rm = p.removed || none;   // 23.10.2026: не падать, если какого-то блока нет
   if(p.added){
     const upd = p.updated.total + (p.moved || []).length;
     h += `<div class="grid3" style="margin-top:12px">${box('Добавятся', p.added.total, rolesTxt(p.added.by_role), 'c-work')}${box('Обновятся', upd, 'уже есть в базе', 'c-test')}${
-      add ? box('Не тронуты', p.kept.total, rolesTxt(p.kept.by_role))
-          : box('Удалятся', p.removed.total, p.removed.total ? 'нет в файле — уйдут с Планом' : 'никто', p.removed.total ? 'c-pause' : '', p.removed.total ? 'var(--bad-bg)' : '')}</div>`;
+      add ? box('Не тронуты', kp.total, rolesTxt(kp.by_role))
+          : box('Удалятся', rm.total, rm.total ? 'нет в файле — уйдут с Планом' : 'никто', rm.total ? 'c-pause' : '', rm.total ? 'var(--bad-bg)' : '')}</div>`;
   }
   const rows = [];
   const pl = p.plan, f = p.fact;
@@ -1385,7 +1386,7 @@ function peopleBlock(p, add){
     const ag = p.added.list.filter(v => v.role === 'agent').length, agu = p.updated.list.filter(v => v.role === 'agent').length;
     if(ag) list.push(`<tr><td>${ag} агентов</td><td>агенты</td><td>${esc([...new Set(p.added.list.filter(v => v.role === 'agent').map(v => v.boss))].slice(0,5).join(', '))}</td><td><span class="tag s-work">добавятся</span></td></tr>`);
     if(agu) list.push(`<tr><td>${agu} агентов</td><td>агенты</td><td></td><td><span class="tag s-test">обновятся</span></td></tr>`);
-    const rest = add ? p.kept : p.removed;
+    const rest = add ? kp : rm;
     if(rest.total) list.push(`<tr><td>${rest.total} человек не из файла</td><td>${esc(rolesTxt(rest.by_role))}</td><td></td><td><span class="tag ${add ? 's-off' : 's-pause'}">${add ? 'не тронуты' : 'удалятся'}</span></td></tr>`);
     if(list.length) h += `<div class="sec"><h3>Люди</h3><div class="tw"><table><tr><th>Кто</th><th>Роль</th><th>Подчинение</th><th>Что будет</th></tr>${list.join('')}</table></div></div>`;
     if((p.moved || []).length) h += `<div class="note warn">${(p.moved || []).length} чел. уже есть в базе у другого руководителя. Если это <b>тот же человек</b> — он переедет вместе со своими точками. Если это <b>однофамилец</b> — исправьте имя в файле (например, добавьте «Ф2») и загрузите снова.</div>`;
