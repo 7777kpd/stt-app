@@ -256,12 +256,12 @@ details.focus-details[open] .focus-chevron { transform: rotate(90deg); }
 .ra-ring{position:relative;flex-shrink:0}.ra-ring svg{display:block;transform:rotate(-90deg)}
 .ra-ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800}
 .ra-list{display:flex;flex-direction:column;gap:8px}
-.ra-row{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--card)}
-.ra-row.me{border:2px solid #E9B872;background:#FFFCF6}
+.ra-row{border:1.5px solid #3A3A3A;border-radius:14px;overflow:hidden;background:var(--card)}
+.ra-row.me{border:2.5px solid #E39A3B;background:#FFFCF6}
 .ra-rh{display:grid;grid-template-columns:32px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 12px;cursor:pointer}
 .ra-rk{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;background:var(--bg);color:var(--muted)}
 .ra-rk.g1{background:#F6D47A;color:#6B4A00}.ra-rk.g2{background:#DCDFE4;color:#4B5563}.ra-rk.g3{background:#EBC2A0;color:#7A3E12}
-.ra-nm{font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ra-nm{font-size:13.5px;font-weight:700;line-height:1.25;overflow-wrap:anywhere}
 .ra-nm i{font-style:normal;font-size:10.5px;font-weight:700;color:#B7791F;background:#FBF1DF;padding:1px 6px;border-radius:5px;margin-left:4px}
 .ra-sub{font-size:10.5px;color:var(--muted);font-weight:600}
 .ra-strip{display:flex;gap:3px;margin-top:5px}.ra-strip span{flex:1;height:5px;border-radius:3px}
@@ -372,32 +372,35 @@ async function loadAgentRating(month, year) {
     const top = document.getElementById('agent-rating-top');
     const mi = rating.findIndex(r => r.agent === d.my_name);
     if (top) top.textContent = mi >= 0 ? `${mi + 1} из ${rating.length}` : (rating.length ? rating[0].avg_score + '%' : '—');
+    const topL = document.getElementById('agent-rating-top-l');
+    if (topL) topL.textContent = mi >= 0 ? 'ваше место' : 'лучший';
     box.innerHTML = rating.length
       ? raTeamHtml(rating, d.my_name)
       : '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Рейтинг команды пока недоступен</div>';
   } catch (e) {
     box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Не удалось загрузить рейтинг</div>';
   }
-  const now = new Date();
-  if (month === now.getMonth() + 1 && year === now.getFullYear()) loadRatingScopes();
+  loadRatingScopes(month, year);
 }
 
 // 23.10.2026: рейтинг не только в команде — «Торговый отдел» и «Компания» (текущий месяц,
 // с 1-го по вчера). Вкладки и их состав задаются в «Должностях» компании. «Команда» —
 // прежний подробный рейтинг; в отделе и компании — первый, 3 выше вас, вы и 1 ниже.
-let _rateScopes = null;
-async function loadRatingScopes() {
+let _rateScopes = null, _rateClosed = false;
+async function loadRatingScopes(month, year) {
   const seg = document.getElementById('agent-rating-seg');
   if (!seg) return;
   try {
-    const res = await fetch(`${API}/api/leader/${_telegramId}/agent-rating`);
+    // 23.10.2026: и за закрытый месяц (из архива «Итоги месяца»), не только за текущий
+    const now = new Date(), cur = month === now.getMonth() + 1 && year === now.getFullYear();
+    const res = await fetch(`${API}/api/leader/${_telegramId}/agent-rating${cur ? '' : `?month=${month}&year=${year}`}`);
     if (!res.ok) return;
     const d = await res.json();
     if (d.pending) {
       seg.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Рейтинг по отделу и компании считается — загляните через минуту.</div>';
       return;
     }
-    _rateScopes = d.scopes || [];
+    _rateScopes = d.scopes || []; _rateClosed = !!d.closed;
     if (_rateScopes.length < 2) { seg.innerHTML = ''; return; }
     showRatingScope(0);
   } catch (e) { /* без вкладок — остаётся рейтинг команды */ }
@@ -423,7 +426,7 @@ function showRatingScope(i) {
     prev = r.place;
   });
   if (prev < sc.total) h += `<div class="ra-gaprow">··· ещё ${sc.total - prev}</div>`;
-  h += '</div><div style="font-size:11px;color:var(--muted);margin-top:8px;">С 1-го числа по вчера. Показаны первый, 3 места выше вас, вы и 1 ниже.</div>';
+  h += `</div><div style="font-size:11px;color:var(--muted);margin-top:8px;">${_rateClosed ? 'За месяц целиком' : 'С 1-го числа по вчера'}. Показаны первый, 3 места выше вас, вы и 1 ниже.</div>`;
   wide.innerHTML = h;
 }
 
@@ -912,7 +915,7 @@ function buildSttScreen(data) {
             <span style="display:flex;align-items:center;gap:8px;">
               <span style="text-align:right;">
                 <span id="agent-rating-top" style="display:block;font-size:20px;font-weight:700;color:var(--green-bright);line-height:1;">${topRatingScore != null ? topRatingScore : '▸'}</span>
-                <span style="display:block;font-size:9px;color:var(--muted);margin-top:2px;">${_myIdx >= 0 ? 'ваше место' : 'лучший'}</span>
+                <span id="agent-rating-top-l" style="display:block;font-size:9px;color:var(--muted);margin-top:2px;">${_myIdx >= 0 ? 'ваше место' : 'лучший'}</span>
               </span>
               <span style="font-size:13px;color:var(--muted);">▶</span>
             </span>
