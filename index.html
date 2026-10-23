@@ -316,6 +316,59 @@ async function loadAgentRating(month, year) {
   } catch (e) {
     box.innerHTML = '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Не удалось загрузить рейтинг</div>';
   }
+  const now = new Date();
+  if (month === now.getMonth() + 1 && year === now.getFullYear()) loadRatingScopes();
+}
+
+// 23.10.2026: рейтинг не только в команде — «Торговый отдел» и «Компания» (текущий месяц,
+// с 1-го по вчера). Вкладки и их состав задаются в «Должностях» компании. «Команда» —
+// прежний подробный рейтинг; в отделе и компании — первый, 3 выше вас, вы и 1 ниже.
+let _rateScopes = null;
+async function loadRatingScopes() {
+  const seg = document.getElementById('agent-rating-seg');
+  if (!seg) return;
+  try {
+    const res = await fetch(`${API}/api/leader/${_telegramId}/agent-rating`);
+    if (!res.ok) return;
+    const d = await res.json();
+    if (d.pending) {
+      seg.innerHTML = '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Рейтинг по отделу и компании считается — загляните через минуту.</div>';
+      return;
+    }
+    _rateScopes = d.scopes || [];
+    if (_rateScopes.length < 2) { seg.innerHTML = ''; return; }
+    showRatingScope(0);
+  } catch (e) { /* без вкладок — остаётся рейтинг команды */ }
+}
+function showRatingScope(i) {
+  const seg = document.getElementById('agent-rating-seg');
+  const list = document.getElementById('agent-rating-list');
+  const wide = document.getElementById('agent-rating-wide');
+  if (!seg || !list || !wide || !_rateScopes) return;
+  seg.innerHTML = `<div style="display:flex;background:var(--bg);border-radius:11px;padding:3px;margin-bottom:12px;">${_rateScopes.map((sc, j) =>
+    `<button onclick="showRatingScope(${j})" style="flex:1;border:none;font-family:inherit;font-size:12px;font-weight:700;padding:8px 2px;border-radius:8px;cursor:pointer;${j === i ? 'background:var(--card,#fff);color:var(--text);' : 'background:transparent;color:var(--muted);'}">${sc.label}</button>`).join('')}</div>`;
+  if (i === 0) { list.style.display = ''; wide.style.display = 'none'; return; }
+  list.style.display = 'none'; wide.style.display = '';
+  const sc = _rateScopes[i];
+  const col = v => v >= 75 ? 'var(--green-bright)' : v >= 50 ? 'var(--yellow-bright)' : 'var(--red-bright)';
+  let h = `<div style="display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px;">
+      <div><div style="font-size:11px;color:var(--muted);font-weight:600;">${sc.label}${sc.who ? ' · ' + sc.who : ''}</div>
+      <div style="font-size:14px;font-weight:700;margin-top:2px;">Ваше место</div>
+      ${sc.gap != null ? `<div style="font-size:11px;font-weight:700;color:#D98A3D;margin-top:3px;">${sc.gap > 0 ? `до ${sc.place - 1}-го места: +${sc.gap}%` : `вровень с ${sc.place - 1}-м местом`}</div>` : '<div style="font-size:11px;font-weight:700;color:var(--green-bright);margin-top:3px;">Вы первый!</div>'}</div>
+      <div style="text-align:right;"><div style="font-size:26px;font-weight:800;line-height:1;">${sc.place}</div><div style="font-size:12px;color:var(--muted);font-weight:600;">из ${sc.total}</div></div></div>`;
+  h += '<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;">';
+  let prev = 0;
+  sc.rows.forEach(r => {
+    if (r.place > prev + 1) h += `<div style="text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding:5px;background:var(--bg);border-bottom:1px solid var(--border);">··· ещё ${r.place - prev - 1}</div>`;
+    h += `<div style="display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--border);${r.me ? 'background:#F8EBDB;' : ''}">
+      <span style="font-size:13px;font-weight:800;color:${r.place === 1 ? '#D98A3D' : 'var(--muted)'};">${r.place === 1 ? '🥇' : r.place}</span>
+      <span style="min-width:0;"><span style="display:block;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.me ? 'Вы · ' : ''}${r.name}</span>${r.sub ? `<span style="display:block;font-size:10.5px;color:var(--muted);font-weight:600;">${r.sub}</span>` : ''}</span>
+      <span style="font-size:15px;font-weight:800;color:${col(r.avg)};">${r.avg}%</span></div>`;
+    prev = r.place;
+  });
+  if (prev < sc.total) h += `<div style="text-align:center;font-size:11px;font-weight:700;color:var(--muted);padding:5px;background:var(--bg);">··· ещё ${sc.total - prev}</div>`;
+  h += '</div><div style="font-size:11px;color:var(--muted);margin-top:8px;">С 1-го числа по вчера, тот же балл, что у руководителя. Показаны первый, 3 места выше вас, вы и 1 ниже.</div>';
+  wide.innerHTML = h;
 }
 
 const API = new URLSearchParams(window.location.search).get('dev') === '1'
@@ -807,7 +860,9 @@ function buildSttScreen(data) {
               <span style="font-size:13px;color:var(--muted);">▶</span>
             </span>
           </summary>
-          <div id="agent-rating-list" style="padding-top:14px;">${ratingListHtml || '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Загрузка…</div>'}</div>
+          <div id="agent-rating-seg" style="padding-top:14px;"></div>
+          <div id="agent-rating-wide" style="display:none;"></div>
+          <div id="agent-rating-list">${ratingListHtml || '<div style="font-size:12px;color:var(--muted);padding:6px 0;">Загрузка…</div>'}</div>
         </details>
       </div>`}
     </div>`;
