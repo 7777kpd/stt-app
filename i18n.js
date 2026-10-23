@@ -9,7 +9,7 @@
    применяется сразу, без мигания. */
 (function () {
   'use strict';
-  var VER = '3';                                   // поднять при изменении словарей
+  var VER = '4';                                   // поднять при изменении словарей
   var LANGS = [['ru', 'RU', 'Русский'], ['uk', 'UA', 'Українська'], ['uz', 'UZ', 'Oʻzbekcha']];
   var DEV = new URLSearchParams(location.search).get('dev') === '1';
   var API = DEV ? 'https://develop-production-0a2d.up.railway.app' : 'https://upload.stt-navigator.com';     // 20.10.2026: как в дашбордах (обход блокировки railway.app в РФ)
@@ -34,6 +34,45 @@
   var dict = null, rx = null, rules = [];
   var orig = new WeakMap(), done = new WeakMap();
   var info = {lang: lang, 'switch': false};
+  // 23.10.2026: режим проверки перевода — &check=1 в адресе (вместе с &lang=uz / &lang=uk).
+  // Всё, что осталось по-русски, обводится красным; внизу кнопка «Не переведено: N» со списком
+  // этих фраз — их добавляют в словарь. Имена людей и точек тоже попадут в список — их пропускаем.
+  var CHECK = new URLSearchParams(location.search).get('check') === '1';
+  var missed = {}, missN = 0, missBtn = null, missT = null;
+  function miss(el, text) {
+    if (!el || ours(el)) return;
+    el.setAttribute('data-i18n-miss', '');
+    text = text.replace(/\s+/g, ' ').trim();
+    if (!text || missed[text]) return;
+    missed[text] = 1; missN++;
+    clearTimeout(missT); missT = setTimeout(missPanel, 300);
+  }
+  function missPanel() {
+    if (!document.getElementById('i18n-miss-css')) {
+      var st = document.createElement('style'); st.id = 'i18n-miss-css';
+      st.textContent = '[data-i18n-miss]{outline:2px solid #EF4444;outline-offset:1px;background:rgba(239,68,68,.08)}';
+      document.head.appendChild(st);
+    }
+    if (!missBtn) {
+      missBtn = document.createElement('div'); missBtn.setAttribute('data-noi18n', '');
+      missBtn.style.cssText = 'position:fixed;left:8px;bottom:76px;z-index:70;background:#EF4444;color:#fff;font:700 12px -apple-system,sans-serif;padding:7px 11px;border-radius:10px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.2)';
+      missBtn.onclick = missList;
+      document.body.appendChild(missBtn);
+    }
+    missBtn.textContent = '⚠ Не переведено: ' + missN;
+  }
+  function missList() {
+    var old = document.getElementById('i18n-miss-box'); if (old) { old.remove(); return; }
+    var b = document.createElement('div'); b.id = 'i18n-miss-box'; b.setAttribute('data-noi18n', '');
+    b.style.cssText = 'position:fixed;left:8px;right:8px;bottom:118px;z-index:71;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;box-shadow:0 6px 20px rgba(0,0,0,.2);font:13px -apple-system,sans-serif';
+    var ta = document.createElement('textarea');
+    ta.value = Object.keys(missed).join('\n');
+    ta.style.cssText = 'width:100%;height:220px;font:12px monospace;border:1px solid #e5e7eb;border-radius:8px;padding:6px';
+    var cp = document.createElement('div');
+    cp.textContent = 'Скопировать список'; cp.style.cssText = 'margin-top:8px;text-align:center;font-weight:700;color:#1a56db;cursor:pointer';
+    cp.onclick = function () { ta.select(); try { navigator.clipboard.writeText(ta.value); } catch (e) { document.execCommand('copy'); } cp.textContent = 'Скопировано ✓'; };
+    b.appendChild(ta); b.appendChild(cp); document.body.appendChild(b);
+  }
 
   function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   function compile(d) {
@@ -62,6 +101,7 @@
     var out = lang === 'ru' ? src : tr(src);
     if (out !== cur) n.data = out;
     done.set(n, out);
+    if (CHECK && lang !== 'ru' && CYR.test(out)) miss(n.parentElement, out);
   }
   function doAttrs(el) {
     ['placeholder', 'title', 'aria-label'].forEach(function (a) {
