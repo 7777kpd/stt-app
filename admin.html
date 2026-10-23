@@ -102,6 +102,14 @@ td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 }
 @media (max-width:520px){.grid3,.grid2{grid-template-columns:1fr}.src{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.toast{transition:none}}
+/* 23.10.2026 «Должности» */
+.pos td input[type=text]{padding:5px 8px;min-width:200px}
+.pos td input[type=text]::placeholder{color:var(--ink-3)}
+.pos td input[type=checkbox]{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+.pos .c{text-align:center}.pos th.c{white-space:nowrap}
+.pos .x{border:0;background:transparent;color:var(--ink-3);font-size:15px;padding:2px 6px}
+.pos .x:hover{color:var(--accent)}
+.pos tr.manual td{background:var(--surface-2)}
 </style>
 </head>
 <body>
@@ -187,7 +195,7 @@ const TABS = c => {
   // 20.10.2026: «Подключение» — пошаговая проверка; на этапах «Тест»/«Подключение» — первая вкладка
   const onb = c && ['test','conn'].includes(c.stage) ? [['onb','Подключение']] : [['onb','Проверка']];
   const rest = role() === 'tech' ? [['data','Данные'],['ctasks','Задачи'],['clog','Журнал']]
-    : [['overview','Обзор'],['cfg','Настройки'],['data','Данные'],['pay','Оплата'],['ctasks','Задачи'],['clog','Журнал']];
+    : [['overview','Обзор'],['pos','Должности'],['cfg','Настройки'],['data','Данные'],['pay','Оплата'],['ctasks','Задачи'],['clog','Журнал']];
   return c && ['test','conn'].includes(c.stage) ? onb.concat(rest) : rest.concat(onb);
 };
 
@@ -208,6 +216,7 @@ async function setTab(t){
   if(t === 'clog'){ try { S.clog = await api('/log?company_id=' + encodeURIComponent(S.sel)); } catch(e){ toast(e.message); } }
   if(t === 'pay'){ S.payKind = 'lic'; await loadBill(S.sel); }
   if(t === 'ctasks'){ await loadCTasks(S.sel); }
+  if(t === 'pos'){ await loadPos(S.sel); }
   render();
 }
 
@@ -263,7 +272,7 @@ function renderCompanies(){
 
 function renderDetail(c){
   const tabs = TABS(c); if(!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
-  const body = S.tab === 'onb' ? tabOnb(c) : S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : tabLog();
+  const body = S.tab === 'onb' ? tabOnb(c) : S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : S.tab === 'pos' ? tabPos(c) : tabLog();
   return `<button class="back" onclick="S.showDet=false;render()">← Все компании</button>
   <div class="dhead"><div><h2>${esc(c.name || c.company_id)}</h2><div class="meta">${esc(c.company_id)} · ${esc(c.timezone)}</div></div>
   <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></div>
@@ -404,6 +413,62 @@ async function routesCheck(id){
   try { S.routes[id] = await api('/companies/' + encodeURIComponent(id) + '/routes-check', {method:'POST'}); }
   catch(e){ S.routes[id] = {error: e.message}; }
   if(S.sel === id) render();
+}
+
+/* ---------- Должности (23.10.2026, проект РДБ) ---------- */
+const POS_DASH = [['agent','Агент'],['sv','Супервайзер'],['terr','Территориальный'],['lead','Руководитель']];
+async function loadPos(id){
+  S.pos = S.pos || {};
+  S.pos[id] = 'loading';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/positions');
+    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]}))}; }
+  catch(e){ S.pos[id] = {error: e.message}; }
+}
+function tabPos(c){
+  const id = c.company_id, P = (S.pos || {})[id], e = canMgr();
+  if(!P || P === 'loading'){ if(!P) loadPos(id).then(render); return '<p class="small" style="margin-top:16px">Загружаю…</p>'; }
+  if(P.error) return `<p class="err">${esc(P.error)}</p>`;
+  if(!P.chain) return `<div class="panel" style="padding:14px 16px"><p class="small" style="margin:0">У компании стандартные колонки Структуры (Директор, РФ, РП, ТМ, СВ, Агент) — должности и дашборды работают как раньше.
+    Свои уровни появятся здесь, когда загрузите файл Структуры со своими названиями колонок (до «Telegram ID»), например CEO, Коммерческий директор, Региональный менеджер.</p></div>`;
+  const L = P.levels, dis = e ? '' : 'disabled';
+  const rows = L.map((r,i) => `<tr class="${r.manual ? 'manual' : ''}"><td>${r.manual
+      ? `<input type="text" value="${esc(r.col)}" placeholder="Колонка в файле, напр. «Старший СВ»" oninput="posSet('${esc(id)}',${i},'col',this.value)" ${dis}>`
+      : `<input type="text" value="${esc(r.title || '')}" placeholder="${esc(r.col)}" oninput="posSet('${esc(id)}',${i},'title',this.value)" ${dis}>`}</td>
+    <td class="c">${r.manual ? '0<div class="small" style="color:var(--warn)">ждём в файле</div>' : (r.n || 0) + (r.new ? ' <span class="tag s-test">новый</span>' : '')}</td>` +
+    POS_DASH.map(([k]) => `<td class="c"><input type="checkbox" ${r.dash.includes(k)?'checked':''} onchange="posDash('${esc(id)}',${i},'${k}')" ${dis}></td>`).join('') +
+    `<td class="c">${i < L.length - 1 ? `<input type="checkbox" ${r.rate?'checked':''} onchange="posSet('${esc(id)}',${i},'rate',this.checked)" ${dis}>` : '—'}</td>
+    <td style="white-space:nowrap">${e ? `<button class="x" title="Добавить уровень ниже" onclick="posAdd('${esc(id)}',${i})">↓</button>${r.manual ? `<button class="x" title="Убрать" onclick="posDel('${esc(id)}',${i})">✕</button>` : ''}` : ''}</td></tr>`).join('');
+  return `<div class="panel pos" style="padding:14px 16px">
+    <p class="small" style="margin:0 0 8px">Уровни приходят из файла Структуры — колонки сверху вниз, до «Telegram ID». Серым — название из файла; впишите своё, если нужно (его увидят в кнопках /dashboard и на дашбордах). Уровень можно добавить заранее, до файла — ↓ под нужной строкой.</p>
+    <div class="tw"><table><tr><th>Должность</th><th class="c">Людей</th>${POS_DASH.map(([,n]) => `<th class="c">${n}</th>`).join('')}<th class="c">Рейтинг агента</th><th></th></tr>${rows}</table></div>
+    <div id="pos_chk">${posCheck(L)}</div>
+    ${e ? `<div class="acts"><button onclick="posAdd('${esc(id)}')">+ Уровень</button><button class="pri" id="pos_b" onclick="posSave('${esc(id)}')">Сохранить</button></div>` : ''}
+    <p class="small">«Рейтинг агента» — вкладки в «Итогах» агента: уровень СВ — «Команда», верхний — «Компания», между ними — «Торговый отдел» (не больше трёх вкладок).</p></div>`;
+}
+function posCheck(L){
+  const m = [];
+  L.forEach(r => { if(r.manual && !String(r.col || '').trim()) m.push('у добавленного уровня не указана колонка в файле'); });
+  L.filter(r => !r.manual).forEach(r => { if(!r.dash.length) m.push(`«${esc(r.title || r.col)}» — без дашборда`); });
+  const fl = L.filter(r => !r.manual);
+  if(fl.length && !fl[fl.length-1].dash.includes('agent')) m.push('у нижнего уровня нет «Агент»');
+  if(!L.some(r => r.dash.includes('terr'))) m.push('«Территориальный» не отмечен ни у кого — ТОП-5 маршрутов не будет');
+  return m.length ? `<div class="note warn" style="margin-top:10px">⚠️ ${m.join(' · ')}</div>` : '';
+}
+function posRefresh(id){ const el = $('pos_chk'); if(el) el.innerHTML = posCheck(S.pos[id].levels); }
+function posSet(id, i, k, v){ S.pos[id].levels[i][k] = v; posRefresh(id); }
+function posDash(id, i, k){ const d = S.pos[id].levels[i].dash, j = d.indexOf(k); j >= 0 ? d.splice(j,1) : d.push(k); posRefresh(id); }
+function posAdd(id, after){ const L = S.pos[id].levels, i = after === undefined ? Math.max(0, L.length - 1) : after + 1;
+  L.splice(i, 0, {col:'', title:'', n:0, dash:['lead'], rate:false, manual:true}); render(); }
+function posDel(id, i){ S.pos[id].levels.splice(i, 1); render(); }
+async function posSave(id){
+  const L = S.pos[id].levels;
+  if(L.some(r => r.manual && !String(r.col || '').trim())){ toast('Укажите колонку в файле у добавленного уровня'); return; }
+  const b = $('pos_b'); b.disabled = true; b.textContent = 'Сохраняю…';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/positions', {method:'POST',
+      body:{levels: L.map(x => ({col: x.manual ? x.col : x.col, title: x.manual ? (x.title || x.col) : x.title, dash: x.dash, rate: !!x.rate, manual: !!x.manual}))}});
+    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]}))};
+    toast('Должности сохранены — бот и дашборды уже работают по ним'); render(); }
+  catch(e){ toast(e.message); b.disabled = false; b.textContent = 'Сохранить'; }
 }
 
 /* ---------- Доступ ко всем дашбордам (14.10.2026) ---------- */
