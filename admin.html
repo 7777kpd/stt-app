@@ -428,21 +428,22 @@ function tabPos(c){
   const id = c.company_id, P = (S.pos || {})[id], e = canMgr();
   if(!P || P === 'loading'){ if(!P) loadPos(id).then(render); return '<p class="small" style="margin-top:16px">Загружаю…</p>'; }
   if(P.error) return `<p class="err">${esc(P.error)}</p>`;
-  if(!P.chain) return `<div class="panel" style="padding:14px 16px"><p class="small" style="margin:0">У компании стандартные колонки Структуры (Директор, РФ, РП, ТМ, СВ, Агент) — должности и дашборды работают как раньше.
-    Свои уровни появятся здесь, когда загрузите файл Структуры со своими названиями колонок (до «Telegram ID»), например CEO, Коммерческий директор, Региональный менеджер.</p></div>`;
-  const L = P.levels, dis = e ? '' : 'disabled';
+  if(!P.levels.length) return `<div class="panel" style="padding:14px 16px"><p class="small" style="margin:0">Структура компании ещё не загружена — должности появятся после первого файла.</p></div>`;
+  // 23.10.2026: «Должности» доступны всегда — и у своих уровней, и у стандартных колонок
+  const L = P.levels, dis = e ? '' : 'disabled', ch = P.chain, ea = e && ch;
   const rows = L.map((r,i) => `<tr class="${r.manual ? 'manual' : ''}"><td>${r.manual
       ? `<input type="text" value="${esc(r.col)}" placeholder="Колонка в файле, напр. «Старший СВ»" oninput="posSet('${esc(id)}',${i},'col',this.value)" ${dis}>`
       : `<input type="text" value="${esc(r.title || '')}" placeholder="${esc(r.col)}" oninput="posSet('${esc(id)}',${i},'title',this.value)" ${dis}>`}</td>
     <td class="c">${r.manual ? '0<div class="small" style="color:var(--warn)">ждём в файле</div>' : (r.n || 0) + (r.new ? ' <span class="tag s-test">новый</span>' : '')}</td>` +
     POS_DASH.map(([k]) => `<td class="c"><input type="checkbox" ${r.dash.includes(k)?'checked':''} onchange="posDash('${esc(id)}',${i},'${k}')" ${dis}></td>`).join('') +
     `<td class="c">${i < L.length - 1 ? `<input type="checkbox" ${r.rate?'checked':''} onchange="posSet('${esc(id)}',${i},'rate',this.checked)" ${dis}>` : '—'}</td>
-    <td style="white-space:nowrap">${e ? `<button class="x" title="Добавить уровень ниже" onclick="posAdd('${esc(id)}',${i})">↓</button>${r.manual ? `<button class="x" title="Убрать" onclick="posDel('${esc(id)}',${i})">✕</button>` : ''}` : ''}</td></tr>`).join('');
+    <td style="white-space:nowrap">${ea ? `<button class="x" title="Добавить уровень ниже" onclick="posAdd('${esc(id)}',${i})">↓</button>${r.manual ? `<button class="x" title="Убрать" onclick="posDel('${esc(id)}',${i})">✕</button>` : ''}` : ''}</td></tr>`).join('');
   return `<div class="panel pos" style="padding:14px 16px">
-    <p class="small" style="margin:0 0 8px">Уровни приходят из файла Структуры — колонки сверху вниз, до «Telegram ID». Серым — название из файла; впишите своё, если нужно (его увидят в кнопках /dashboard и на дашбордах). Уровень можно добавить заранее, до файла — ↓ под нужной строкой.</p>
+    <p class="small" style="margin:0 0 8px">${ch ? 'Уровни приходят из файла Структуры — колонки сверху вниз, до «Telegram ID». Серым — название из файла; впишите своё, если нужно (его увидят в кнопках /dashboard и на дашбордах). Уровень можно добавить заранее, до файла — ↓ под нужной строкой.'
+      : 'У компании стандартные колонки Структуры. Серым — название колонки; впишите, как должность называют в компании, и отметьте, какие дашборды она открывает и где агент видит рейтинг. Пока ничего не сохранено — всё работает как раньше.'}</p>
     <div class="tw"><table><tr><th>Должность</th><th class="c">Людей</th>${POS_DASH.map(([,n]) => `<th class="c">${n}</th>`).join('')}<th class="c">Рейтинг агента</th><th></th></tr>${rows}</table></div>
     <div id="pos_chk">${posCheck(L)}</div>
-    ${e ? `<div class="acts"><button onclick="posAdd('${esc(id)}')">+ Уровень</button><button class="pri" id="pos_b" onclick="posSave('${esc(id)}')">Сохранить</button></div>` : ''}
+    ${e ? `<div class="acts">${ch ? `<button onclick="posAdd('${esc(id)}')">+ Уровень</button>` : ''}<button class="pri" id="pos_b" onclick="posSave('${esc(id)}')">Сохранить</button></div>` : ''}
     <p class="small">«Рейтинг агента» — вкладки в «Итогах» агента: уровень СВ — «Команда», верхний — «Компания», между ними — «Торговый отдел» (не больше трёх вкладок).</p></div>`;
 }
 function posCheck(L){
