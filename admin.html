@@ -421,7 +421,7 @@ async function loadPos(id){
   S.pos = S.pos || {};
   S.pos[id] = 'loading';
   try { const r = await api('/companies/' + encodeURIComponent(id) + '/positions');
-    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]}))}; }
+    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]})), opts: r.opts || {skip_single: true}, no_id: r.no_id || []}; }
   catch(e){ S.pos[id] = {error: e.message}; }
 }
 function tabPos(c){
@@ -436,15 +436,33 @@ function tabPos(c){
       : `<input type="text" value="${esc(r.title || '')}" placeholder="${esc(r.col)}" oninput="posSet('${esc(id)}',${i},'title',this.value)" ${dis}>`}</td>
     <td class="c">${r.manual ? '0<div class="small" style="color:var(--warn)">ждём в файле</div>' : (r.n || 0) + (r.new ? ' <span class="tag s-test">новый</span>' : '')}</td>` +
     POS_DASH.map(([k]) => `<td class="c"><input type="checkbox" ${r.dash.includes(k)?'checked':''} onchange="posDash('${esc(id)}',${i},'${k}')" ${dis}></td>`).join('') +
-    `<td class="c">${i < L.length - 1 ? `<input type="checkbox" ${r.rate?'checked':''} onchange="posSet('${esc(id)}',${i},'rate',this.checked)" ${dis}>` : '—'}</td>
-    <td style="white-space:nowrap">${ea ? `<button class="x" title="Добавить уровень ниже" onclick="posAdd('${esc(id)}',${i})">↓</button>${r.manual ? `<button class="x" title="Убрать" onclick="posDel('${esc(id)}',${i})">✕</button>` : ''}` : ''}</td></tr>`).join('');
+    `<td style="white-space:nowrap">${ea ? `<button class="x" title="Добавить уровень ниже" onclick="posAdd('${esc(id)}',${i})">↓</button>${r.manual ? `<button class="x" title="Убрать" onclick="posDel('${esc(id)}',${i})">✕</button>` : ''}` : ''}</td></tr>`).join('');
   return `<div class="panel pos" style="padding:14px 16px">
     <p class="small" style="margin:0 0 8px">${ch ? 'Уровни приходят из файла Структуры — колонки сверху вниз, до «Telegram ID». Серым — название из файла; впишите своё, если нужно (его увидят в кнопках /dashboard и на дашбордах). Уровень можно добавить заранее, до файла — ↓ под нужной строкой.'
-      : 'У компании стандартные колонки Структуры. Серым — название колонки; впишите, как должность называют в компании, и отметьте, какие дашборды она открывает и где агент видит рейтинг. Пока ничего не сохранено — всё работает как раньше.'}</p>
-    <div class="tw"><table><tr><th>Должность</th><th class="c">Людей</th>${POS_DASH.map(([,n]) => `<th class="c">${n}</th>`).join('')}<th class="c">Рейтинг агента</th><th></th></tr>${rows}</table></div>
+      : 'У компании стандартные колонки Структуры. Серым — название колонки; впишите, как должность называют в компании, и отметьте, какие дашборды она открывает. Пока ничего не сохранено — всё работает как раньше.'}</p>
+    <div class="tw"><table><tr><th>Должность</th><th class="c">Людей</th>${POS_DASH.map(([,n]) => `<th class="c">${n}</th>`).join('')}<th></th></tr>${rows}</table></div>
     <div id="pos_chk">${posCheck(L)}</div>
+    ${`<label class="check"><input type="checkbox" ${P.opts.skip_single !== false ? 'checked' : ''} onchange="S.pos['${esc(id)}'].opts.skip_single=this.checked" ${dis}> Пропускать уровни с одним человеком <span class="small" style="margin:0">— руководитель сразу видит первый уровень, где есть с кем сравнить</span></label>`}
     ${e ? `<div class="acts">${ch ? `<button onclick="posAdd('${esc(id)}')">+ Уровень</button>` : ''}<button class="pri" id="pos_b" onclick="posSave('${esc(id)}')">Сохранить</button></div>` : ''}
-    <p class="small">«Рейтинг агента» — вкладки в «Итогах» агента: уровень СВ — «Команда», верхний — «Компания», между ними — «Торговый отдел» (не больше трёх вкладок).</p></div>`;
+    <p class="small">Рейтинг агента — автоматически: «Команда», «Торговый отдел», «Компания».</p></div>
+    ${posNoId(id, P, e)}`;
+}
+// 23.10.2026: «Люди без Telegram ID» — вписать ID без нового файла Структуры
+function posNoId(id, P, e){
+  const L = P.no_id || [];
+  if(!L.length) return '';
+  return `<div class="sec"><h3>Люди без Telegram ID <span class="tag s-pause">${L.length}</span></h3>
+    <div class="panel" style="padding:4px 16px 12px"><div class="tw"><table><tr><th>Кто</th><th>Должность</th><th>Руководитель</th>${e ? '<th>Telegram ID</th><th></th>' : ''}</tr>
+    ${L.map((p, i) => `<tr><td>${esc(p.name)}</td><td>${esc(p.title)}</td><td>${esc(p.boss || '—')}</td>${e ? `<td><input id="nid_${i}" inputmode="numeric" placeholder="только цифры" style="width:150px"></td>
+      <td><button class="pri" style="padding:5px 12px;font-size:13px" onclick="posSetId('${esc(id)}',${i})">Сохранить</button></td>` : ''}</tr>`).join('')}</table></div>
+    <p class="small">ID сохраняется сразу и не стирается следующим файлом Структуры. Человек пишет боту /start — и получает свой дашборд. Свой ID человек узнаёт у @userinfobot.</p></div></div>`;
+}
+async function posSetId(id, i){
+  const p = S.pos[id].no_id[i], v = ($('nid_' + i).value || '').trim();
+  if(!/^\d{5,15}$/.test(v)){ toast('Telegram ID — только цифры (5–15 знаков)'); return; }
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/telegram-id', {method:'POST', body:{name: p.name, col: p.col, telegram_id: v}});
+    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]})), opts: r.opts || {skip_single: true}, no_id: r.no_id || []}; toast('ID сохранён: ' + p.name); render(); }
+  catch(e){ toast(e.message); }
 }
 function posCheck(L){
   const m = [];
@@ -466,8 +484,8 @@ async function posSave(id){
   if(L.some(r => r.manual && !String(r.col || '').trim())){ toast('Укажите колонку в файле у добавленного уровня'); return; }
   const b = $('pos_b'); b.disabled = true; b.textContent = 'Сохраняю…';
   try { const r = await api('/companies/' + encodeURIComponent(id) + '/positions', {method:'POST',
-      body:{levels: L.map(x => ({col: x.manual ? x.col : x.col, title: x.manual ? (x.title || x.col) : x.title, dash: x.dash, rate: !!x.rate, manual: !!x.manual}))}});
-    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]}))};
+      body:{levels: L.map(x => ({col: x.col, title: x.manual ? (x.title || x.col) : x.title, dash: x.dash, manual: !!x.manual})), opts: S.pos[id].opts}});
+    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]})), opts: r.opts || {skip_single: true}, no_id: r.no_id || []};
     toast('Должности сохранены — бот и дашборды уже работают по ним'); render(); }
   catch(e){ toast(e.message); b.disabled = false; b.textContent = 'Сохранить'; }
 }

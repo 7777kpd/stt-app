@@ -250,6 +250,8 @@
   .cb-sec span { font-size: 11px; color: var(--ink-soft); font-weight: 600; }
   .cb-how { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-bottom: 10px; }
   .cb-how summary { list-style: none; cursor: pointer; padding: 11px 14px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; }
+  .cb-skip { font-size: 11px; color: var(--ink-soft); font-weight: 600; margin: -4px 2px 8px; line-height: 1.45; }
+  .cb-skip span { font-weight: 500; }
   .cb-how ul { margin: 0; padding: 0 14px 12px 30px; font-size: 12px; color: #4A463E; line-height: 1.5; } .cb-how li { margin-top: 4px; }
 </style>
 </head>
@@ -746,6 +748,11 @@ const CB_HOW = () => `<details class="cb-how" ${S.open.cbhow ? 'open' : ''} onto
   <li><b>Нагрузка визитов</b> — плановых визитов агента за месяц к типичному агенту компании, норма 90–110%. У директора в балл не входит (по компании всегда около 100%) — показан разброс по агентам, тап открывает «Маршруты». У руководителей ниже — входит в балл.</li>
   <li><b>Порядок карточек</b> — от лучшего балла. Тап по карточке — формула, ПАКБ, СТТ, вне маршрута, призраки, слабые категории.</li>
   <li><b>Что делать</b>: смотрите красные плашки у последних мест и блок «Требует решения» ниже.</li></ul></details>`;
+// 23.10.2026: почему разрез не на шаг ниже — уровни, где по одному человеку (сравнивать не с кем)
+function skippedNote(sk) {
+  if (!sk || !sk.length) return '';
+  return `<div class="cb-skip">${sk.map(x => `${esc(x.name)} <span>(${esc(String(x.title || '').toLowerCase())})</span>`).join(' → ')} — по одному человеку, сравнивать не с кем</div>`;
+}
 function cardsSummary(label, b) {
   const nowG = b.now, prevG = b.prev, prevCh = prevG ? prevG.children : {};
   const t = nowG.total;
@@ -753,7 +760,7 @@ function cardsSummary(label, b) {
   h += CB_HOW();
   const ch = sortedChildren(nowG);
   if (ch.length) {
-    h += `<div class="cb-sec"><h3>${esc(S.sum.child_level_name || '')}</h3><span>от лучшего</span></div>`;
+    h += `<div class="cb-sec"><h3>${esc(S.sum.child_level_name || '')}</h3><span>от лучшего</span></div>` + skippedNote(S.sum.skipped);
     h += ch.map(([n, c], i) => cbCard(n, c.agents ? `${c.agents} агентов` : '', c, prevCh[n], 'sum:' + n, i + 1, b)).join('');
   }
   return h;
@@ -942,7 +949,7 @@ function screenMonth() {
   const levels = m.rating_levels || [];
   if (!S.rLevel || !levels.some(l => l.key === S.rLevel)) S.rLevel = levels.length ? levels[0].key : null;
   const rl = (m.ratings || {})[S.rLevel] || [];
-  return nav + heroBlock(`Среднее за ${MONTHS[m.month - 1]}`, now, prev,
+  return nav + (m.skipped && m.skipped.length ? `<div class="cb-skip" style="margin:0 2px 10px">Разрез — ${esc(String(m.child_level_name || '').toLowerCase())}: ${skippedNote(m.skipped).replace(/^<div class="cb-skip">|<\/div>$/g, '')}</div>` : '') + heroBlock(`Среднее за ${MONTHS[m.month - 1]}`, now, prev,
       `Итоги закрытого месяца. Изменение — к предыдущему месяцу. Нажмите на строку — увидите, из чего сложилась цифра.`, 'mon') +
     mCard('stt', 'Клиентская база', `<div class="kb-text" style="margin-top:10px">ПАКБ <b>${num(t.pakb)}</b> · СТТ <b>${num(t.stt_pts)} шт</b> · АКБ <b>${num(t.akb_pts)}</b> · Не АКБ <b>${num(t.neakb_pts)}</b></div>${rows('stt', sysColor)}`,
       'Доля точек СТТ от всей клиентской базы (ПАКБ) за месяц. СТТ — заказ в 75%+ плановых визитов.', t.pct.stt) +
