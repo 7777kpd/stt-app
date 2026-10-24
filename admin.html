@@ -589,7 +589,19 @@ function tzCity(tz){ const k = String(tz || '').split('/').pop(); return TZ_RU[k
 function hm(h, m){ h = ((h % 24) + 24) % 24; return String(h).padStart(2,'0') + ':' + String(m || 0).padStart(2,'0'); }
 function shiftHM(h, m, d){ const t = ((h * 60 + m + d) % 1440 + 1440) % 1440; return [Math.floor(t / 60), t % 60]; }
 function nowHM(tz){ try { const p = new Intl.DateTimeFormat('en-GB',{timeZone:tz, hour:'2-digit', minute:'2-digit', hour12:false}).format(new Date()).split(':'); return [+p[0] % 24, +p[1]]; } catch(e){ const d = new Date(); return [d.getHours(), d.getMinutes()]; } }
-function nextAt(tz, h, m){ const [nh, nm] = nowHM(tz); return (nh * 60 + nm < h * 60 + m ? 'сегодня ' : 'завтра ') + hm(h, m); }
+// 24.10.2026: с учётом выходных компании (off — ['пт','сб']); без off — каждый день
+const WD_RU = ['вс','пн','вт','ср','чт','пт','сб'];
+function nowWD(tz){ try { const w = new Intl.DateTimeFormat('en-US',{timeZone:tz, weekday:'short'}).format(new Date()); return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].indexOf(w); } catch(e){ return new Date().getDay(); } }
+function nextAt(tz, h, m, off){
+  const [nh, nm] = nowHM(tz), wd = nowWD(tz), o = off || [];
+  for(let k = 0; k < 8; k++){
+    if(k === 0 && nh * 60 + nm >= h * 60 + m) continue;
+    const w = (wd + k) % 7;
+    if(o.includes(WD_RU[w])) continue;
+    return (k === 0 ? 'сегодня ' : k === 1 ? 'завтра ' : WD_RU[w] + ' ') + hm(h, m);
+  }
+  return hm(h, m);
+}
 // время события в часовом поясе компании (журнал, последние обновления)
 const fdtz = (iso, tz) => { if(!iso) return '—'; try { return new Date(iso).toLocaleString('ru-RU',{timeZone:tz || undefined, day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}).replace(',', ''); } catch(e){ return fdt(iso); } };
 function scheduleBlock(c){
@@ -605,9 +617,14 @@ function scheduleBlock(c){
                   ...(spBad ? [`Последний забор Структуры и Плана из BigQuery — с ошибкой: ${bqLast.details || ''}`] : [])];
   const mh = +c.morning_hour || 8, eh = +c.evening_hour || 19;
   const btn = (label, js) => `<button style="white-space:nowrap" onclick="${js}">${label}</button>`;
+  // 24.10.2026: кнопка показывает «Загружаю…» и результат прямо в своей строке
+  const runBtn = (key, label, js) => { const st = S.run[key] || {};
+    return `<button style="white-space:nowrap" ${st.busy ? 'disabled' : ''} onclick="${js}">${st.busy ? 'Загружаю…' : label}</button>`
+      + (st.busy ? `<div class="small">идёт загрузка, до минуты</div>` : st.text ? `<div class="small" style="color:${st.ok ? 'var(--ok)' : 'var(--bad)'};max-width:260px">${st.ok ? '✓ ' : '⚠️ '}${esc(st.text)}${st.at ? ' · ' + esc(st.at) : ''}</div>` : ''); };
   const toLoad = btn('К загрузке ↓', "document.getElementById('xl_cards').scrollIntoView({behavior:'smooth'})");
   const rows = [];   // [что, время, следующий раз, пояснение, как сделать сейчас]
-  const add = (what, hmArr, note, now) => rows.push([what, hm(...hmArr), nextAt(tz, ...hmArr), note || '', now || '']);
+  const off = String(c.days_off || '').split(',').map(x => x.trim()).filter(Boolean);
+  const add = (what, hmArr, note, now) => rows.push([what, hm(...hmArr), nextAt(tz, ...hmArr, off), note || '', now || '']);
   const auto = '<span class="small">только по расписанию</span>';
   const spAt = shiftHM(mh, 0, -60), spPm = shiftHM(eh, 0, -60);
   const nextSp = () => { const [nh, nn] = nowHM(tz), n = nh * 60 + nn; return n < spAt[0] * 60 ? spAt : n < spPm[0] * 60 ? spPm : spAt; };
@@ -615,18 +632,18 @@ function scheduleBlock(c){
     const b = S.bq[c.company_id], last = b && b !== 'loading' && (b.last || [])[0];
     rows.push(['Структура и План из BigQuery — новые люди, Telegram ID, маршруты', hm(...spAt) + ' и ' + hm(...spPm), nextAt(tz, ...nextSp()),
         last ? `последний раз: ${fdtz(last.at, tz)}${last.action.includes('ошибка') ? ' — с ошибкой' : ''}` : 'ещё не забирали',
-        btn('Загрузить сейчас', `bqSync('${id}', false)`)]);
+        runBtn(c.company_id + ':sp', 'Загрузить сейчас', `bqSync('${id}', false)`)]);
   }
   add('Утренний отчёт людям', [mh, 0], '', auto);
   if(src === 'bigquery' || src === 'api')
     add('Заказы (Факт) из ' + (src === 'api' ? 'API' : 'BigQuery') + ' за сегодня', shiftHM(eh, 0, -15), '',
-        btn('Загрузить сейчас', `reload('${id}')`));
+        runBtn(c.company_id + ':ord', 'Загрузить сейчас', `reload('${id}')`));
   if(src === 'file')
     add('Проверка: пришёл ли файл по ссылке', shiftHM(eh, 0, -20), 'файл записывается сразу при получении — в любое время',
         '<span class="small">попросите IT клиента отправить файл по ссылке</span> ' + toLoad);
   add('Вечерний отчёт людям', [eh, 0], '', auto);
   if(src === 'bigquery' || src === 'api')
-    add('Повтор загрузки заказов, если был сбой', shiftHM(eh, 40, 0), 'молчит, если всё пришло', btn('Загрузить сейчас', `reload('${id}')`));
+    add('Повтор загрузки заказов, если был сбой', shiftHM(eh, 40, 0), 'молчит, если всё пришло', '<span class="small">та же кнопка, что в строке «Заказы»</span>');
   if(src === 'file')
     add('Повторная проверка файла', shiftHM(eh, 40, 0), 'файла нет — сообщение техконтакту', toLoad);
   if(src === 'excel') rows.push(['Структура, План, Факт', '—', 'вручную', 'обновляются только когда вы загружаете файл', toLoad]);
@@ -650,7 +667,7 @@ function scheduleBlock(c){
     ${alerts.map(a => `<div class="note bad" style="margin-top:8px">⚠️ ${esc(a)}</div>`).join('')}
     <div class="tw"><table style="margin-top:6px"><tr><th>Что</th><th>Каждый день</th><th>Следующий раз</th><th></th><th>Сделать сейчас</th></tr>
     ${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="mono" style="white-space:nowrap">${r[1]}</td><td style="white-space:nowrap">${esc(r[2])}</td><td class="small">${esc(r[3])}</td><td>${r[4]}</td></tr>`).join('')}</table></div>
-    ${c.days_off ? `<p class="small">Выходные компании (${esc(c.days_off)}) — отчётов и загрузок по расписанию нет.</p>` : ''}
+    ${c.days_off ? `<p class="small">Выходные компании (${esc(c.days_off)}) — отчётов и загрузок заказов по расписанию нет${src === 'bigquery' ? '; Структура и План из BigQuery забираются каждый день' : ''}.</p>` : ''}
     <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:500">Новый сотрудник не видит дашборд — что сделать</summary>${noTg.length ? `<p class="small" style="margin:6px 0 0;color:var(--warn)">${esc(noTg[0].title)}${noTg[0].hint ? ': ' + esc(noTg[0].hint) : ''}</p>` : ''}<ol class="small" style="margin:6px 0 0;padding-left:20px">${howNew}</ol></details>
     <details style="margin-top:6px"><summary style="cursor:pointer;font-weight:500">Данные за сегодня не появились — что сделать</summary><p class="small" style="margin:6px 0 0">${howData} Дашборды показывают данные с 1-го числа по вчера; сегодняшние заказы видны с завтрашнего утра.</p></details></div>`;
 }
@@ -708,7 +725,7 @@ function tabData(c){
     card(xlBtn('replace', 'Заменить всю компанию', false),
     'Файл = вся компания (листы «Структура», «План посещений», «Факт посещений», можно только нужные). Кого нет в файле — удаляются вместе с Планом. Для полной перезагрузки и чистки уволенных.') : '';
   const loadCard = (src === 'bigquery' || src === 'api') ? card(
-    `<button class="pri" style="width:100%" id="rl" onclick="reload('${esc(c.company_id)}')">Загрузить данные сейчас</button>`,
+    `<button class="pri" style="width:100%" id="rl" ${(S.run[c.company_id + ':ord'] || {}).busy ? 'disabled' : ''} onclick="reload('${esc(c.company_id)}')">${(S.run[c.company_id + ':ord'] || {}).busy ? 'Загружаю…' : 'Загрузить данные сейчас'}</button>`,
     'Заберёт заказы из источника клиента прямо сейчас, не дожидаясь вечера.' + (role()==='manager' ? ' Для менеджера — ограниченное число запусков в сутки.' : ''),
     'Если источник отвечает ошибкой — проверьте адрес и соответствие полей. Не помогло — передайте техспециалисту.') : '';
   const pm = periodMonths();
@@ -720,7 +737,70 @@ function tabData(c){
     'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
   if(src === 'bigquery' && !S.bq[c.company_id]) loadBq(c.company_id);   // для «последний раз» в расписании
   return `${src !== 'google' ? scheduleBlock(c) : ''}${srcBlock}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" id="xl_cards" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
-    <div id="xl_out"></div>`;
+    <div id="xl_out"></div>${(src === 'bigquery' || src === 'api' || src === 'file') ? ingestBlock(c) : ''}`;
+}
+/* ---------- Журнал загрузок заказов (24.10.2026) ---------- */
+// Когда мы ходили за заказами, когда клиент обновил данные и что пришло. Подсветка —
+// данных за день в момент нашего забора ещё не было, клиент выгрузил их позже.
+S.ing = S.ing || {};
+S.run = S.run || {};   // 24.10.2026: состояние кнопок «Загрузить сейчас» (идёт / результат)
+async function loadIngest(id){
+  S.ing[id] = 'loading';
+  const c = co(id), mode = c && srcKey(c) === 'file' ? '?mode=file' : '';
+  try { S.ing[id] = await api('/companies/' + encodeURIComponent(id) + '/ingest-log' + mode); }
+  catch(e){ S.ing[id] = {error: e.message}; }
+  if(S.sel === id && S.tab === 'data') render();
+}
+function ingestBlock(c){
+  const id = c.company_id, L = S.ing[id];
+  let body;
+  if(!L || L === 'loading'){ if(!L) loadIngest(id); body = '<p class="small">Загружаю…</p>'; }
+  else if(L.error) body = `<p class="err">${esc(L.error)}</p>`;
+  else if(L.mode === 'file') body = ingestFileBody(id, L);
+  else if(!L.rows.length) body = '<p class="small">Попыток за последнюю неделю нет.</p>';
+  else {
+    const box = (l, v, sub, col) => `<div class="box"><p class="lbl">${l}</p><p class="val"${col ? ` style="color:${col}"` : ''}>${v}</p><p class="small">${sub}</p></div>`;
+    const sums = `<div class="grid3" style="margin-bottom:12px">
+      ${box('Наш забор', esc(L.schedule), 'за 15 мин до вечернего отчёта и повтор')}
+      ${box('Клиент обновляет данные', L.usual ? 'обычно в ' + esc(L.usual) : '—', L.has_src ? 'по последним дням' : 'источник не сообщает время обновления', L.usual ? 'var(--warn)' : '')}
+      ${box('Опоздали к нашему забору', L.days ? `${L.late_days} из ${L.days} дн.` : '—', 'данные за день пришли после нашего забора', L.late_days ? 'var(--bad)' : 'var(--ok)')}</div>`;
+    const res = r => r.status !== 'ok' ? `<span style="color:var(--bad);font-weight:600">${r.status === 'error' ? 'ошибка' : 'не загружено'}</span><div class="small">${esc(r.error)}</div>`
+      : `<span style="color:${r.loaded ? 'var(--ok)' : 'var(--bad)'};font-weight:600">${(r.loaded || 0).toLocaleString('ru-RU')} строк</span>`
+        + `<div class="small">${r.by_day.map(([d, n]) => `${d}: <b style="color:${n ? 'var(--ink)' : 'var(--bad)'}">${n.toLocaleString('ru-RU')}</b>`).join(' · ')}</div>`;
+    const rows = L.rows.map(r => `<tr${r.late ? ' style="background:var(--warn-bg)"' : ''}><td${r.late ? ' style="box-shadow:inset 3px 0 0 var(--warn)"' : ''}>${esc(r.at)}</td>
+      <td class="small" style="margin:0">${esc(r.kind)}${r.by ? '<br>' + esc(r.by) : ''}</td>
+      <td>${esc(r.src || '—')}${r.late ? `<div class="small" style="color:var(--warn);font-weight:600;margin-top:3px">⏰ клиент выгрузил позже: ${r.late.exact ? '' : 'к '}${esc(r.late.when)} — через ${esc(r.late.after)} после нас</div>` : ''}</td>
+      <td>${res(r)}</td></tr>`).join('');
+    const tip = L.late_days ? `<div class="note warn" style="margin-top:10px"><b>Клиент выгружает позже нашего забора.</b> Дашборды за день остаются пустыми до следующей загрузки. Варианты: попросить клиента выгружать раньше (до ${esc(L.schedule.slice(0,5))} по времени компании) или загрузить вручную — «Загрузить данные сейчас» выше.</div>` : '';
+    body = sums + `<div class="tw"><table><tr><th>Мы ходили</th><th>Как</th><th>Данные клиента обновлены</th><th>Пришло</th></tr>${rows}</table></div>` + tip
+      + `<p class="small">⏰ — в момент нашего забора данных за этот день ещё не было, клиент выгрузил их позже. Время — по часовому поясу компании. <a href="#" onclick="loadIngest('${esc(id)}');return false">Обновить</a></p>`;
+  }
+  return `<div class="sec"><h3>Журнал загрузок заказов</h3><div class="panel" style="padding:14px 16px">${body}</div></div>`;
+}
+// 24.10.2026: компании с секретной ссылкой — файл присылает клиент; ⏰ — после вечернего отчёта или не пришёл
+function ingestFileBody(id, L){
+  const box = (l, v, sub, col) => `<div class="box"><p class="lbl">${l}</p><p class="val"${col ? ` style="color:${col}"` : ''}>${v}</p><p class="small">${sub}</p></div>`;
+  const sums = `<div class="grid3" style="margin-bottom:12px">
+    ${box('Ждём файл', 'до ' + esc(L.report) + ' — вечерний отчёт', 'проверки в ' + esc(L.checks) + (L.days_off ? ', выходные: ' + esc(L.days_off) : ''))}
+    ${box('Клиент присылает', L.usual ? 'обычно в ' + esc(L.usual) : '—', 'по последним рабочим дням')}
+    ${box('Опоздали к отчёту', L.days ? `${L.late_days} из ${L.days} дн.` : '—', 'файл после ' + esc(L.report) + ' или не пришёл', L.late_days ? 'var(--bad)' : 'var(--ok)')}</div>`;
+  if(!L.rows.length) return sums + '<p class="small">Файлов за последнюю неделю не было. Журнал заполняется с 24.10.2026.</p>';
+  const lateCell = 'style="box-shadow:inset 3px 0 0 var(--warn)"';
+  const rows = L.rows.map(r => {
+    if(r.missing) return `<tr style="background:var(--warn-bg)"><td ${lateCell}>${esc(r.at)}</td><td class="small">—</td>
+      <td><span class="tag s-pause">файл не пришёл</span><div class="small">техконтакту ушло сообщение после отчёта</div></td><td style="color:var(--bad);font-weight:600">—</td></tr>`;
+    const ok = r.status === 'ok';
+    const res = ok ? `<span class="tag s-work">принят</span>` + (r.late ? `<div class="small" style="color:var(--warn);font-weight:600;margin-top:3px">⏰ после вечернего отчёта на ${esc(r.late.after)}</div><div class="small">отчёт в ${esc(r.late.report)} ушёл без этих данных, дашборды обновились сразу</div>` : '')
+      : `<span class="tag s-pause">не принят</span><div class="small">${esc(r.error)}</div>`;
+    const got = !ok ? '<span style="color:var(--bad);font-weight:600">0 строк</span>'
+      : r.loaded == null ? '<span class="small">без Факта (Структура/План)</span>'
+      : `<span style="color:var(--ok);font-weight:600">${(+r.loaded).toLocaleString('ru-RU')} строк</span><div class="small">${r.by_day.map(([d, n]) => `${d}: <b>${(+n).toLocaleString('ru-RU')}</b>`).join(' · ')}</div>`;
+    return `<tr${r.late ? ' style="background:var(--warn-bg)"' : ''}><td${r.late ? ' ' + lateCell : ''}>${esc(r.at)}</td>
+      <td class="small">${esc(r.file || '—')}${r.via ? '<br>' + esc(r.via) : ''}</td><td>${res}</td><td>${got}</td></tr>`;
+  }).join('');
+  const tip = L.late_days ? `<div class="note warn" style="margin-top:10px"><b>Файл приходит после вечернего отчёта или не приходит.</b> Дашборды обновляются сразу, как файл принят, а вечерний отчёт людям уходит по тем данным, что были к ${esc(L.report)}. Попросите IT клиента ставить отправку не позже чем за 30 мин до отчёта (время компании). Если файл «не принят» — причина в строке, техконтакту клиента она уже ушла в Telegram.</div>` : '';
+  return sums + `<div class="tw"><table><tr><th>Файл пришёл</th><th>Файл</th><th>Результат</th><th>Пришло</th></tr>${rows}</table></div>` + tip
+    + `<p class="small">⏰ — файл пришёл после вечернего отчёта или в рабочий день не пришёл. Время — по часовому поясу компании. <a href="#" onclick="loadIngest('${esc(id)}');return false">Обновить</a></p>`;
 }
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 const PERIOD_HINT = {
@@ -827,7 +907,7 @@ function bqSpBlock(c){
     <div><p class="lbl">Представление «План посещений»</p><input id="bq_p" class="mono" value="${esc(r.plan)}" placeholder="проект.датасет.представление" ${t?'':'disabled'}></div></div>
     <div class="acts">${t ? `<button onclick="bqSave('${esc(c.company_id)}')">Сохранить адреса</button>` : ''}
       <button onclick="bqCheck('${esc(c.company_id)}')" id="bq_c">Проверить</button>
-      <button class="pri" onclick="bqSync('${esc(c.company_id)}', false)" id="bq_y">Загрузить сейчас</button></div>
+      <button class="pri" onclick="bqSync('${esc(c.company_id)}', false)" id="bq_y" ${(S.run[c.company_id + ':sp'] || {}).busy ? 'disabled' : ''}>${(S.run[c.company_id + ':sp'] || {}).busy ? 'Загружаю…' : 'Загрузить сейчас'}</button></div>
     <p class="small">«Проверить» ничего не записывает — покажет, что пришло из BigQuery. Если «нет доступа» — IT клиента должно выдать нашему техническому аккаунту роль BigQuery Data Viewer на эти представления (как для заказов).</p>
     ${b.error ? `<div class="note bad">${esc(b.error)}</div>` : ''}${chk}${blocked}
     <p class="lbl" style="margin-top:12px">Последние обновления</p>${last || '<p class="small">Ещё не было.</p>'}</div>`;
@@ -855,12 +935,23 @@ async function bqCheck(id){
 }
 async function bqSync(id, force){
   if(force && !confirm('Записать данные из BigQuery, несмотря на предупреждение? Структура и План компании будут заменены.')) return;
-  const btn = $('bq_y'); if(btn){ btn.disabled = true; btn.textContent = 'Загружаю…'; }
+  const key = id + ':sp';
+  if((S.run[key] || {}).busy) return;
+  S.run[key] = {busy:true}; render();
+  const at = () => new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+  if(!S.bq[id] || S.bq[id] === 'loading') S.bq[id] = {refs:{structure:'', plan:''}, last:[]};
   try { await bqEnsureSaved(id); const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/sync', {method:'POST', body:{force:!!force}});
+    S.run[key] = {ok:true, text:r.message, at:at()};
     toast(r.message); delete S.health[id]; delete S.plan[id]; await loadBq(id); return; }
   catch(e){
-    if(/Похоже на сбой|меньше половины/.test(e.message)){ S.bq[id].blocked = e.message; S.bq[id].error = ''; }
-    else { S.bq[id].error = e.message; }
+    if(/Похоже на сбой|меньше половины/.test(e.message)){
+      S.bq[id].blocked = e.message; S.bq[id].error = '';
+      S.run[key] = {ok:false, text:'Не записано: ' + e.message + ' Подробности — в блоке «Структура и План из BigQuery» ниже.', at:at()};
+    } else {
+      S.bq[id].error = e.message;
+      S.run[key] = {ok:false, text:e.message, at:at()};
+    }
+    toast(e.message);
   }
   render();
 }
@@ -1321,7 +1412,7 @@ function fileLinkBlock(c){
       <button onclick="rotateLink('${esc(c.company_id)}')">Перевыпустить ссылку</button></div>
     <p class="small">Без ссылки загрузить файл нельзя. Если она попала не к тем людям — перевыпустите: старая сразу перестанет работать, новую передайте клиенту.</p>
     ${itBlock(c, url)}
-    <p class="lbl" style="margin-top:12px">Последние файлы</p>${last || '<p class="small">Пока не было ни одного файла.</p>'}
+    <p class="small" style="margin-top:12px">Какие файлы пришли, когда и что записано — в «Журнале загрузок заказов» внизу вкладки.</p>
   </div>`;
 }
 /* 19.10.2026: «Инструкция для IT клиента» — готовый ответ и примеры кода с подставленной ссылкой
@@ -1505,10 +1596,13 @@ async function checkPeriod(id){
   catch(e){ $('xl_out').innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
 }
 async function reload(id, cacheOnly){
-  const b = $('rl'); if(b && !cacheOnly){ b.disabled = true; b.textContent = 'Загружаю…'; }
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'}); toast(r.message); delete S.health[id]; }
-  catch(e){ toast(e.message); }
-  if(b && !cacheOnly){ b.disabled = false; b.textContent = 'Загрузить данные сейчас'; }
+  const key = id + ':ord';
+  if(!cacheOnly){ if((S.run[key] || {}).busy) return; S.run[key] = {busy:true}; render(); }
+  let ok = true, text = '';
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'}); text = r.message || 'Готово'; ok = !r.status || r.status === 'ok'; toast(text); delete S.health[id]; }
+  catch(e){ ok = false; text = e.message; toast(e.message); }
+  if(!cacheOnly){ delete S.ing[id];   // журнал — с новой попыткой
+    S.run[key] = {ok, text, at: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}; render(); }
 }
 
 // ============================================================
