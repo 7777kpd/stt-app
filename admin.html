@@ -278,11 +278,12 @@ function renderCompanies(){
 
 function renderDetail(c){
   const tabs = TABS(c); if(!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
+  if(role() !== 'tech' && !S.brd[c.company_id]) loadBrd(c.company_id);   // 24.10.2026: выходные по филиалам
   const body = S.tab === 'onb' ? tabOnb(c) : S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : S.tab === 'pos' ? tabPos(c) : tabLog();
   return `<button class="back" onclick="S.showDet=false;render()">← Все компании</button>
   <div class="dhead"><div><h2>${esc(c.name || c.company_id)}</h2><div class="meta">${esc(c.company_id)} · ${esc(c.timezone)}</div></div>
   <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></div>
-  <div class="tabs">${tabs.map(([k,n]) => `<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${n}</button>`).join('')}</div>${body}`;
+  <div class="tabs">${tabs.map(([k,n]) => `<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${n}${k === 'cfg' && brNeed(c.company_id) ? ' <span title="Есть ли у компании филиалы? Выберите уровень или «нет»." style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);vertical-align:middle"></span>' : ''}</button>`).join('')}</div>${body}`;
 }
 
 function tabOverview(c){
@@ -354,8 +355,7 @@ function tabCfg(c){
     <div class="grid3"><div><p class="lbl">Часовой пояс</p><select id="f_tz" ${dis(e)} onchange="cfgPreview()">${opts(tzs, c.timezone)}</select></div>
     <div><p class="lbl">Утренний отчёт</p><select id="f_m" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.morning_hour, hh)}</select></div>
     <div><p class="lbl">Вечерний отчёт</p><select id="f_e" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.evening_hour, hh)}</select></div></div>
-    <p class="lbl" style="margin-top:12px">Выходные — отчёты и подгрузка не идут</p>
-    <div class="chips" id="f_off">${DAYS.map(d => `<span class="chip ${off.includes(d)?'on':''}" data-d="${d}" ${e?`onclick="this.classList.toggle('on');cfgPreview()"`:''}>${d}</span>`).join('')}</div>
+    <div id="br_box">${daysBlock(c, off, e)}</div>
     <div class="note" id="f_prev"></div></div>
   <div class="sec"><h3>Люди и уведомления</h3>
     <div class="grid2"><div><p class="lbl">Техконтакт клиента — Telegram ID</p><input id="f_ti" value="${esc(c.tech_contact_id)}" inputmode="numeric" placeholder="302513790" ${dis(e)}>
@@ -363,7 +363,7 @@ function tabCfg(c){
     <div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div></div>
     <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>
   <p class="err" id="f_err"></p>
-  ${e ? `<div class="acts"><button class="pri" id="f_save" onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="render()">Отменить изменения</button></div>` : ''}
+  ${e ? `<div class="acts"><button class="pri" id="f_save" ${brNeed(c.company_id) ? 'disabled title="Есть ли у компании филиалы? Выберите уровень или «нет»."' : ''} onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="S.brdD['${esc(c.company_id)}']={};render()">Отменить изменения</button></div>` : ''}
   ${viewersBlock(c)}`;
 }
 
@@ -535,6 +535,94 @@ async function removeViewer(id, tg){
     S.viewers[id] = r.viewers || []; toast('Доступ убран'); render(); }
   catch(e){ toast(e.message); }
 }
+/* ---------- Выходные по филиалам (24.10.2026) ----------
+   Таблица «Выходные»: строка компании (#f_off — как раньше сохраняется в days_off)
+   и строки филиалов уровня, выбранного в «по филиалам». Серый «вых» — как у компании,
+   чёрный — свои выходные филиала. Пока не выбрано «есть ли филиалы» — сохранить нельзя. */
+S.brd = S.brd || {}; S.brdD = S.brdD || {};
+async function loadBrd(id, level){
+  if(level === undefined) S.brd[id] = 'loading';
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id) + '/branch-days' + (level ? '?level=' + encodeURIComponent(level) : ''));
+    if(level === undefined) S.brd[id] = r;
+    else { const D = S.brdD[id] || (S.brdD[id] = {}); D.br = r.branches; D.brLevel = r.branches_level; }
+  } catch(e){ if(level === undefined) S.brd[id] = {error: e.message}; }
+  if(S.sel === id){ if(level === undefined) render(); else brPaint(id); }
+}
+const brOK = id => { const B = S.brd[id]; return B && B !== 'loading' && !B.error; };
+function brNeed(id){ const B = S.brd[id], D = S.brdD[id] || {}; return brOK(id) && !B.chosen && D.level === undefined; }
+function brLevel(id){ const B = S.brd[id], D = S.brdD[id] || {}; return D.level !== undefined ? D.level : (brOK(id) ? B.level : ''); }
+function compOffNow(c){ const el = document.querySelectorAll('#f_off .chip.on'); return el.length || $('f_off') ? [...el].map(x => x.dataset.d) : String(c.days_off || '').split(',').map(x => x.trim()).filter(Boolean); }
+function brList(id){
+  const B = S.brd[id], D = S.brdD[id] || {}, lv = brLevel(id);
+  if(!lv) return [];
+  if(D.brLevel === lv && D.br) return D.br;
+  if(brOK(id) && B.branches_level === lv) return B.branches;
+  return null;                       // ещё не загружен — loadBrd(id, lv)
+}
+function brOwn(id, b){ const D = S.brdD[id] || {}; return D.off && b.name in D.off ? D.off[b.name] : b.off; }
+function daysBlock(c, off, e){
+  const id = c.company_id, B = S.brd[id], lv = brLevel(id), need = brNeed(id);
+  const cell = (on, inh, js, dd) => `<td style="padding:4px 3px;text-align:center"><span class="chip ${on ? 'on' : ''}" ${dd ? `data-d="${dd}"` : ''} style="display:inline-block;min-width:36px;text-align:center;${on && inh ? 'background:var(--mute-bg);color:var(--ink-3);border-color:var(--line)' : ''}${e ? '' : ';cursor:default'}" ${e && js ? `onclick="${js}"` : ''}>${on ? 'вых' : '&nbsp;'}</span></td>`;
+  let sel = '';
+  if(brOK(id) && (B.levels.length || B.chosen || need)){
+    const opts = (need ? '<option value="__" selected>— выберите —</option>' : '')
+      + `<option value="" ${!need && !lv ? 'selected' : ''}>нет — одни выходные на всю компанию</option>`
+      + B.levels.map(x => `<option value="${esc(x.key)}" ${!need && lv === x.key ? 'selected' : ''}>${esc(x.title)} (${x.n})${x.key === B.guess ? ' — похоже на филиал' : ''}</option>`).join('');
+    sel = `<span class="small" style="margin:0">по филиалам:</span><select id="br_lv" style="width:auto;padding:4px 8px;font-size:13px;${need ? 'border-color:var(--warn)' : ''}" ${e ? '' : 'disabled'} onchange="brSetLevel('${esc(id)}', this.value)">${opts}</select>`;
+  } else if(B === 'loading') sel = '<span class="small" style="margin:0">филиалы: загружаю…</span>';
+  else if(B && B.error) sel = `<span class="small" style="margin:0;color:var(--bad)">филиалы не прочитались: ${esc(B.error)}</span>`;
+  const list = brList(id);
+  if(lv && list === null) loadBrd(id, lv);
+  const head = `<tr><th style="border:0"></th>${DAYS.map(d => `<th class="small" style="text-align:center;font-weight:500;border:0;padding:2px">${d}</th>`).join('')}</tr>`;
+  const compRow = `<tr id="f_off"><td style="padding:4px 14px 4px 0;font-weight:600;white-space:nowrap">${lv ? 'Вся компания' : 'Компания'}</td>${DAYS.map(d =>
+    cell(off.includes(d), false, `brComp('${esc(id)}', this, '${d}')`, d)).join('')}</tr>`;
+  const rows = !lv ? '' : list === null ? `<tr><td colspan="8" class="small">Загружаю список…</td></tr>`
+    : !list.length ? `<tr><td colspan="8" class="small">На этом уровне в Структуре никого нет.</td></tr>`
+    : list.map((b, i) => { const own = brOwn(id, b), set = own == null ? off : own;
+        return `<tr><td style="padding:4px 14px 4px 0;white-space:nowrap">${esc(b.name)} <span class="small">· ${b.n} чел.</span></td>${DAYS.map(d => cell(set.includes(d), own == null, `brCell('${esc(id)}', ${i}, '${d}')`)).join('')}</tr>`; }).join('');
+  return `<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px"><p class="lbl" style="margin:0">Выходные — отчёты и подгрузка не идут</p>${sel}</div>
+    ${need ? '<div class="note warn" style="margin:8px 0 4px">Есть ли у компании филиалы? Выберите уровень или «нет».</div>' : ''}
+    <div class="tw"><table style="width:auto;margin-top:6px">${head}${compRow}${rows}</table></div>
+    ${lv && list && list.length ? '<p class="small">Серый «вых» — как у компании. Нажмите день у филиала, чтобы задать ему свои выходные. Заказы забираем, если работает хотя бы один филиал; отчёт получают работающие филиалы.</p>' : ''}`;
+}
+function brPaint(id){
+  const c = co(id), box = $('br_box'); if(!c || !box) return;
+  box.innerHTML = daysBlock(c, compOffNow(c), canMgr());
+  cfgPreview();
+  const b = $('f_save'); if(b){ b.disabled = brNeed(id); }
+}
+function brComp(id, el, d){ el.classList.toggle('on'); el.innerHTML = el.classList.contains('on') ? 'вых' : '&nbsp;'; brPaint(id); }
+function brSetLevel(id, v){
+  if(v === '__') return;
+  const D = S.brdD[id] || (S.brdD[id] = {});
+  D.level = v; D.off = {};
+  brPaint(id);
+}
+function brCell(id, i, d){
+  const c = co(id), list = brList(id) || [], b = list[i]; if(!b) return;
+  const D = S.brdD[id] || (S.brdD[id] = {}); D.off = D.off || {};
+  const comp = compOffNow(c), own = brOwn(id, b);
+  let cur = (own == null ? comp : own).slice();
+  cur = cur.includes(d) ? cur.filter(x => x !== d) : cur.concat(d);
+  cur = DAYS.filter(x => cur.includes(x));
+  if(cur.length === 7){ toast('Хотя бы один рабочий день'); return; }
+  D.off[b.name] = cur.join() === DAYS.filter(x => comp.includes(x)).join() ? null : cur;
+  brPaint(id);
+}
+// что отправить при «Сохранить»: null — без изменений, 'need' — не выбрано «есть ли филиалы»
+function brPending(id){
+  if(!brOK(id)) return null;
+  const B = S.brd[id], D = S.brdD[id] || {};
+  if(brNeed(id)) return 'need';
+  const lv = brLevel(id), touched = D.level !== undefined || Object.keys(D.off || {}).length;
+  if(!touched) return null;
+  const off = {};
+  if(lv){
+    (brList(id) || []).forEach(b => { const own = brOwn(id, b); if(own != null) off[b.name] = own; });
+  }
+  return {level: lv, off};
+}
 function cfgPreview(){
   const el = $('f_prev'); if(!el) return;
   const m = +$('f_m').value, e = +$('f_e').value, tz = $('f_tz').value;
@@ -554,16 +642,25 @@ function collectCfg(c){
   return ch;
 }
 async function saveCfg(id){
-  const c = co(id), ch = collectCfg(c);
-  if(!Object.keys(ch).length){ toast('Изменений нет'); return; }
+  const c = co(id), ch = collectCfg(c), bd = brPending(id);
+  if(bd === 'need'){ $('f_err').textContent = 'Есть ли у компании филиалы? Выберите уровень или «нет».'; return; }
+  if(!Object.keys(ch).length && !bd){ toast('Изменений нет'); return; }
   if(+$('f_e').value <= +$('f_m').value){ $('f_err').textContent = 'Вечерний отчёт должен быть позже утреннего'; return; }
   $('f_save').disabled = true;
   try {
-    const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body: ch});
-    Object.assign(c, r.company); delete S.health[id];
-    toast(`Сохранено: ${r.changed} изм.` + (('timezone' in ch || 'morning_hour' in ch || 'evening_hour' in ch || 'days_off' in ch) ? ' Бот подхватит расписание в течение 10 минут' : ''));
+    let n = 0;
+    if(Object.keys(ch).length){
+      const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body: ch});
+      Object.assign(c, r.company); n += r.changed || 0;
+    }
+    if(bd){   // 24.10.2026: выходные по филиалам — отдельно от справочника
+      S.brd[id] = await api('/companies/' + encodeURIComponent(id) + '/branch-days', {method:'POST', body: bd});
+      S.brdD[id] = {}; n += 1;
+    }
+    delete S.health[id];
+    toast(`Сохранено: ${n} изм.` + (('timezone' in ch || 'morning_hour' in ch || 'evening_hour' in ch || 'days_off' in ch || bd) ? ' Бот подхватит расписание в течение 10 минут' : ''));
     render();
-  } catch(e){ $('f_err').textContent = e.message; $('f_save').disabled = false; }
+  } catch(e){ $('f_err').textContent = e.message; $('f_save').disabled = brNeed(id); }
 }
 
 async function saveStage(id){
@@ -631,7 +728,12 @@ function scheduleBlock(c){
       + (st.busy ? `<div class="small">идёт загрузка — можно не ждать, итог появится здесь и в журнале</div>` : st.text ? `<div class="small" style="color:${st.ok ? 'var(--ok)' : 'var(--bad)'};max-width:260px">${st.ok ? '✓ ' : '⚠️ '}${esc(st.text)}${st.at ? ' · ' + esc(st.at) : ''}</div>` : ''); };
   const toLoad = btn('К загрузке ↓', "document.getElementById('xl_cards').scrollIntoView({behavior:'smooth'})");
   const rows = [];   // [что, время, следующий раз, пояснение, как сделать сейчас]
-  const off = String(c.days_off || '').split(',').map(x => x.trim()).filter(Boolean);
+  let off = String(c.days_off || '').split(',').map(x => x.trim()).filter(Boolean);
+  // 24.10.2026: свои выходные у филиалов — расписание идёт, если работает хотя бы один филиал
+  if(brOK(c.company_id) && S.brd[c.company_id].level){
+    const own = (S.brd[c.company_id].branches || []).map(b => b.off).filter(x => x != null);
+    if(own.length) off = off.filter(d => own.every(x => x.includes(d)));
+  }
   const add = (what, hmArr, note, now) => rows.push([what, hm(...hmArr), nextAt(tz, ...hmArr, off), note || '', now || '']);
   const auto = '<span class="small">только по расписанию</span>';
   const spAt = shiftHM(mh, 0, -60), spPm = shiftHM(eh, 0, -60);
@@ -675,7 +777,9 @@ function scheduleBlock(c){
     ${alerts.map(a => `<div class="note bad" style="margin-top:8px">⚠️ ${esc(a)}</div>`).join('')}
     <div class="tw"><table style="margin-top:6px"><tr><th>Что</th><th>Каждый день</th><th>Следующий раз</th><th></th><th>Сделать сейчас</th></tr>
     ${rows.map(r => `<tr><td>${esc(r[0])}</td><td class="mono" style="white-space:nowrap">${r[1]}</td><td style="white-space:nowrap">${esc(r[2])}</td><td class="small">${esc(r[3])}</td><td>${r[4]}</td></tr>`).join('')}</table></div>
-    ${c.days_off ? `<p class="small">Выходные компании (${esc(c.days_off)}) — отчётов и загрузок заказов по расписанию нет${src === 'bigquery' ? '; Структура и План из BigQuery забираются каждый день' : ''}.</p>` : ''}
+    ${(() => { const own = brOK(c.company_id) && S.brd[c.company_id].level ? (S.brd[c.company_id].branches || []).filter(b => b.off != null).length : 0;
+      return own ? `<p class="small">Выходные компании: ${esc(c.days_off || 'нет')}; свои выходные у филиалов: ${own}. Заказы забираем, если работает хотя бы один филиал; отчёт получают работающие филиалы${src === 'bigquery' ? '. Структура и План из BigQuery забираются каждый день' : ''}.</p>`
+        : c.days_off ? `<p class="small">Выходные компании (${esc(c.days_off)}) — отчётов и загрузок заказов по расписанию нет${src === 'bigquery' ? '; Структура и План из BigQuery забираются каждый день' : ''}.</p>` : ''; })()}
     <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:500">Новый сотрудник не видит дашборд — что сделать</summary>${noTg.length ? `<p class="small" style="margin:6px 0 0;color:var(--warn)">${esc(noTg[0].title)}${noTg[0].hint ? ': ' + esc(noTg[0].hint) : ''}</p>` : ''}<ol class="small" style="margin:6px 0 0;padding-left:20px">${howNew}</ol></details>
     <details style="margin-top:6px"><summary style="cursor:pointer;font-weight:500">Данные за сегодня не появились — что сделать</summary><p class="small" style="margin:6px 0 0">${howData} Дашборды показывают данные с 1-го числа по вчера; сегодняшние заказы видны с завтрашнего утра.</p></details></div>`;
 }
