@@ -147,11 +147,17 @@ const canTech = () => ['owner','tech'].includes(role());
 function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('show'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('show'),3600); }
 
 async function api(path, opts = {}){
-  const res = await fetch(API + '/api/admin' + path, {
-    method: opts.method || 'GET',
-    headers: {'X-Telegram-Init-Data': INIT, 'Content-Type': 'application/json'},
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
+  let res;
+  try {
+    res = await fetch(API + '/api/admin' + path, {
+      method: opts.method || 'GET',
+      headers: {'X-Telegram-Init-Data': INIT, 'Content-Type': 'application/json'},
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+  } catch(e){
+    // 24.10.2026: «Load failed» / «Failed to fetch» — ответ не дошёл (обрыв связи, перезапуск сервера)
+    throw new Error('Связь с сервером оборвалась, ответ не пришёл. Действие могло выполниться — обновите страницу через минуту и посмотрите «последний раз». Не выполнилось — нажмите ещё раз.');
+  }
   let data = null;
   try { data = await res.json(); } catch(e) {}
   if(!res.ok) throw new Error((data && data.detail) || ('Ошибка сервера ' + res.status));
@@ -618,9 +624,11 @@ function scheduleBlock(c){
   const mh = +c.morning_hour || 8, eh = +c.evening_hour || 19;
   const btn = (label, js) => `<button style="white-space:nowrap" onclick="${js}">${label}</button>`;
   // 24.10.2026: кнопка показывает «Загружаю…» и результат прямо в своей строке
+  if(src === 'bigquery') resumeRun(c.company_id, 'sp');
+  if(src === 'bigquery' || src === 'api') resumeRun(c.company_id, 'ord');
   const runBtn = (key, label, js) => { const st = S.run[key] || {};
     return `<button style="white-space:nowrap" ${st.busy ? 'disabled' : ''} onclick="${js}">${st.busy ? 'Загружаю…' : label}</button>`
-      + (st.busy ? `<div class="small">идёт загрузка, до минуты</div>` : st.text ? `<div class="small" style="color:${st.ok ? 'var(--ok)' : 'var(--bad)'};max-width:260px">${st.ok ? '✓ ' : '⚠️ '}${esc(st.text)}${st.at ? ' · ' + esc(st.at) : ''}</div>` : ''); };
+      + (st.busy ? `<div class="small">идёт загрузка — можно не ждать, итог появится здесь и в журнале</div>` : st.text ? `<div class="small" style="color:${st.ok ? 'var(--ok)' : 'var(--bad)'};max-width:260px">${st.ok ? '✓ ' : '⚠️ '}${esc(st.text)}${st.at ? ' · ' + esc(st.at) : ''}</div>` : ''); };
   const toLoad = btn('К загрузке ↓', "document.getElementById('xl_cards').scrollIntoView({behavior:'smooth'})");
   const rows = [];   // [что, время, следующий раз, пояснение, как сделать сейчас]
   const off = String(c.days_off || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -938,21 +946,25 @@ async function bqSync(id, force){
   const key = id + ':sp';
   if((S.run[key] || {}).busy) return;
   S.run[key] = {busy:true}; render();
-  const at = () => new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
   if(!S.bq[id] || S.bq[id] === 'loading') S.bq[id] = {refs:{structure:'', plan:''}, last:[]};
-  try { await bqEnsureSaved(id); const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/sync', {method:'POST', body:{force:!!force}});
-    S.run[key] = {ok:true, text:r.message, at:at()};
-    toast(r.message); delete S.health[id]; delete S.plan[id]; await loadBq(id); return; }
-  catch(e){
-    if(/Похоже на сбой|меньше половины/.test(e.message)){
-      S.bq[id].blocked = e.message; S.bq[id].error = '';
-      S.run[key] = {ok:false, text:'Не записано: ' + e.message + ' Подробности — в блоке «Структура и План из BigQuery» ниже.', at:at()};
-    } else {
-      S.bq[id].error = e.message;
-      S.run[key] = {ok:false, text:e.message, at:at()};
-    }
-    toast(e.message);
+  let st;
+  try {
+    await bqEnsureSaved(id);
+    const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/sync', {method:'POST', body:{force:!!force}});
+    st = (r.status === 'started' || r.status === 'running') ? await pollRun(id, 'sp') : {ok:true, text:r.message};   // 24.10.2026: в фоне
+  } catch(e){ st = {ok:false, text:e.message}; }
+  if(st.ok){
+    S.run[key] = {ok:true, text:st.text, at:st.at || ''};
+    toast(st.text); delete S.health[id]; delete S.plan[id]; S.bq[id].blocked = ''; S.bq[id].error = ''; await loadBq(id); return;
   }
+  if(st.blocked || /Похоже на сбой|меньше половины/.test(st.text || '')){
+    S.bq[id].blocked = st.text; S.bq[id].error = '';
+    S.run[key] = {ok:false, text:'Не записано: ' + String(st.text || '').replace(/[.\s]*$/, '.') + ' Подробности — в блоке «Структура и План из BigQuery» ниже.', at:st.at || ''};
+  } else {
+    S.bq[id].error = st.text;
+    S.run[key] = {ok:false, text:st.text, at:st.at || ''};
+  }
+  toast(st.text);
   render();
 }
 
@@ -1598,11 +1610,45 @@ async function checkPeriod(id){
 async function reload(id, cacheOnly){
   const key = id + ':ord';
   if(!cacheOnly){ if((S.run[key] || {}).busy) return; S.run[key] = {busy:true}; render(); }
-  let ok = true, text = '';
-  try { const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'}); text = r.message || 'Готово'; ok = !r.status || r.status === 'ok'; toast(text); delete S.health[id]; }
-  catch(e){ ok = false; text = e.message; toast(e.message); }
+  let ok = true, text = '', at = '';
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'});
+    if(r.status === 'started' || r.status === 'running'){
+      const st = await pollRun(id, 'ord');        // 24.10.2026: загрузка идёт в фоне, ждём итог
+      ok = !!st.ok; text = st.text || ''; at = st.at || '';
+    } else { text = r.message || 'Готово'; ok = !r.status || r.status === 'ok'; }
+    delete S.health[id];
+  }
+  catch(e){ ok = false; text = e.message; }
+  toast(text);
   if(!cacheOnly){ delete S.ing[id];   // журнал — с новой попыткой
-    S.run[key] = {ok, text, at: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}; render(); }
+    S.run[key] = {ok, text, at: at || new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}; render(); }
+}
+// 24.10.2026: долгая загрузка идёт на сервере в фоне — раз в 5 с спрашиваем, закончилась ли (до 15 мин)
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function pollRun(id, kind){
+  const url = '/companies/' + encodeURIComponent(id) + '/run-status?kind=' + kind;
+  for(let i = 0; i < 180; i++){
+    await sleep(5000);
+    try { const st = await api(url); if(!st.busy) return st.text ? st : {ok:false, text:'Сервер перезапустился во время загрузки — посмотрите журнал загрузок или нажмите ещё раз'}; }
+    catch(e){ /* связь моргнула — спрашиваем дальше */ }
+  }
+  return {ok:false, text:'Нет результата за 15 минут — посмотрите журнал загрузок'};
+}
+// после обновления страницы: если загрузка ещё идёт на сервере — кнопка снова «Загружаю…» и ждёт итог
+async function resumeRun(id, kind){
+  const key = id + ':' + kind;
+  if(S.run[key]) return;
+  S.run[key] = {};
+  try {
+    const st = await api('/companies/' + encodeURIComponent(id) + '/run-status?kind=' + kind);
+    if(!st.busy) return;
+    S.run[key] = {busy:true}; render();
+    const r = await pollRun(id, kind);
+    S.run[key] = {ok:!!r.ok, text:r.text, at:r.at || ''};
+    if(kind === 'ord') delete S.ing[id]; else if(r.ok) await loadBq(id);
+    render();
+  } catch(e){}
 }
 
 // ============================================================
