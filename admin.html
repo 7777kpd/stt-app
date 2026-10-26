@@ -882,7 +882,7 @@ function ingestBlock(c){
     const rows = L.rows.map(r => `<tr${r.late ? ' style="background:var(--warn-bg)"' : ''}><td${r.late ? ' style="box-shadow:inset 3px 0 0 var(--warn)"' : ''}>${esc(r.at)}</td>
       <td class="small" style="margin:0">${esc(r.kind)}${r.by ? '<br>' + esc(r.by) : ''}</td>
       <td>${esc(r.src || '—')}${r.late ? `<div class="small" style="color:var(--warn);font-weight:600;margin-top:3px">⏰ клиент выгрузил позже: ${r.late.exact ? '' : 'к '}${esc(r.late.when)} — через ${esc(r.late.after)} после нас</div>` : ''}</td>
-      <td>${res(r)}</td></tr>`).join('');
+      <td>${res(r)}${missList(r)}</td></tr>`).join('');
     const tip = L.late_days ? `<div class="note warn" style="margin-top:10px"><b>Клиент выгружает позже нашего забора.</b> Дашборды за день остаются пустыми до следующей загрузки. Варианты: попросить клиента выгружать раньше (до ${esc(L.schedule.slice(0,5))} по времени компании) или загрузить вручную — «Загрузить данные сейчас» выше.</div>` : '';
     body = sums + `<div class="tw"><table><tr><th>Мы ходили</th><th>Как</th><th>Данные клиента обновлены</th><th>Пришло</th></tr>${rows}</table></div>` + tip
       + `<p class="small">⏰ — в момент нашего забора данных за этот день ещё не было, клиент выгрузил их позже. Время — по часовому поясу компании. <a href="#" onclick="loadIngest('${esc(id)}');return false">Обновить</a></p>`;
@@ -1606,6 +1606,23 @@ function itDownload(id){
   a.href = URL.createObjectURL(new Blob([md], {type: 'text/markdown;charset=utf-8'}));
   a.download = `СТТ_загрузка_${id}.md`;
   document.body.appendChild(a); a.click(); a.remove();
+}
+// 26.10.2026: «Кого нет в Структуре» — полный список агентов из заказов, которых нет в Структуре
+function missList(r){
+  const m = r.missing || [];
+  if(!m.length) return '';
+  const total = m.reduce((a, x) => a + (+x[1] || 0), 0);
+  const lines = m.map(([n, c]) => `${n} — ${c}`).join('\n');
+  return `<details style="margin-top:4px"><summary class="small" style="cursor:pointer;color:var(--warn);font-weight:600">Кого нет в Структуре (${m.length}) · ${total.toLocaleString('ru-RU')} строк</summary>
+    <div class="small" style="max-height:240px;overflow:auto;margin:6px 0;white-space:pre-line">${esc(lines)}</div>
+    <button onclick="copyText(this)" data-t="${esc('Агенты из заказов, которых нет в Структуре (агент — строк заказов):\n' + lines)}">Скопировать список</button></details>`;
+}
+function copyText(btn){
+  const t = btn.getAttribute('data-t') || '';
+  const fallback = () => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e){} ta.remove(); };
+  try { navigator.clipboard.writeText(t).catch(fallback); } catch(e){ fallback(); }
+  toast('Список скопирован');
 }
 function copyUrl(){ const el = $('up_url'); el.select(); try { navigator.clipboard.writeText(el.value); } catch(e){ document.execCommand('copy'); } toast('Ссылка скопирована'); }
 async function rotateLink(id){
