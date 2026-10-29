@@ -941,7 +941,10 @@ async function saveSource(id, key){
     catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message); }
     return;
   }
-  if(c.file_mode){
+  // 29.10.2026: у компаний с BigQuery/API ссылка живёт рядом (для Структуры и Плана) — сохранение
+  // их настроек её не трогает. Выключаем ссылку только при уходе с «Секретной ссылки» на другой источник.
+  if(c.file_mode && !(c.connection_type && (key === 'bigquery' || key === 'api'))){
+    if(!confirm('Выключить секретную ссылку? Автоматическая отправка файлов от клиента остановится. Если включить снова — вернётся та же ссылка.')) return;
     try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'disable'}}); c.file_mode = false; delete S.upl[id]; }
     catch(e){ toast(e.message); return; }
   }
@@ -1525,8 +1528,11 @@ function fileLinkBlock(c){
     <p class="lbl">Секретная ссылка для загрузки — передайте клиенту</p>
     <div style="display:flex;gap:8px"><input id="up_url" class="mono" value="${esc(url)}" readonly style="flex:1"><button onclick="copyUrl()">Скопировать</button></div>
     <div class="acts"><button onclick="window.open($('up_url').value,'_blank')">Открыть страницу загрузки</button>
-      <button onclick="rotateLink('${esc(c.company_id)}')">Перевыпустить ссылку</button></div>
-    <p class="small">Без ссылки загрузить файл нельзя. Если она попала не к тем людям — перевыпустите: старая сразу перестанет работать, новую передайте клиенту.</p>
+      <button onclick="rotateOpen('${esc(c.company_id)}')">Перевыпустить ссылку</button></div>
+    ${rotateBlock(c, u)}
+    ${u.old_until ? `<p class="small" style="color:var(--warn,#b26a00)">Прежняя ссылка ещё работает до ${fdt(u.old_until)} — до этого срока клиент должен сменить её в 1С.</p>` : ''}
+    <p class="small">Без ссылки загрузить файл нельзя. Ссылка постоянная: «Создать» и «Выключить» её не меняют, меняет только «Перевыпустить». Если ссылка попала не к тем людям — перевыпустите «Срочно».</p>
+    ${linkHistory(u)}
     ${itBlock(c, url)}
     <p class="small" style="margin-top:12px">Какие файлы пришли, когда и что записано — в «Журнале загрузок заказов» внизу вкладки.</p>
   </div>`;
@@ -1625,9 +1631,35 @@ function copyText(btn){
   toast('Список скопирован');
 }
 function copyUrl(){ const el = $('up_url'); el.select(); try { navigator.clipboard.writeText(el.value); } catch(e){ document.execCommand('copy'); } toast('Ссылка скопирована'); }
-async function rotateLink(id){
-  if(!confirm('Перевыпустить ссылку? Старая сразу перестанет работать — новую нужно будет передать клиенту и программисту 1С.')) return;
-  try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'rotate'}}); delete S.upl[id]; toast('Новая ссылка готова'); render(); }
+/* 29.10.2026: перевыпуск — только с вводом названия компании и выбором «плавно / срочно».
+   «Плавно»: прежняя ссылка живёт ещё 7 дней, автоотправка клиента не обрывается.
+   «Срочно»: прежняя умирает сразу (если ссылка утекла). */
+function rotateOpen(id){ S.rot = S.rot === id ? null : id; render(); }
+function rotateBlock(c, u){
+  if(S.rot !== c.company_id) return '';
+  const week = 7 * 864e5;
+  const auto = (u.last || []).some(x => !String(x.action || '').includes('ошибка') && Date.now() - new Date(x.at).getTime() < week);
+  const nm = c.name || c.company_id;
+  return `<div class="note warn" style="margin-top:10px">
+    ${auto ? '<p style="margin:0 0 8px"><b>По этой ссылке за последнюю неделю приходили файлы</b> — скорее всего, идёт автоотправка из 1С. После перевыпуска она остановится, пока в 1С не заменят ссылку.</p>' : ''}
+    <p class="small" style="margin:0 0 6px">Для подтверждения введите название компании: <b>${esc(nm)}</b></p>
+    <input id="rot_name" placeholder="${esc(nm)}" autocomplete="off" style="width:100%">
+    <div class="acts" style="margin-top:8px">
+      <button class="pri" onclick="rotateGo('${esc(c.company_id)}','soft')">Плавно — старая ещё 7 дней</button>
+      <button onclick="rotateGo('${esc(c.company_id)}','now')">Срочно — старая сразу умрёт</button>
+      <button onclick="S.rot=null;render()">Отмена</button></div></div>`;
+}
+function linkHistory(u){
+  const h = (u.history || []).map(x => `<div class="small" style="padding:3px 0">${fdt(x.at)} · ${esc(x.actor_name || '—')} · ${esc(x.details)}</div>`).join('');
+  return h ? `<p class="lbl" style="margin-top:12px">Кто менял ссылку</p>${h}` : '';
+}
+async function rotateGo(id, mode){
+  const name = ($('rot_name') || {}).value || '';
+  if(!name.trim()){ toast('Введите название компании'); return; }
+  try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'rotate', mode, confirm:name}});
+    S.rot = null; delete S.upl[id];
+    toast(mode === 'soft' ? 'Новая ссылка готова. Старая работает ещё 7 дней — передайте новую клиенту' : 'Новая ссылка готова. Старая отключена');
+    render(); }
   catch(e){ toast(e.message); }
 }
 
