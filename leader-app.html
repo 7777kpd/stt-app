@@ -729,6 +729,13 @@ function cbAgents(c, own, b) {
     + (idle ? `<div class="ar"><span>Без заказов за ${esc(span)}</span><b class="rd">${num(idle)} ${plAg(idle)}</b></div>${lst.length ? `<div class="ag-names">${lst.map(a => `<span>${esc(a.n)}${a.plan ? ' · ' + num(a.plan) + ' виз.' : ''}</span>`).join('')}</div>` : ''}` : '')
     + `</div>`;
 }
+// 01.11.2026: то же у подчинённого — сколько агентов работало за период и сколько без заказов (где просадка)
+function cbAgentsKid(c) {
+  if (c.agents_active == null) return '';
+  const pv = c.agents_active_prev, d = pv == null ? 0 : c.agents_active - pv, idle = c.agents_idle || 0;
+  return `<div class="cb-ag"><div class="ar"><span>Работали</span><b>${num(c.agents_active)} ${plAg(c.agents_active)}${d ? ` <i class="${d < 0 ? 'rd' : 'gn'}">${d > 0 ? '+' : '−'}${num(Math.abs(d))}</i>` : ''}</b></div>`
+    + (idle ? `<div class="ar"><span>Без заказов</span><b class="rd">${num(idle)} ${plAg(idle)}</b></div>` : '') + `</div>`;
+}
 function cbLoad(c, own) {
   const pc = c.pct, r = c.load_range;
   const td = new Date(S.sum.today + 'T00:00:00'); td.setDate(td.getDate() - 1);
@@ -762,7 +769,7 @@ function cbCard(name, sub, c, p, key, rank, b) {
     <div class="cb-top"><div class="cb-rw">${cbRing(pc.avg, own ? 80 : 64, own ? 8 : 7, own ? 19 : 15)}${own ? '' : `<div class="cb-rk${rank <= 3 ? ' g' + rank : ''}">${rank}</div>`}</div>
       <div style="min-width:0"><div class="cb-nm">${esc(name)}</div>${sub ? `<div class="cb-sb">${sub}</div>` : ''}
       ${d != null ? `<div class="cb-dl">${delta(d)} ${vs}</div>` : ''}</div></div>
-    ${cbTiles(pc, pp)}${cbAgents(c, own, b)}${cbLoad(c, own)}</summary>
+    ${cbTiles(pc, pp)}${own ? cbAgents(c, own, b) : cbAgentsKid(c)}${cbLoad(c, own)}</summary>
     ${cbMore(c, p, key, b, own)}</details>`;
 }
 const CB_HOW = () => `<details class="cb-how" ${S.open.cbhow ? 'open' : ''} ontoggle="S.open.cbhow=this.open"><summary>ℹ️ Как мы работаем <span class="br-arrow">›</span></summary><ul>
