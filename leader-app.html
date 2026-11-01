@@ -716,26 +716,26 @@ function cbTiles(pc, pp) {
     return `<div><b style="color:${colorOf(k)(v)}">${v == null ? '—' : Math.round(v) + '%'}</b><small>${lbl === 'ТОП-5 отстающих' ? 'ТОП-5' : lbl}</small><i style="color:${dc}">${d == null ? '' : d ? (d > 0 ? '+' : '') + d : '·'}</i></div>`;
   }).join('')}</div>`;
 }
-// 01.11.2026: состав агентов. Поля приходят от сервера в итогах недели: agents_prev (из агентов — работали и в прошлом месяце),
-// agents_idle (есть план, нет заказов ни в этом, ни в прошлом месяце, в число agents не входят), agents_idle_list [{n, pts}].
-// Нет полей — блока нет (старые итоги показываются как раньше).
+// 01.11.2026: состав агентов. Поля приходят от сервера в итогах текущей недели (leader_api._agents_split):
+// agents_prev (из agents — заказывали и в 4 прошлых неделях), agents_idle (есть план, заказов нет ни сейчас, ни раньше;
+// входят в agents), agents_idle_list [{n, plan}]. Новые = agents − agents_prev − agents_idle. Нет полей — блока нет.
 const plAg = n => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? 'агентов' : b === 1 ? 'агент' : b >= 2 && b <= 4 ? 'агента' : 'агентов'; };
-function agMonth() {
-  const td = new Date(S.sum.today + 'T00:00:00'); td.setDate(td.getDate() - 1);
-  return MONTHS[td.getMonth()];
+function agParts(c) {
+  const idle = c.agents_idle || 0, prev = c.agents_prev || 0;
+  return { prev, idle, nw: Math.max(0, c.agents - prev - idle) };
 }
 function cbAgents(c, own) {
   if (!own || c.agents == null || c.agents_prev == null) return '';
-  const nw = Math.max(0, c.agents - c.agents_prev), idle = c.agents_idle || 0;
-  return `<div class="cb-ag"><span class="ok">${num(c.agents_prev)} работали и в прошлом месяце</span>${nw ? `<span class="nw">${num(nw)} ${nw === 1 ? 'новый' : 'новых'}</span>` : ''}${idle ? `<span class="id">ещё ${num(idle)} с планом, без заказов</span>` : ''}</div>`;
+  const { prev, idle, nw } = agParts(c);
+  return `<div class="cb-ag">${prev ? `<span class="ok">${num(prev)} заказывали и в прошлые недели</span>` : ''}${nw ? `<span class="nw">${num(nw)} ${nw === 1 ? 'новый' : 'новых'}</span>` : ''}${idle ? `<span class="id">${num(idle)} с планом, без заказов</span>` : ''}</div>`;
 }
 function agMore(c, own) {
   if (!own || c.agents == null || c.agents_prev == null) return '';
-  const nw = Math.max(0, c.agents - c.agents_prev), idle = c.agents_idle || 0, lst = c.agents_idle_list || [];
-  return `<div class="ag-box"><b>${num(c.agents)} ${plAg(c.agents)}</b> заказывали в ${agMonth() === 'март' || agMonth() === 'август' ? agMonth() + 'е' : agMonth().replace(/[ьй]$/, 'е')}.<br>
-    <b>${num(c.agents_prev)}</b> из них работали и в прошлом месяце — по ним считается сравнение месяцев.
-    ${nw ? `<br><b>${num(nw)}</b> ${nw === 1 ? 'новый' : 'новых'}: в прошлом месяце заказов не было, в сравнение с ним не входят.` : ''}
-    ${idle ? `<br><b>${num(idle)}</b> с планом, но без заказов (в число ${plAg(c.agents)} выше не входят): точки нужно передать или закрыть.${lst.length ? `<div class="ag-names">${lst.map(a => `<span>${esc(a.n)}${a.pts ? ' · ' + num(a.pts) : ''}</span>`).join('')}</div>` : ''}` : ''}</div>`;
+  const { prev, idle, nw } = agParts(c), lst = c.agents_idle_list || [];
+  return `<div class="ag-box"><b>${num(c.agents)} ${plAg(c.agents)}</b>: у кого в этот период есть план или заказы.
+    <br><b>${num(prev)}</b> заказывали и в 4 прошлых неделях — по ним честно сравнивать недели.
+    ${nw ? `<br><b>${num(nw)}</b> ${nw === 1 ? 'новый' : 'новых'}: в 4 прошлых неделях заказов не было.` : ''}
+    ${idle ? `<br><b>${num(idle)}</b> с планом, но без заказов ни сейчас, ни раньше: точки нужно передать или закрыть.${lst.length ? `<div class="ag-names">${lst.map(a => `<span>${esc(a.n)}${a.plan ? ' · ' + num(a.plan) + ' виз.' : ''}</span>`).join('')}</div>` : ''}` : ''}</div>`;
 }
 function cbLoad(c, own) {
   const pc = c.pct, r = c.load_range;
@@ -788,7 +788,7 @@ function skippedNote(sk) {
 function cardsSummary(label, b) {
   const nowG = b.now, prevG = b.prev, prevCh = prevG ? prevG.children : {};
   const t = nowG.total;
-  let h = cbCard(label, t.agents ? (t.agents_prev != null ? `${num(t.agents)} ${plAg(t.agents)} за ${agMonth()} · ${b.span}` : `${t.agents} агентов · ${b.span}`) : b.span, t, prevG ? prevG.total : null, 'sum:all', null, b);
+  let h = cbCard(label, t.agents ? `${num(t.agents)} ${plAg(t.agents)} · ${b.span}` : b.span, t, prevG ? prevG.total : null, 'sum:all', null, b);
   h += CB_HOW();
   const ch = sortedChildren(nowG);
   if (ch.length) {
