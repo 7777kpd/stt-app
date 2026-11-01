@@ -722,10 +722,10 @@ function cbTiles(pc, pp) {
 const plAg = n => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? 'агентов' : b === 1 ? 'агент' : b >= 2 && b <= 4 ? 'агента' : 'агентов'; };
 function cbAgents(c, own, b) {
   if (!own || c.agents_active == null) return '';
-  const span = b && b.span ? b.span : 'период', act = c.agents_active, pv = c.agents_active_prev, idle = c.agents_idle || 0;
+  const span = b && b.span ? b.span : 'период', act = c.agents_active, pv = c.agents_active_prev, idle = c.agents_idle || 0, wk = c.agents_active_weeks || [];
   const d = pv == null ? 0 : act - pv, lst = c.agents_idle_list || [];
-  const basis = pv == null ? '' : `<div class="as">${b && b.n ? (b.n === 1 ? 'к прошлой неделе' : `к ${b.n} прошлым неделям, в среднем`) : 'к прошлым неделям'}: ${num(pv)} ${plAg(pv)}</div>`;
-  return `<div class="cb-ag"><div class="ar"><span>Заказывали за ${esc(span)}</span><b>${num(act)} ${plAg(act)}${d ? ` <i class="${d < 0 ? 'rd' : 'gn'}">${d > 0 ? '+' : '−'}${num(Math.abs(d))}</i>` : ''}</b></div>${basis}`
+  const basis = pv == null ? '' : `<div class="as">${wk.length > 1 ? `${wk.length} прошлые недели: ${wk.map(num).join(' · ')} (в среднем ${num(pv)})` : `к прошлой неделе: ${num(pv)} ${plAg(pv)}`}</div>`;
+  return `<div class="cb-ag" onclick="event.preventDefault();event.stopPropagation()"><div class="ar"><span>Работали за ${esc(span)}</span><b>${num(act)} ${plAg(act)}${d ? ` <i class="${d < 0 ? 'rd' : 'gn'}">${d > 0 ? '+' : '−'}${num(Math.abs(d))}</i>` : ''}</b></div>${basis}`
     + (idle ? `<div class="ar"><span>Без заказов за ${esc(span)}</span><b class="rd">${num(idle)} ${plAg(idle)}</b></div>${lst.length ? `<div class="ag-names">${lst.map(a => `<span>${esc(a.n)}${a.plan ? ' · ' + num(a.plan) + ' виз.' : ''}</span>`).join('')}</div>` : ''}` : '')
     + `</div>`;
 }
