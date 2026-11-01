@@ -243,15 +243,15 @@
   .cb-mini i { display: block; font-style: normal; font-size: 9px; font-weight: 700; margin-top: 1px; }
   .cb-load { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; background: var(--bg); border-radius: 8px; padding: 7px 10px; font-size: 12px; font-weight: 700; }
   .cb-load small { display: block; font-size: 9.5px; color: var(--ink-soft); font-weight: 600; }
-  /* 01.11.2026: состав агентов под плитками — кто работал и в прошлом месяце, кто новый, у кого есть план, но нет заказов */
-  .cb-ag { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
-  .cb-ag span { font-size: 10.5px; font-weight: 700; border-radius: 100px; padding: 4px 9px; white-space: nowrap; }
-  .cb-ag .ok { background: var(--green-bg); color: #2E8A52; }
-  .cb-ag .nw { background: var(--blue-bg); color: var(--blue); }
-  .cb-ag .id { background: var(--red-bg); color: var(--red-dark); }
-  .ag-box { background: var(--bg); border-radius: 10px; padding: 8px 10px; margin: 0 0 8px; font-size: 11.5px; color: var(--ink-soft); font-weight: 600; line-height: 1.45; }
-  .ag-box b { color: var(--ink); }
-  .ag-names { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  /* 01.11.2026: состав агентов под плитками — кто заказывал за период и у кого есть план, но нет заказов */
+  .cb-ag { margin-top: 6px; background: var(--bg); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; }
+  .cb-ag .ar { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 3px 0; }
+  .cb-ag .ar + .ar { border-top: 1px solid var(--line); }
+  .cb-ag .ar b { font-size: 13px; white-space: nowrap; }
+  .cb-ag .ar i { font-style: normal; font-size: 11px; }
+  .cb-ag .as { font-size: 9.5px; color: var(--ink-soft); font-weight: 600; margin-top: -1px; padding-bottom: 3px; }
+  .cb-ag .rd { color: var(--red-dark); } .cb-ag .gn { color: var(--green); }
+  .ag-names { display: flex; flex-wrap: wrap; gap: 5px; margin: 2px 0 3px; }
   .ag-names span { background: var(--card); border-radius: 7px; padding: 2px 7px; font-size: 11px; color: var(--ink); }
   .cb-load.link { color: var(--blue); cursor: pointer; }
   .cb-more { padding: 0 12px 12px; }
@@ -717,25 +717,17 @@ function cbTiles(pc, pp) {
   }).join('')}</div>`;
 }
 // 01.11.2026: состав агентов. Поля приходят от сервера в итогах текущей недели (leader_api._agents_split):
-// agents_prev (из agents — заказывали и в 4 прошлых неделях), agents_idle (есть план, заказов нет ни сейчас, ни раньше;
-// входят в agents), agents_idle_list [{n, plan}]. Новые = agents − agents_prev − agents_idle. Нет полей — блока нет.
+// agents_active (заказывали за период), agents_active_prev (в среднем за те же дни прошлых недель),
+// agents_idle (есть план, заказов нет), agents_idle_list [{n, plan}]. Нет полей — блока нет.
 const plAg = n => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? 'агентов' : b === 1 ? 'агент' : b >= 2 && b <= 4 ? 'агента' : 'агентов'; };
-function agParts(c) {
-  const idle = c.agents_idle || 0, prev = c.agents_prev || 0;
-  return { prev, idle, nw: Math.max(0, c.agents - prev - idle) };
-}
-function cbAgents(c, own) {
-  if (!own || c.agents == null || c.agents_prev == null) return '';
-  const { prev, idle, nw } = agParts(c);
-  return `<div class="cb-ag">${prev ? `<span class="ok">${num(prev)} заказывали и в прошлые недели</span>` : ''}${nw ? `<span class="nw">${num(nw)} ${nw === 1 ? 'новый' : 'новых'}</span>` : ''}${idle ? `<span class="id">${num(idle)} с планом, без заказов</span>` : ''}</div>`;
-}
-function agMore(c, own) {
-  if (!own || c.agents == null || c.agents_prev == null) return '';
-  const { prev, idle, nw } = agParts(c), lst = c.agents_idle_list || [];
-  return `<div class="ag-box"><b>${num(c.agents)} ${plAg(c.agents)}</b>: у кого в этот период есть план или заказы.
-    <br><b>${num(prev)}</b> заказывали и в 4 прошлых неделях — по ним честно сравнивать недели.
-    ${nw ? `<br><b>${num(nw)}</b> ${nw === 1 ? 'новый' : 'новых'}: в 4 прошлых неделях заказов не было.` : ''}
-    ${idle ? `<br><b>${num(idle)}</b> с планом, но без заказов ни сейчас, ни раньше: точки нужно передать или закрыть.${lst.length ? `<div class="ag-names">${lst.map(a => `<span>${esc(a.n)}${a.plan ? ' · ' + num(a.plan) + ' виз.' : ''}</span>`).join('')}</div>` : ''}` : ''}</div>`;
+function cbAgents(c, own, b) {
+  if (!own || c.agents_active == null) return '';
+  const span = b && b.span ? b.span : 'период', act = c.agents_active, pv = c.agents_active_prev, idle = c.agents_idle || 0;
+  const d = pv == null ? 0 : act - pv, lst = c.agents_idle_list || [];
+  const basis = pv == null ? '' : `<div class="as">${b && b.n ? (b.n === 1 ? 'к прошлой неделе' : `к ${b.n} прошлым неделям, в среднем`) : 'к прошлым неделям'}: ${num(pv)} ${plAg(pv)}</div>`;
+  return `<div class="cb-ag"><div class="ar"><span>Заказывали за ${esc(span)}</span><b>${num(act)} ${plAg(act)}${d ? ` <i class="${d < 0 ? 'rd' : 'gn'}">${d > 0 ? '+' : '−'}${num(Math.abs(d))}</i>` : ''}</b></div>${basis}`
+    + (idle ? `<div class="ar"><span>Без заказов за ${esc(span)}</span><b class="rd">${num(idle)} ${plAg(idle)}</b></div>${lst.length ? `<div class="ag-names">${lst.map(a => `<span>${esc(a.n)}${a.plan ? ' · ' + num(a.plan) + ' виз.' : ''}</span>`).join('')}</div>` : ''}` : '')
+    + `</div>`;
 }
 function cbLoad(c, own) {
   const pc = c.pct, r = c.load_range;
@@ -755,7 +747,6 @@ function cbMore(c, p, key, b, own) {
   const used = COMP.filter(([k]) => pc[k] != null && (k !== 'top5' || pc.top5_in_avg !== false)).map(([k]) => pc[k]);
   if (pc.load_in_avg !== false && pc.load != null) used.push(`<span class="fl">нагрузка ${pc.load}</span>`);
   return `<div class="cb-more">
-    ${agMore(c, own)}
     ${own && b ? `<div class="period">${b.l1(pc.avg ?? '—')}<br>${b.l2(pp.avg ?? '—')}</div>` : ''}
     ${used.length ? `<div class="formula">(${used.join(' + ')}) ÷ ${used.length} = <b>${pc.avg}%</b></div>` : ''}
     <div class="kb-text">ПАКБ <b>${num(c.pakb)}</b> · СТТ <b>${num(c.stt_pts)} шт</b> · <b style="color:${sysColor(pc.stt)}">${pc.stt == null ? '—' : pc.stt + '%'}</b></div>
@@ -771,7 +762,7 @@ function cbCard(name, sub, c, p, key, rank, b) {
     <div class="cb-top"><div class="cb-rw">${cbRing(pc.avg, own ? 80 : 64, own ? 8 : 7, own ? 19 : 15)}${own ? '' : `<div class="cb-rk${rank <= 3 ? ' g' + rank : ''}">${rank}</div>`}</div>
       <div style="min-width:0"><div class="cb-nm">${esc(name)}</div>${sub ? `<div class="cb-sb">${sub}</div>` : ''}
       ${d != null ? `<div class="cb-dl">${delta(d)} ${vs}</div>` : ''}</div></div>
-    ${cbTiles(pc, pp)}${cbAgents(c, own)}${cbLoad(c, own)}</summary>
+    ${cbTiles(pc, pp)}${cbAgents(c, own, b)}${cbLoad(c, own)}</summary>
     ${cbMore(c, p, key, b, own)}</details>`;
 }
 const CB_HOW = () => `<details class="cb-how" ${S.open.cbhow ? 'open' : ''} ontoggle="S.open.cbhow=this.open"><summary>ℹ️ Как мы работаем <span class="br-arrow">›</span></summary><ul>
