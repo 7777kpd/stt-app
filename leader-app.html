@@ -243,6 +243,16 @@
   .cb-mini i { display: block; font-style: normal; font-size: 9px; font-weight: 700; margin-top: 1px; }
   .cb-load { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; background: var(--bg); border-radius: 8px; padding: 7px 10px; font-size: 12px; font-weight: 700; }
   .cb-load small { display: block; font-size: 9.5px; color: var(--ink-soft); font-weight: 600; }
+  /* 01.11.2026: состав агентов под плитками — кто работал и в прошлом месяце, кто новый, у кого есть план, но нет заказов */
+  .cb-ag { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .cb-ag span { font-size: 10.5px; font-weight: 700; border-radius: 100px; padding: 4px 9px; white-space: nowrap; }
+  .cb-ag .ok { background: var(--green-bg); color: #2E8A52; }
+  .cb-ag .nw { background: var(--blue-bg); color: var(--blue); }
+  .cb-ag .id { background: var(--red-bg); color: var(--red-dark); }
+  .ag-box { background: var(--bg); border-radius: 10px; padding: 8px 10px; margin: 0 0 8px; font-size: 11.5px; color: var(--ink-soft); font-weight: 600; line-height: 1.45; }
+  .ag-box b { color: var(--ink); }
+  .ag-names { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .ag-names span { background: var(--card); border-radius: 7px; padding: 2px 7px; font-size: 11px; color: var(--ink); }
   .cb-load.link { color: var(--blue); cursor: pointer; }
   .cb-more { padding: 0 12px 12px; }
   .cb-sec { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 2px 8px; }
@@ -706,6 +716,27 @@ function cbTiles(pc, pp) {
     return `<div><b style="color:${colorOf(k)(v)}">${v == null ? '—' : Math.round(v) + '%'}</b><small>${lbl === 'ТОП-5 отстающих' ? 'ТОП-5' : lbl}</small><i style="color:${dc}">${d == null ? '' : d ? (d > 0 ? '+' : '') + d : '·'}</i></div>`;
   }).join('')}</div>`;
 }
+// 01.11.2026: состав агентов. Поля приходят от сервера в итогах недели: agents_prev (из агентов — работали и в прошлом месяце),
+// agents_idle (есть план, нет заказов ни в этом, ни в прошлом месяце, в число agents не входят), agents_idle_list [{n, pts}].
+// Нет полей — блока нет (старые итоги показываются как раньше).
+const plAg = n => { const a = Math.abs(n) % 100, b = a % 10; return a > 10 && a < 20 ? 'агентов' : b === 1 ? 'агент' : b >= 2 && b <= 4 ? 'агента' : 'агентов'; };
+function agMonth() {
+  const td = new Date(S.sum.today + 'T00:00:00'); td.setDate(td.getDate() - 1);
+  return MONTHS[td.getMonth()];
+}
+function cbAgents(c, own) {
+  if (!own || c.agents == null || c.agents_prev == null) return '';
+  const nw = Math.max(0, c.agents - c.agents_prev), idle = c.agents_idle || 0;
+  return `<div class="cb-ag"><span class="ok">${num(c.agents_prev)} работали и в прошлом месяце</span>${nw ? `<span class="nw">${num(nw)} ${nw === 1 ? 'новый' : 'новых'}</span>` : ''}${idle ? `<span class="id">ещё ${num(idle)} с планом, без заказов</span>` : ''}</div>`;
+}
+function agMore(c, own) {
+  if (!own || c.agents == null || c.agents_prev == null) return '';
+  const nw = Math.max(0, c.agents - c.agents_prev), idle = c.agents_idle || 0, lst = c.agents_idle_list || [];
+  return `<div class="ag-box"><b>${num(c.agents)} ${plAg(c.agents)}</b> заказывали в ${agMonth() === 'март' || agMonth() === 'август' ? agMonth() + 'е' : agMonth().replace(/[ьй]$/, 'е')}.<br>
+    <b>${num(c.agents_prev)}</b> из них работали и в прошлом месяце — по ним считается сравнение месяцев.
+    ${nw ? `<br><b>${num(nw)}</b> ${nw === 1 ? 'новый' : 'новых'}: в прошлом месяце заказов не было, в сравнение с ним не входят.` : ''}
+    ${idle ? `<br><b>${num(idle)}</b> с планом, но без заказов (в число ${plAg(c.agents)} выше не входят): точки нужно передать или закрыть.${lst.length ? `<div class="ag-names">${lst.map(a => `<span>${esc(a.n)}${a.pts ? ' · ' + num(a.pts) : ''}</span>`).join('')}</div>` : ''}` : ''}</div>`;
+}
 function cbLoad(c, own) {
   const pc = c.pct, r = c.load_range;
   const td = new Date(S.sum.today + 'T00:00:00'); td.setDate(td.getDate() - 1);
@@ -724,6 +755,7 @@ function cbMore(c, p, key, b, own) {
   const used = COMP.filter(([k]) => pc[k] != null && (k !== 'top5' || pc.top5_in_avg !== false)).map(([k]) => pc[k]);
   if (pc.load_in_avg !== false && pc.load != null) used.push(`<span class="fl">нагрузка ${pc.load}</span>`);
   return `<div class="cb-more">
+    ${agMore(c, own)}
     ${own && b ? `<div class="period">${b.l1(pc.avg ?? '—')}<br>${b.l2(pp.avg ?? '—')}</div>` : ''}
     ${used.length ? `<div class="formula">(${used.join(' + ')}) ÷ ${used.length} = <b>${pc.avg}%</b></div>` : ''}
     <div class="kb-text">ПАКБ <b>${num(c.pakb)}</b> · СТТ <b>${num(c.stt_pts)} шт</b> · <b style="color:${sysColor(pc.stt)}">${pc.stt == null ? '—' : pc.stt + '%'}</b></div>
@@ -739,7 +771,7 @@ function cbCard(name, sub, c, p, key, rank, b) {
     <div class="cb-top"><div class="cb-rw">${cbRing(pc.avg, own ? 80 : 64, own ? 8 : 7, own ? 19 : 15)}${own ? '' : `<div class="cb-rk${rank <= 3 ? ' g' + rank : ''}">${rank}</div>`}</div>
       <div style="min-width:0"><div class="cb-nm">${esc(name)}</div>${sub ? `<div class="cb-sb">${sub}</div>` : ''}
       ${d != null ? `<div class="cb-dl">${delta(d)} ${vs}</div>` : ''}</div></div>
-    ${cbTiles(pc, pp)}${cbLoad(c, own)}</summary>
+    ${cbTiles(pc, pp)}${cbAgents(c, own)}${cbLoad(c, own)}</summary>
     ${cbMore(c, p, key, b, own)}</details>`;
 }
 const CB_HOW = () => `<details class="cb-how" ${S.open.cbhow ? 'open' : ''} ontoggle="S.open.cbhow=this.open"><summary>ℹ️ Как мы работаем <span class="br-arrow">›</span></summary><ul>
@@ -756,7 +788,7 @@ function skippedNote(sk) {
 function cardsSummary(label, b) {
   const nowG = b.now, prevG = b.prev, prevCh = prevG ? prevG.children : {};
   const t = nowG.total;
-  let h = cbCard(label, t.agents ? `${t.agents} агентов · ${b.span}` : b.span, t, prevG ? prevG.total : null, 'sum:all', null, b);
+  let h = cbCard(label, t.agents ? (t.agents_prev != null ? `${num(t.agents)} ${plAg(t.agents)} за ${agMonth()} · ${b.span}` : `${t.agents} агентов · ${b.span}`) : b.span, t, prevG ? prevG.total : null, 'sum:all', null, b);
   h += CB_HOW();
   const ch = sortedChildren(nowG);
   if (ch.length) {
