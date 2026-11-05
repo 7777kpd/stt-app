@@ -363,6 +363,7 @@ function tabCfg(c){
       <p class="small">Получает уведомления о сбоях загрузки своей компании.</p></div>
     <div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div></div>
     <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>
+  ${limitsBlock(c)}
   <p class="err" id="f_err"></p>
   ${e ? `<div class="acts"><button class="pri" id="f_save" ${brNeed(c.company_id) ? 'disabled title="Есть ли у компании филиалы? Выберите уровень или «нет»."' : ''} onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="S.brdD['${esc(c.company_id)}']={};render()">Отменить изменения</button></div>` : ''}
   ${viewersBlock(c)}`;
@@ -632,8 +633,10 @@ function planDayBlock(c, e){
   const opts = Array.from({length:15}, (_, i) => i + 1).map(d => `<option value="${d}" ${d===cur?'selected':''}>${d}</option>`).join('');
   return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px">
       <p class="lbl" style="margin:0">Новый План на месяц применяется сразу, если пришёл до</p>
-      <select id="f_pday" style="width:auto;padding:4px 8px;font-size:13px" ${e ? '' : 'disabled'}>${opts}</select>
-      <span class="small" style="margin:0">числа включительно</span></div>
+      <select id="f_pday" style="width:auto;padding:4px 8px;font-size:13px" ${e ? '' : 'disabled'} onchange="$('f_pday_s').disabled = +this.value === ${cur}; $('f_pday_ok').textContent = +this.value === ${cur} ? '' : 'Число изменено — нажмите «Сохранить».'">${opts}</select>
+      <span class="small" style="margin:0">числа включительно</span>
+      ${e ? `<button class="pri" id="f_pday_s" disabled style="padding:4px 12px" onclick="savePday('${esc(c.company_id)}')">Сохранить</button>` : ''}</div>
+    <p class="small" id="f_pday_ok" style="color:var(--ok)"></p>
     <p class="small">Смена дней и перенос точек, пришедшие до этого числа, действуют с 1-го числа месяца. Позже — с 1-го числа следующего. Утренний забор до 12:00 считается предыдущим днём: клиент мог выгрузить вечером. Новые точки и закрытые клиенты учитываются всегда сразу.</p>`;
 }
 function cfgPreview(){
@@ -742,9 +745,15 @@ function scheduleBlock(c){
   // 24.10.2026: кнопка показывает «Загружаю…» и результат прямо в своей строке
   if(src === 'bigquery') resumeRun(c.company_id, 'sp');
   if(src === 'bigquery' || src === 'api') resumeRun(c.company_id, 'ord');
+  if(src === 'bigquery' || src === 'api') loadLim(c.company_id);
+  // 05.11.2026: «Загружается… начали в 11:20», «Запустим в 09:30», «сегодня осталось 3 из 4»
   const runBtn = (key, label, js) => { const st = S.run[key] || {};
-    return `<button style="white-space:nowrap" ${st.busy ? 'disabled' : ''} onclick="${js}">${st.busy ? 'Загружаю…' : label}</button>`
-      + (st.busy ? `<div class="small">идёт загрузка — можно не ждать, итог появится здесь и в журнале</div>` : st.text ? `<div class="small" style="color:${st.ok ? 'var(--ok)' : 'var(--bad)'};max-width:260px">${st.ok ? '✓ ' : '⚠️ '}${esc(st.text)}${st.at ? ' · ' + esc(st.at) : ''}</div>` : ''); };
+    const busyTxt = st.queued ? `Запустим в ${esc(st.queued)}` : 'Загружаю…';
+    const busyNote = st.queued ? `утренний час пик — загрузка начнётся в ${esc(st.queued)}, итог придёт в Telegram`
+      : `идёт загрузка${st.since ? ' — начали в ' + esc(st.since) : ''}; можно не ждать, итог появится здесь и в журнале`;
+    return `<button style="white-space:nowrap" ${st.busy ? 'disabled' : ''} onclick="${js}">${st.busy ? busyTxt : label}</button>`
+      + (st.busy ? `<div class="small">${busyNote}</div>` : st.text ? `<div class="small" style="color:${st.ok ? 'var(--ok)' : 'var(--bad)'};max-width:260px">${st.ok ? '✓ ' : '⚠️ '}${esc(st.text)}${st.at ? ' · ' + esc(st.at) : ''}</div>` : '')
+      + limNote(c.company_id, key.split(':').pop()); };
   const toLoad = btn('К загрузке ↓', "document.getElementById('xl_cards').scrollIntoView({behavior:'smooth'})");
   const rows = [];   // [что, время, следующий раз, пояснение, как сделать сейчас]
   let off = String(c.days_off || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -875,6 +884,55 @@ function tabData(c){
 // данных за день в момент нашего забора ещё не было, клиент выгрузил их позже.
 S.ing = S.ing || {};
 S.run = S.run || {};   // 24.10.2026: состояние кнопок «Загрузить сейчас» (идёт / результат)
+// 05.11.2026: лимиты ручных загрузок (load_guard на сервере) — подписи под кнопками
+S.lim = S.lim || {};
+async function loadLim(id){
+  if(S.lim[id]) return;
+  S.lim[id] = 'loading';
+  try { S.lim[id] = await api('/companies/' + encodeURIComponent(id) + '/load-limits'); } catch(e){ S.lim[id] = {limited:false, err:e.message}; }
+  render();
+}
+function limNote(id, kind){
+  const L = S.lim[id];
+  if(!L || L === 'loading' || !L.limited) return '';
+  const k = (L.kinds || {})[kind]; if(!k) return '';
+  const parts = [k.left ? `сегодня осталось ${k.left} из ${k.per_day}` : 'на сегодня запуски закончились — следующий завтра'];
+  if(k.left && k.next_at) parts.push(`следующая в ${k.next_at}`);
+  if(k.left && L.peak_until && kind !== 'close') parts.push(`сейчас час пик — начнётся в ${L.peak_until}`);
+  return `<div class="small" style="color:var(--ink-3)">${esc(parts.join(' · '))}</div>`;
+}
+// Владелец: лимиты компании (свой блок и своя кнопка «Сохранить»)
+function limitsBlock(c){
+  if(!isOwner()) return '';
+  const id = c.company_id, L = S.lim[id];
+  if(!L){ loadLim(id); return ''; }
+  if(L === 'loading' || !L.limits) return '';
+  const m = L.limits, num = (fid, v, max) => `<input id="${fid}" type="number" min="${fid.endsWith('g') ? 0 : 1}" max="${max}" value="${v}" style="width:80px" oninput="$('lim_s').disabled=false">`;
+  return `<div class="sec"><h3>Ручные загрузки</h3>
+    <p class="small" style="margin-top:0">Сколько раз в день менеджер СТТ и клиент могут нажимать «Загрузить сейчас» и «Закрыть период». Защищает сервер от лишней нагрузки. Вы и техспециалист — без лимитов. Компании на этапе «Тест» и «Подключение» — без лимитов.</p>
+    <div class="tw"><table style="width:auto"><tr><th>Что</th><th>Раз в день</th><th>Пауза между, мин</th></tr>
+      <tr><td>Заказы</td><td>${num('lim_o', m.ord.per_day, 20)}</td><td>${num('lim_og', m.ord.gap_min, 240)}</td></tr>
+      <tr><td>Структура и План</td><td>${num('lim_s1', m.sp.per_day, 20)}</td><td class="small">—</td></tr>
+      <tr><td>Закрытие периода</td><td>${num('lim_c', m.close.per_day, 20)}</td><td class="small">—</td></tr></table></div>
+    <label class="check"><input type="checkbox" id="lim_p" ${m.peak ? 'checked' : ''} onchange="$('lim_s').disabled=false"> Утренний час пик: с «утренний отчёт − 30 мин» до «+ 90 мин» ручная загрузка встаёт в очередь на конец окна</label>
+    <div class="acts"><button class="pri" id="lim_s" disabled onclick="saveLim('${esc(id)}')">Сохранить</button><span class="small" id="lim_out"></span></div></div>`;
+}
+async function saveLim(id){
+  const b = $('lim_s'); b.disabled = true;
+  try {
+    S.lim[id] = await api('/companies/' + encodeURIComponent(id) + '/load-limits', {method:'POST', body:{
+      ord:{per_day:+$('lim_o').value, gap_min:+$('lim_og').value}, sp:{per_day:+$('lim_s1').value},
+      close:{per_day:+$('lim_c').value}, peak:$('lim_p').checked}});
+    toast('Лимиты сохранены'); render();
+  } catch(e){ $('lim_out').textContent = e.message; b.disabled = false; }
+}
+// 05.11.2026: «до какого числа применять План» — своя кнопка «Сохранить» прямо у выбора
+async function savePday(id){
+  const b = $('f_pday_s'), v = +$('f_pday').value; b.disabled = true;
+  try { await api('/companies/' + encodeURIComponent(id) + '/plan-opts', {method:'POST', body:{apply_day:v}});
+    S.brd[id].plan_apply_day = v; $('f_pday_ok').textContent = `✓ Сохранено: изменения Плана применяются, если пришли до ${v} числа.`; toast('Сохранено'); }
+  catch(e){ $('f_pday_ok').textContent = e.message; b.disabled = false; }
+}
 async function loadIngest(id){
   S.ing[id] = 'loading';
   const c = co(id), mode = c && srcKey(c) === 'file' ? '?mode=file' : '';
@@ -1074,6 +1132,8 @@ async function bqSync(id, force){
   try {
     await bqEnsureSaved(id);
     const r = await api('/companies/' + encodeURIComponent(id) + '/bq-sp/sync', {method:'POST', body:{force:!!force}});
+    delete S.lim[id];
+    if(r.queued_until){ S.run[key] = {busy:true, queued:r.queued_until}; toast(r.message); render(); return; }
     st = (r.status === 'started' || r.status === 'running') ? await pollRun(id, 'sp') : {ok:true, text:r.message};   // 24.10.2026: в фоне
   } catch(e){ st = {ok:false, text:e.message}; }
   if(st.ok){
@@ -1753,6 +1813,7 @@ async function reload(id, cacheOnly){
   let ok = true, text = '', at = '';
   try {
     const r = await api('/companies/' + encodeURIComponent(id) + '/reload', {method:'POST'});
+    if(r.queued_until){ S.run[key] = {busy:true, queued:r.queued_until}; delete S.lim[id]; toast(r.message); render(); return; }
     if(r.status === 'started' || r.status === 'running'){
       const st = await pollRun(id, 'ord');        // 24.10.2026: загрузка идёт в фоне, ждём итог
       ok = !!st.ok; text = st.text || ''; at = st.at || '';
@@ -1761,7 +1822,7 @@ async function reload(id, cacheOnly){
   }
   catch(e){ ok = false; text = e.message; }
   toast(text);
-  if(!cacheOnly){ delete S.ing[id];   // журнал — с новой попыткой
+  if(!cacheOnly){ delete S.ing[id]; delete S.lim[id];   // журнал — с новой попыткой
     S.run[key] = {ok, text, at: at || new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}; render(); }
 }
 // 24.10.2026: долгая загрузка идёт на сервере в фоне — раз в 5 с спрашиваем, закончилась ли (до 15 мин)
@@ -1783,7 +1844,8 @@ async function resumeRun(id, kind){
   try {
     const st = await api('/companies/' + encodeURIComponent(id) + '/run-status?kind=' + kind);
     if(!st.busy) return;
-    S.run[key] = {busy:true}; render();
+    if(st.queued_until){ S.run[key] = {busy:true, queued:st.queued_until}; render(); return; }   // 05.11.2026: ждёт часа пик — не опрашиваем
+    S.run[key] = {busy:true, since:st.since || ''}; render();
     const r = await pollRun(id, kind);
     S.run[key] = {ok:!!r.ok, text:r.text, at:r.at || ''};
     if(kind === 'ord') delete S.ing[id]; else if(r.ok) await loadBq(id);
@@ -1804,7 +1866,7 @@ function renderClient(){
     const step1 = c.source === 'file'
       ? `<p class="small" style="margin:0">Данные приходят файлом по секретной ссылке. Отправьте по ней свежую выгрузку (ссылку можно взять у менеджера СТТ), затем закройте период.</p>`
       : `<button class="pri" style="width:100%" id="crl_${esc(c.company_id)}" onclick="clientReload('${esc(c.company_id)}')">Загрузить данные сейчас</button>
-         <p class="small">Заберёт из ${c.source === 'bigquery' ? 'BigQuery' : 'API'} все заказы прошлого и текущего месяца. Повтор не задваивает заказы. Число запусков в сутки ограничено.</p>`;
+         <p class="small">Заберёт из ${c.source === 'bigquery' ? 'BigQuery' : 'API'} свежие заказы. Повтор не задваивает заказы. Если в источнике ничего не изменилось — загрузки не будет.</p>${clientLim(c.company_id, 'ord')}`;
     const opts = c.months.map((p, i) => `<option value="${p.month}.${p.year}" ${i===1?'selected':''}>${MONTHS_RU[p.month-1]} ${p.year}${i===0?' · идёт':''}</option>`).join('');
     return `<div class="panel" style="padding:16px 18px;max-width:560px;margin-bottom:16px">
       <div class="dhead"><h2>${esc(c.name)}</h2><span class="tag ${okY ? 's-work' : 's-test'}">${okY ? 'Данные за ' + y + ' пришли' : 'Нет данных за ' + y}</span></div>
@@ -1813,10 +1875,20 @@ function renderClient(){
       <div class="box" style="margin-top:10px"><p class="val" style="margin-bottom:8px">2. Закрыть период</p>
         <div style="display:flex;gap:8px"><select id="ccm_${esc(c.company_id)}" style="flex:1">${opts}</select>
         <button class="pri" id="ccb_${esc(c.company_id)}" onclick="clientClose('${esc(c.company_id)}')">Закрыть период</button></div>
-        <p class="small">Нажмите после обновления заказов — итоги месяца и недели пересчитаются, дашборды покажут новые цифры. Для текущего месяца пересчитаются только закончившиеся недели.</p></div>
+        <p class="small">Нажмите после обновления заказов — итоги месяца и недели пересчитаются, дашборды покажут новые цифры. Для текущего месяца пересчитаются только закончившиеся недели.</p>${clientLim(c.company_id, 'close')}</div>
       <div id="cout_${esc(c.company_id)}"></div>
       <p class="small" style="margin-top:12px;color:var(--ink-3)">Доступны прошлый и текущий месяц. Менеджер СТТ получает уведомление о каждом действии.</p></div>`;
   }).join('');
+}
+S.clim = S.clim || {};
+function clientLim(id, kind){   // 05.11.2026: сколько запусков осталось сегодня
+  const L = S.clim[id];
+  if(!L){ S.clim[id] = 'loading'; api('/client/' + encodeURIComponent(id) + '/load-limits').then(r => { S.clim[id] = r; renderClient(); }).catch(() => { S.clim[id] = {limited:false}; }); return ''; }
+  if(L === 'loading' || !L.limited) return '';
+  const k = (L.kinds || {})[kind]; if(!k) return '';
+  const t = k.left ? `Сегодня осталось ${k.left} из ${k.per_day}` + (k.next_at ? ` · следующий в ${k.next_at}` : '') + (kind === 'ord' && L.peak_until ? ` · сейчас час пик — начнётся в ${L.peak_until}` : '')
+    : 'На сегодня запуски закончились — следующий завтра. Автозагрузка по расписанию идёт как обычно.';
+  return `<p class="small" style="color:var(--ink-3)">${esc(t)}</p>`;
 }
 async function clientReload(id){
   const b = $('crl_' + id); b.disabled = true; b.textContent = 'Загружаю…';
@@ -1824,6 +1896,7 @@ async function clientReload(id){
     $('cout_' + id).innerHTML = `<div class="note">${esc(r.message)}</div>`; }
   catch(e){ $('cout_' + id).innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
   b.disabled = false; b.textContent = 'Загрузить данные сейчас';
+  delete S.clim[id]; const keep = $('cout_' + id).innerHTML; renderClient(); $('cout_' + id).innerHTML = keep;
 }
 async function clientClose(id){
   const [m, y] = $('ccm_' + id).value.split('.').map(Number);
@@ -1833,6 +1906,7 @@ async function clientClose(id){
     $('cout_' + id).innerHTML = periodResult(r); }
   catch(e){ $('cout_' + id).innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
   b.disabled = false; b.textContent = 'Закрыть период';
+  delete S.clim[id]; const keep = $('cout_' + id).innerHTML; renderClient(); $('cout_' + id).innerHTML = keep;
 }
 
 function logTable(rows, withCo){
