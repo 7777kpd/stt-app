@@ -126,7 +126,7 @@ const API = new URLSearchParams(location.search).get('dev') === '1'
 const TG = window.Telegram && window.Telegram.WebApp;
 const INIT = TG ? TG.initData : '';
 
-const ROLES = {owner:'Владелец', manager:'Менеджер СТТ', tech:'Техспециалист'};
+const ROLES = {owner:'Владелец', manager:'Менеджер СТТ', tech:'Техспециалист', cadmin:'Администратор клиента'};
 const STAGES = {test:'Тест (Excel)', conn:'Подключение', work:'Работает', pause:'Приостановлена', off:'Отключена'};
 const DAYS = ['пн','вт','ср','чт','пт','сб','вс'];
 const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia/Almaty','Asia/Dushanbe','Asia/Ashgabat','Asia/Bishkek'];
@@ -143,6 +143,9 @@ const role = () => S.me ? S.me.role : '';
 const isOwner = () => role() === 'owner';
 const canMgr = () => ['owner','manager'].includes(role());
 const canTech = () => ['owner','tech'].includes(role());
+// 05.11.2026: администратор клиента — своя компания: настройки, должности, источник, загрузки
+const isCl = () => role() === 'cadmin';
+const canCfg = () => canMgr() || isCl();
 
 function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('show'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('show'),3600); }
 
@@ -179,11 +182,11 @@ async function boot(){
     try { S.client = await api('/client/me'); renderClient(); return; }
     catch(e2){ fatal(e2.message || e.message); return; }
   }
-  S.tab = role() === 'tech' ? 'data' : 'overview';
+  S.tab = role() === 'tech' ? 'data' : isCl() ? 'cfg' : 'overview';
   await loadCompanies();
   if(canMgr()){ try { S.bset = await api('/billing/settings'); } catch(e){} }
-  try { S.people = await api('/tasks/people'); } catch(e){}
-  await refreshTaskCount();
+  if(!isCl()){ try { S.people = await api('/tasks/people'); } catch(e){}
+    await refreshTaskCount(); }
   render();
 }
 
@@ -196,9 +199,11 @@ async function loadCompanies(){
 const co = id => S.companies.find(c => c.company_id === id);
 const VIEWS = () => isOwner() ? [['companies','Компании'],['tasks','Задачи'],['sales','Продажи'],['team','Команда'],['log','Журнал изменений'],['tariff','Тариф']]
   : role() === 'manager' ? [['companies','Мои компании'],['tasks','Задачи'],['sales','Мои продажи'],['log','Журнал изменений']]
+  : isCl() ? [['companies','Моя компания'],['log','Журнал изменений']]
   : [['companies','Компании'],['tasks','Задачи'],['log','Журнал изменений']];
 const TABS = c => {
   // 20.10.2026: «Подключение» — пошаговая проверка; на этапах «Тест»/«Подключение» — первая вкладка
+  if(isCl()) return [['cfg','Настройки'],['pos','Должности'],['data','Данные'],['clog','Журнал']];   // 05.11.2026
   const onb = c && ['test','conn'].includes(c.stage) ? [['onb','Подключение']] : [['onb','Проверка']];
   const rest = role() === 'tech' ? [['data','Данные'],['ctasks','Задачи'],['clog','Журнал']]
     : [['overview','Обзор'],['pos','Должности'],['cfg','Настройки'],['data','Данные'],['pay','Оплата'],['ctasks','Задачи'],['clog','Журнал']];
@@ -260,6 +265,7 @@ function renderCompanies(){
     <div class="panel det" style="margin-top:14px"><p class="val">У вас пока нет компаний</p>
     <p class="small">${role()==='manager' ? 'Заведите нового клиента или возьмите себе свободную компанию ниже.' : 'Справочник пуст.'}</p></div>${freeBlock()}`;
   const c = co(S.sel);
+  if(isCl() && V.length === 1) return `<div class="panel det" style="display:block">${c ? renderDetail(c) : ''}</div>`;   // 05.11.2026
   const chips = [['all','Все',V.length], ...(isOwner() ? [['nomgr','Без менеджера',V.filter(x=>!x.manager_telegram_id).length]] : []),
     ...Object.entries(STAGES).map(([k,n]) => [k,n,cnt(k)]).filter(x => x[2]), ...(DEL.length ? [['deleted','Удалённые',DEL.length]] : [])];
   return `<div class="head"><h1>${title}</h1>${newBtn}</div>
@@ -280,7 +286,7 @@ function renderDetail(c){
   const tabs = TABS(c); if(!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   if(role() !== 'tech' && !S.brd[c.company_id]) loadBrd(c.company_id);   // 24.10.2026: выходные по филиалам
   const body = S.tab === 'onb' ? tabOnb(c) : S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : S.tab === 'pos' ? tabPos(c) : tabLog();
-  return `<button class="back" onclick="S.showDet=false;render()">← Все компании</button>
+  return `${isCl() && S.companies.length === 1 ? '' : '<button class="back" onclick="S.showDet=false;render()">← Все компании</button>'}
   <div class="dhead"><div><h2>${esc(c.name || c.company_id)}</h2><div class="meta">${esc(c.company_id)} · ${esc(c.timezone)}</div></div>
   <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${n}${k === 'cfg' && brNeed(c.company_id) ? ' <span title="Есть ли у компании филиалы? Выберите уровень или «нет»." style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);vertical-align:middle"></span>' : ''}</button>`).join('')}</div>${body}`;
@@ -341,15 +347,15 @@ function healthBlock(c){
 
 /* ---------- Настройки ---------- */
 function tabCfg(c){
-  const e = canMgr(), dis = x => x ? '' : 'disabled';
+  const e = canCfg(), dis = x => x ? '' : 'disabled', ours = canMgr();   // 05.11.2026: название, язык, техконтакт — только наши
   const opts = (arr, v, lab) => arr.map(a => `<option value="${esc(a)}" ${String(a)===String(v)?'selected':''}>${esc(lab ? lab(a) : a)}</option>`).join('');
   const hours = Array.from({length:24}, (_, i) => i);
   const tzs = TZS.includes(c.timezone) ? TZS : [c.timezone, ...TZS];
   const off = (c.days_off || '').split(',').map(s => s.trim()).filter(Boolean);
   return `<div class="sec" style="margin-top:0"><h3>Основное</h3>
-    <div class="grid2"><div><p class="lbl">Название</p><input id="f_name" value="${esc(c.name)}" ${dis(e)}></div>
+    <div class="grid2"><div><p class="lbl">Название</p><input id="f_name" value="${esc(c.name)}" ${dis(ours)}></div>
     <div><p class="lbl">Код компании</p><input value="${esc(c.company_id)}" disabled title="Код не меняется — к нему привязаны данные"></div></div>
-    <div style="margin-top:12px"><p class="lbl">Язык приложения и бота</p><select id="f_lang" ${dis(e)} onchange="setCompanyLang('${esc(c.company_id)}', this.value)">${[['ru','Русский'],['uk','Українська'],['uz','Oʻzbekcha (lotin)']].map(([k,n]) => `<option value="${k}" ${(c.lang||'ru')===k?'selected':''}>${n}</option>`).join('')}</select>
+    <div style="margin-top:12px"><p class="lbl">Язык приложения и бота</p><select id="f_lang" ${dis(ours)} onchange="setCompanyLang('${esc(c.company_id)}', this.value)">${[['ru','Русский'],['uk','Українська'],['uz','Oʻzbekcha (lotin)']].map(([k,n]) => `<option value="${k}" ${(c.lang||'ru')===k?'selected':''}>${n}</option>`).join('')}</select>
       <p class="small">Язык по умолчанию для всех сотрудников компании. Каждый может сменить его для себя кнопкой 🌐 в приложении. Данные клиента (точки, адреса, категории) не переводятся.</p></div></div>
   <div class="sec"><h3>Расписание</h3>
     <div class="grid3"><div><p class="lbl">Часовой пояс</p><select id="f_tz" ${dis(e)} onchange="cfgPreview()">${opts(tzs, c.timezone)}</select></div>
@@ -359,9 +365,10 @@ function tabCfg(c){
     ${planDayBlock(c, e)}
     <div class="note" id="f_prev"></div></div>
   <div class="sec"><h3>Люди и уведомления</h3>
-    <div class="grid2"><div><p class="lbl">Техконтакт клиента — Telegram ID</p><input id="f_ti" value="${esc(c.tech_contact_id)}" inputmode="numeric" placeholder="302513790" ${dis(e)}>
+    <div class="grid2"><div><p class="lbl">Техконтакт клиента — Telegram ID</p><input id="f_ti" value="${esc(c.tech_contact_id)}" inputmode="numeric" placeholder="302513790" ${dis(ours)}>
       <p class="small">Получает уведомления о сбоях загрузки своей компании.</p></div>
-    <div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div></div>
+    ${isCl() ? '' : `<div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div>`}</div>
+    ${clientAdminsBlock(c)}
     <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>
   ${limitsBlock(c)}
   <p class="err" id="f_err"></p>
@@ -429,11 +436,11 @@ async function loadPos(id){
   S.pos = S.pos || {};
   S.pos[id] = 'loading';
   try { const r = await api('/companies/' + encodeURIComponent(id) + '/positions');
-    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]})), opts: r.opts || {skip_single: true}, no_id: r.no_id || []}; }
+    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]})), opts: r.opts || {skip_single: true}, no_id: r.no_id || []}; posRemember(id); }
   catch(e){ S.pos[id] = {error: e.message}; }
 }
 function tabPos(c){
-  const id = c.company_id, P = (S.pos || {})[id], e = canMgr();
+  const id = c.company_id, P = (S.pos || {})[id], e = canCfg();
   if(!P || P === 'loading'){ if(!P) loadPos(id).then(render); return '<p class="small" style="margin-top:16px">Загружаю…</p>'; }
   if(P.error) return `<p class="err">${esc(P.error)}</p>`;
   if(!P.levels.length) return `<div class="panel" style="padding:14px 16px"><p class="small" style="margin:0">Структура компании ещё не загружена — должности появятся после первого файла.</p></div>`;
@@ -451,7 +458,7 @@ function tabPos(c){
     <div class="tw"><table><tr><th>Должность</th><th class="c">Людей</th>${POS_DASH.map(([,n]) => `<th class="c">${n}</th>`).join('')}<th></th></tr>${rows}</table></div>
     <div id="pos_chk">${posCheck(L)}</div>
     ${`<label class="check"><input type="checkbox" ${P.opts.skip_single !== false ? 'checked' : ''} onchange="S.pos['${esc(id)}'].opts.skip_single=this.checked" ${dis}> Пропускать уровни с одним человеком <span class="small" style="margin:0">— руководитель сразу видит первый уровень, где есть с кем сравнить</span></label>`}
-    ${e ? `<div class="acts">${ch ? `<button onclick="posAdd('${esc(id)}')">+ Уровень</button>` : ''}<button class="pri" id="pos_b" onclick="posSave('${esc(id)}')">Сохранить</button></div>` : ''}
+    ${e ? `<div class="acts">${ch ? `<button onclick="posAdd('${esc(id)}')">+ Уровень</button>` : ''}<button class="pri" id="pos_b" onclick="posSave('${esc(id)}')">Сохранить</button><button onclick="posRevert('${esc(id)}')">Вернуть как было</button></div>` : ''}
     <p class="small">Рейтинг агента — автоматически: «Команда», «Торговый отдел», «Компания».</p></div>
     ${posNoId(id, P, e)}`;
 }
@@ -490,12 +497,28 @@ function posDel(id, i){ S.pos[id].levels.splice(i, 1); render(); }
 async function posSave(id){
   const L = S.pos[id].levels;
   if(L.some(r => r.manual && !String(r.col || '').trim())){ toast('Укажите колонку в файле у добавленного уровня'); return; }
+  // 05.11.2026: перед сохранением — кто что потеряет / получит
+  const was = S.posSaved && S.posSaved[id] || [], DN = Object.fromEntries(POS_DASH), out = [];
+  L.forEach(r => { const o = was.find(x => x.col === r.col); if(!o || !r.n) return;
+    r.dash.filter(d => !o.dash.includes(d)).forEach(d => out.push(`${r.n} чел. (${r.title || r.col}) получат «${DN[d] || d}»`));
+    o.dash.filter(d => !r.dash.includes(d)).forEach(d => out.push(`${r.n} чел. (${r.title || r.col}) потеряют «${DN[d] || d}»`)); });
+  if(out.length && !confirm('После сохранения:\n• ' + out.join('\n• ') + '\n\nСохранить?')) return;
   const b = $('pos_b'); b.disabled = true; b.textContent = 'Сохраняю…';
   try { const r = await api('/companies/' + encodeURIComponent(id) + '/positions', {method:'POST',
       body:{levels: L.map(x => ({col: x.col, title: x.manual ? (x.title || x.col) : x.title, dash: x.dash, manual: !!x.manual})), opts: S.pos[id].opts}});
     S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]})), opts: r.opts || {skip_single: true}, no_id: r.no_id || []};
-    toast('Должности сохранены — бот и дашборды уже работают по ним'); render(); }
+    posRemember(id); toast('Должности сохранены — бот и дашборды уже работают по ним'); render(); }
   catch(e){ toast(e.message); b.disabled = false; b.textContent = 'Сохранить'; }
+}
+// 05.11.2026: что сохранено сейчас — для сравнения «кто потеряет / получит» и «Вернуть как было»
+S.posSaved = S.posSaved || {};
+function posRemember(id){ const P = S.pos[id]; if(P && P.levels) S.posSaved[id] = P.levels.map(x => ({col:x.col, dash:[...(x.dash || [])]})); }
+async function posRevert(id){
+  if(!confirm('Вернуть «Должности», как они были до последнего сохранения?')) return;
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/positions-revert', {method:'POST'});
+    S.pos[id] = {chain: r.chain, levels: (r.levels || []).map(x => ({...x, dash: [...(x.dash || [])]})), opts: r.opts || {skip_single: true}, no_id: r.no_id || []};
+    posRemember(id); toast('Вернули как было'); render(); }
+  catch(e){ toast(e.message); }
 }
 
 /* ---------- Доступ ко всем дашбордам (14.10.2026) ---------- */
@@ -506,7 +529,7 @@ async function loadViewers(id){
   if(S.sel === id && S.tab === 'cfg') render();
 }
 function viewersBlock(c){
-  const id = c.company_id, v = S.viewers[id], e = canMgr();
+  const id = c.company_id, v = S.viewers[id], e = canCfg();
   let list;
   if(!v || v === 'loading'){ if(!v) loadViewers(id); list = '<p class="small">Загружаю…</p>'; }
   else if(v.error) list = `<p class="err">${esc(v.error)}</p>`;
@@ -590,7 +613,7 @@ function daysBlock(c, off, e){
 }
 function brPaint(id){
   const c = co(id), box = $('br_box'); if(!c || !box) return;
-  box.innerHTML = daysBlock(c, compOffNow(c), canMgr());
+  box.innerHTML = daysBlock(c, compOffNow(c), canCfg());
   cfgPreview();
   const b = $('f_save'); if(b){ b.disabled = brNeed(id); }
 }
@@ -815,13 +838,13 @@ function srcKey(c){ return c.connection_type === 'bigquery' ? 'bigquery' : c.con
 function sourceName(c){ return {excel:'Excel', file:'Секретная ссылка', bigquery:'BigQuery', api:'API', google:'Google (переход)'}[srcKey(c)]; }
 function tabData(c){
   const cur = S.srcDraft && S.srcDraft.id === c.company_id ? S.srcDraft.key : srcKey(c);
-  const canSrc = canTech() || canMgr();   // 30.09.2026: менеджер тоже подключает BigQuery/API
+  const canSrc = canTech() || canMgr() || isCl();   // 30.09.2026: менеджер тоже подключает BigQuery/API; 05.11.2026: и администратор клиента — адреса своего источника
   const segs = [['excel','Excel'],['file','Секретная ссылка'],['bigquery','BigQuery'],['api','API']];
   // 30.09.2026: менеджер тоже может переключать Excel ⇄ Секретная ссылка — это его
   // работа с клиентом (выдать ссылку, выключить её). BigQuery/API — только
   // владелец и техспециалист: там технические адреса и соответствие полей.
   const simple = k => ['excel','file'].includes(k);
-  const canPick = k => canSrc || (canMgr() && simple(k) && simple(srcKey(c)));
+  const canPick = k => isCl() ? k === srcKey(c) && ['bigquery','api'].includes(k) : canSrc || (canMgr() && simple(k) && simple(srcKey(c)));
   const segHtml = segs.map(([k,n]) => {
     const on = cur === k, can = canPick(k);
     return `<span class="chip ${on?'on':''}" style="${can||on?'':'opacity:.5;cursor:default'}" ${can ? `onclick="S.srcDraft={id:'${esc(c.company_id)}',key:'${k}'};render()"` : `title="Меняет владелец или техспециалист"`}>${n}</span>`;
@@ -851,7 +874,7 @@ function tabData(c){
   const srcBlock = `<div class="panel" style="padding:12px 16px"><p class="lbl">Источник данных</p>
     ${srcKey(c) === 'google' && cur === 'google' ? `<div class="chips"><span class="chip on">Google (переходный режим)</span></div>` : `<div class="chips">${segHtml}</div>`}
     <p class="small" style="margin-top:8px">${hints[cur] || ''}</p>${fields}
-    ${canPick(cur) && changed && cur !== 'google' ? `<p class="err" id="src_err"></p><div class="acts"><button class="pri" onclick="saveSource('${esc(c.company_id)}','${cur}')">${cur === 'file' && srcKey(c) !== 'file' ? 'Создать ссылку' : 'Сохранить источник'}</button>${S.srcDraft ? '<button onclick="S.srcDraft=null;render()">Отмена</button>' : ''}</div>` : ''}</div>${srcKey(c) === 'api' && cur === 'api' ? routesApiBlock(c) : ''}${linkBlock}`;   // 14.10.2026: маршруты — сразу под источником
+    ${canPick(cur) && changed && cur !== 'google' ? `<p class="err" id="src_err"></p><div class="acts"><button class="pri" onclick="saveSource('${esc(c.company_id)}','${cur}')">${cur === 'file' && srcKey(c) !== 'file' ? 'Создать ссылку' : 'Сохранить источник'}</button>${S.srcDraft ? '<button onclick="S.srcDraft=null;render()">Отмена</button>' : ''}${['bigquery','api'].includes(cur) && cur === srcKey(c) ? `<button onclick="srcRevert('${esc(c.company_id)}')">Вернуть как было</button>` : ''}</div><p class="small" id="src_ok" style="color:var(--ok)"></p>` : ''}</div>${srcKey(c) === 'api' && cur === 'api' ? routesApiBlock(c) : ''}${linkBlock}`;   // 14.10.2026: маршруты — сразу под источником
 
   const src = srcKey(c);
   const months = lastMonths(12);
@@ -1032,11 +1055,40 @@ async function saveSource(id, key){
     body.bq_column_map = Object.keys(map).length ? map : null;
   }
   if(key === 'api'){ body.connection_type = 'rest_api'; body.rest_base_url = $('f_rest').value.trim(); }
+  if(isCl()) delete body.connection_type;   // 05.11.2026: тип подключения меняем мы
+  const sb = document.querySelector('#src_err + .acts .pri'); if(sb && isCl()){ sb.disabled = true; sb.textContent = 'Проверяю источник…'; }
   try {
     const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body});
     Object.assign(c, r.company); S.srcDraft = null; delete S.health[id];
     toast(r.changed ? 'Источник сохранён' : 'Изменений нет'); render();
-  } catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message); }
+    if(r.probe && $('src_ok')) $('src_ok').textContent = r.probe + ' Настройки сохранены.';
+  } catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message);
+    if(sb){ sb.disabled = false; sb.textContent = 'Сохранить источник'; } }
+}
+async function srcRevert(id){
+  if(!confirm('Вернуть настройки источника, какими они были до последнего изменения?')) return;
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/source-revert', {method:'POST'});
+    Object.assign(co(id), r.company); delete S.bq[id]; delete S.health[id]; toast(r.message); render(); }
+  catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message); }
+}
+// 05.11.2026: «Администраторы клиента» — задаёт владелец или менеджер (карточка → «Настройки»)
+S.cadm = S.cadm || {};
+function clientAdminsBlock(c){
+  if(!canMgr()) return '';
+  const id = c.company_id, A = S.cadm[id];
+  if(!A){ S.cadm[id] = 'loading'; api('/companies/' + encodeURIComponent(id) + '/client-admins').then(r => { S.cadm[id] = r; if(S.tab === 'cfg') render(); }).catch(e => { S.cadm[id] = {error:e.message}; }); return ''; }
+  if(A === 'loading' || A.error) return '';
+  return `<div style="margin-top:12px"><p class="lbl">Администраторы клиента — Telegram ID через запятую, до ${A.max}</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="f_cadm" inputmode="numeric" value="${esc(A.ids.join(', '))}" placeholder="518334210, 702115448" style="flex:1;min-width:200px" oninput="$('f_cadm_s').disabled=false">
+    <button class="pri" id="f_cadm_s" disabled onclick="saveCadm('${esc(id)}')">Сохранить</button></div>
+    <p class="small">Ведут свою компанию в админке сами (команда /admin в боте): источник данных, должности, расписание, План, загрузки, закрытие периода. Не видят этап, оплату и другие компании.${A.tech_contact_id ? ' Техконтакт — администратор автоматически.' : ''} Убрали ID — доступ закрывается сразу.</p>
+    <p class="err" id="f_cadm_err"></p></div>`;
+}
+async function saveCadm(id){
+  const b = $('f_cadm_s'); b.disabled = true;
+  try { S.cadm[id] = await api('/companies/' + encodeURIComponent(id) + '/client-admins', {method:'POST', body:{ids: $('f_cadm').value}});
+    toast('Сохранено: администраторов клиента — ' + S.cadm[id].ids.length); render(); }
+  catch(e){ $('f_cadm_err').textContent = e.message; b.disabled = false; }
 }
 
 /* ---------- Мастер «Перевод с Google на базу» ---------- */
@@ -1085,7 +1137,7 @@ async function loadBq(id){
 function bqSpBlock(c){
   const b = S.bq[c.company_id];
   if(!b || b === 'loading'){ if(!b) loadBq(c.company_id); return '<div class="panel" style="padding:12px 16px;margin-top:12px"><p class="small">Загружаю…</p></div>'; }
-  const t = canTech() || canMgr(), r = b.refs || {};
+  const t = canTech() || canMgr() || isCl(), r = b.refs || {};
   const last = (b.last || []).map(x => `<div style="padding:6px 0;border-top:1px solid var(--line)"><span class="tag ${x.action.includes('ошибка') ? 's-pause' : 's-work'}">${x.action.includes('ошибка') ? 'не обновлено' : 'обновлено'}</span> <span class="small">${fdtz(x.at, c.timezone)} (${esc(tzCity(c.timezone))}) · ${esc(x.actor_name)} · ${esc(x.details)}</span></div>`).join('');
   const chk = b.check ? `<div class="note ${b.check.warning ? 'warn' : ''}" style="margin-top:10px">${esc(b.check.summary)}${b.check.warning ? '<br><b>' + esc(b.check.warning) + '</b>' : ''}</div>
       <details style="margin-top:6px"><summary style="cursor:pointer">Полный отчёт проверки</summary><pre style="white-space:pre-wrap;font:13px/1.5 var(--sans)">${esc(b.check.report)}</pre></details>` : '';
@@ -1192,9 +1244,9 @@ function planBlock(c){
   if(!p || p === 'loading'){ if(!p) loadPlan(c.company_id); return '<div class="panel" style="padding:12px 16px;margin-top:12px"><p class="small">Загружаю План…</p></div>'; }
   const lines = (p.lines || []).map(t => `<div class="small" style="padding:3px 0">• ${esc(t)}</div>`).join('');
   const last = (p.last || []).map(x => `<div class="small" style="padding:4px 0;border-top:1px solid var(--line)">${fdt(x.at)} · ${esc(x.actor_name)} · ${esc(x.details)}</div>`).join('');
-  const btn = p.pending && canMgr() ? `<div class="note warn" style="margin-top:10px"><b>${p.pending} ${p.pending === 1 ? 'изменение ждёт' : 'изменений ждут'} ${esc(p.pending_from)}.</b> Если клиент просит включить их сейчас — можно, но показатели этого месяца пересчитаются задним числом.
+  const btn = p.pending && canCfg() ? `<div class="note warn" style="margin-top:10px"><b>${p.pending} ${p.pending === 1 ? 'изменение ждёт' : 'изменений ждут'} ${esc(p.pending_from)}.</b> Если клиент просит включить их сейчас — можно, но показатели этого месяца пересчитаются задним числом.
       <div class="acts"><button class="danger" id="pl_now" onclick="planApplyNow('${esc(c.company_id)}')">Применить План сейчас</button></div></div>`
-    : p.pending ? `<p class="small" style="margin-top:8px">Применить раньше 1-го числа может владелец или менеджер СТТ.</p>` : '';
+    : p.pending ? `<p class="small" style="margin-top:8px">Применить раньше 1-го числа может владелец, менеджер СТТ или администратор клиента.</p>` : '';
   return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">План посещений: изменения маршрутов</strong>
     <p class="small" style="margin:4px 0 8px">✅ Новая точка считается со дня, когда её добавили. ⏳ Смена дня визита и удаление точки — с 1-го числа следующего месяца; если файл пришёл 1–3 числа — с 1-го числа этого месяца. Так цифры прошедших дней не меняются задним числом.</p>
     ${p.error ? `<div class="note bad">${esc(p.error)}</div>` : (lines || '<p class="small">В этом месяце маршруты не менялись.</p>')}${btn}
