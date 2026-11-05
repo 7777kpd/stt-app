@@ -356,6 +356,7 @@ function tabCfg(c){
     <div><p class="lbl">Утренний отчёт</p><select id="f_m" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.morning_hour, hh)}</select></div>
     <div><p class="lbl">Вечерний отчёт</p><select id="f_e" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.evening_hour, hh)}</select></div></div>
     <div id="br_box">${daysBlock(c, off, e)}</div>
+    ${planDayBlock(c, e)}
     <div class="note" id="f_prev"></div></div>
   <div class="sec"><h3>Люди и уведомления</h3>
     <div class="grid2"><div><p class="lbl">Техконтакт клиента — Telegram ID</p><input id="f_ti" value="${esc(c.tech_contact_id)}" inputmode="numeric" placeholder="302513790" ${dis(e)}>
@@ -623,6 +624,18 @@ function brPending(id){
   }
   return {level: lv, off};
 }
+// 05.11.2026: до какого числа изменения Плана (смена дней, перенос точек) применяются с 1-го числа
+function planDayBlock(c, e){
+  const B = S.brd[c.company_id];
+  if(!brOK(c.company_id)) return '';
+  const cur = +(B.plan_apply_day || 3);
+  const opts = Array.from({length:15}, (_, i) => i + 1).map(d => `<option value="${d}" ${d===cur?'selected':''}>${d}</option>`).join('');
+  return `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px">
+      <p class="lbl" style="margin:0">Новый План на месяц применяется сразу, если пришёл до</p>
+      <select id="f_pday" style="width:auto;padding:4px 8px;font-size:13px" ${e ? '' : 'disabled'}>${opts}</select>
+      <span class="small" style="margin:0">числа включительно</span></div>
+    <p class="small">Смена дней и перенос точек, пришедшие до этого числа, действуют с 1-го числа месяца. Позже — с 1-го числа следующего. Утренний забор до 12:00 считается предыдущим днём: клиент мог выгрузить вечером. Новые точки и закрытые клиенты учитываются всегда сразу.</p>`;
+}
 function cfgPreview(){
   const el = $('f_prev'); if(!el) return;
   const m = +$('f_m').value, e = +$('f_e').value, tz = $('f_tz').value;
@@ -644,7 +657,8 @@ function collectCfg(c){
 async function saveCfg(id){
   const c = co(id), ch = collectCfg(c), bd = brPending(id);
   if(bd === 'need'){ $('f_err').textContent = 'Есть ли у компании филиалы? Выберите уровень или «нет».'; return; }
-  if(!Object.keys(ch).length && !bd){ toast('Изменений нет'); return; }
+  const pdEl = $('f_pday'), pdChanged = pdEl && brOK(id) && +pdEl.value !== +(S.brd[id].plan_apply_day || 3);
+  if(!Object.keys(ch).length && !bd && !pdChanged){ toast('Изменений нет'); return; }
   if(+$('f_e').value <= +$('f_m').value){ $('f_err').textContent = 'Вечерний отчёт должен быть позже утреннего'; return; }
   $('f_save').disabled = true;
   try {
@@ -652,6 +666,11 @@ async function saveCfg(id){
     if(Object.keys(ch).length){
       const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body: ch});
       Object.assign(c, r.company); n += r.changed || 0;
+    }
+    const pd = $('f_pday'), B0 = S.brd[id];
+    if(pd && brOK(id) && +pd.value !== +(B0.plan_apply_day || 3)){   // 05.11.2026
+      await api('/companies/' + encodeURIComponent(id) + '/plan-opts', {method:'POST', body:{apply_day: +pd.value}});
+      B0.plan_apply_day = +pd.value; n += 1;
     }
     if(bd){   // 24.10.2026: выходные по филиалам — отдельно от справочника
       S.brd[id] = await api('/companies/' + encodeURIComponent(id) + '/branch-days', {method:'POST', body: bd});
@@ -941,10 +960,7 @@ async function saveSource(id, key){
     catch(e){ const el = $('src_err'); if(el) el.textContent = e.message; else toast(e.message); }
     return;
   }
-  // 29.10.2026: у компаний с BigQuery/API ссылка живёт рядом (для Структуры и Плана) — сохранение
-  // их настроек её не трогает. Выключаем ссылку только при уходе с «Секретной ссылки» на другой источник.
-  if(c.file_mode && !(c.connection_type && (key === 'bigquery' || key === 'api'))){
-    if(!confirm('Выключить секретную ссылку? Автоматическая отправка файлов от клиента остановится. Если включить снова — вернётся та же ссылка.')) return;
+  if(c.file_mode){
     try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'disable'}}); c.file_mode = false; delete S.upl[id]; }
     catch(e){ toast(e.message); return; }
   }
@@ -1528,11 +1544,8 @@ function fileLinkBlock(c){
     <p class="lbl">Секретная ссылка для загрузки — передайте клиенту</p>
     <div style="display:flex;gap:8px"><input id="up_url" class="mono" value="${esc(url)}" readonly style="flex:1"><button onclick="copyUrl()">Скопировать</button></div>
     <div class="acts"><button onclick="window.open($('up_url').value,'_blank')">Открыть страницу загрузки</button>
-      <button onclick="rotateOpen('${esc(c.company_id)}')">Перевыпустить ссылку</button></div>
-    ${rotateBlock(c, u)}
-    ${u.old_until ? `<p class="small" style="color:var(--warn,#b26a00)">Прежняя ссылка ещё работает до ${fdt(u.old_until)} — до этого срока клиент должен сменить её в 1С.</p>` : ''}
-    <p class="small">Без ссылки загрузить файл нельзя. Ссылка постоянная: «Создать» и «Выключить» её не меняют, меняет только «Перевыпустить». Если ссылка попала не к тем людям — перевыпустите «Срочно».</p>
-    ${linkHistory(u)}
+      <button onclick="rotateLink('${esc(c.company_id)}')">Перевыпустить ссылку</button></div>
+    <p class="small">Без ссылки загрузить файл нельзя. Если она попала не к тем людям — перевыпустите: старая сразу перестанет работать, новую передайте клиенту.</p>
     ${itBlock(c, url)}
     <p class="small" style="margin-top:12px">Какие файлы пришли, когда и что записано — в «Журнале загрузок заказов» внизу вкладки.</p>
   </div>`;
@@ -1631,35 +1644,9 @@ function copyText(btn){
   toast('Список скопирован');
 }
 function copyUrl(){ const el = $('up_url'); el.select(); try { navigator.clipboard.writeText(el.value); } catch(e){ document.execCommand('copy'); } toast('Ссылка скопирована'); }
-/* 29.10.2026: перевыпуск — только с вводом названия компании и выбором «плавно / срочно».
-   «Плавно»: прежняя ссылка живёт ещё 7 дней, автоотправка клиента не обрывается.
-   «Срочно»: прежняя умирает сразу (если ссылка утекла). */
-function rotateOpen(id){ S.rot = S.rot === id ? null : id; render(); }
-function rotateBlock(c, u){
-  if(S.rot !== c.company_id) return '';
-  const week = 7 * 864e5;
-  const auto = (u.last || []).some(x => !String(x.action || '').includes('ошибка') && Date.now() - new Date(x.at).getTime() < week);
-  const nm = c.name || c.company_id;
-  return `<div class="note warn" style="margin-top:10px">
-    ${auto ? '<p style="margin:0 0 8px"><b>По этой ссылке за последнюю неделю приходили файлы</b> — скорее всего, идёт автоотправка из 1С. После перевыпуска она остановится, пока в 1С не заменят ссылку.</p>' : ''}
-    <p class="small" style="margin:0 0 6px">Для подтверждения введите название компании: <b>${esc(nm)}</b></p>
-    <input id="rot_name" placeholder="${esc(nm)}" autocomplete="off" style="width:100%">
-    <div class="acts" style="margin-top:8px">
-      <button class="pri" onclick="rotateGo('${esc(c.company_id)}','soft')">Плавно — старая ещё 7 дней</button>
-      <button onclick="rotateGo('${esc(c.company_id)}','now')">Срочно — старая сразу умрёт</button>
-      <button onclick="S.rot=null;render()">Отмена</button></div></div>`;
-}
-function linkHistory(u){
-  const h = (u.history || []).map(x => `<div class="small" style="padding:3px 0">${fdt(x.at)} · ${esc(x.actor_name || '—')} · ${esc(x.details)}</div>`).join('');
-  return h ? `<p class="lbl" style="margin-top:12px">Кто менял ссылку</p>${h}` : '';
-}
-async function rotateGo(id, mode){
-  const name = ($('rot_name') || {}).value || '';
-  if(!name.trim()){ toast('Введите название компании'); return; }
-  try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'rotate', mode, confirm:name}});
-    S.rot = null; delete S.upl[id];
-    toast(mode === 'soft' ? 'Новая ссылка готова. Старая работает ещё 7 дней — передайте новую клиенту' : 'Новая ссылка готова. Старая отключена');
-    render(); }
+async function rotateLink(id){
+  if(!confirm('Перевыпустить ссылку? Старая сразу перестанет работать — новую нужно будет передать клиенту и программисту 1С.')) return;
+  try { await api('/companies/' + encodeURIComponent(id) + '/upload-link', {method:'POST', body:{action:'rotate'}}); delete S.upl[id]; toast('Новая ссылка готова'); render(); }
   catch(e){ toast(e.message); }
 }
 
