@@ -154,7 +154,7 @@ async function api(path, opts = {}){
   try {
     res = await fetch(API + '/api/admin' + path, {
       method: opts.method || 'GET',
-      headers: {'X-Telegram-Init-Data': INIT, 'Content-Type': 'application/json'},
+      headers: {'X-Telegram-Init-Data': INIT + (S.viewAs ? '|view_as=' + S.viewAs : ''), 'Content-Type': 'application/json'},
       body: opts.body ? JSON.stringify(opts.body) : undefined,
     });
   } catch(e){
@@ -221,6 +221,17 @@ async function go(v){
   } catch(e){ toast(e.message); }
   render();
 }
+// 05.11.2026: «Глазами клиента» — та же админка с правами администратора клиента этой компании
+function viewAsReset(){ ['lim','pos','posSaved','cadm','bq','plan','health','brd','brdD','viewers','ing','run','routes','ob'].forEach(k => { S[k] = {}; }); }
+async function viewAs(id){
+  S.realMe = S.me; S.realSel = S.sel; S.viewAs = id; viewAsReset();
+  try { S.me = await api('/me'); await loadCompanies(); S.sel = id; S.view = 'companies'; S.tab = 'cfg'; S.showDet = true; render(); window.scrollTo(0,0); }
+  catch(e){ S.viewAs = null; S.me = S.realMe; toast(e.message); }
+}
+async function viewAsExit(){
+  S.viewAs = null; S.me = S.realMe || S.me; viewAsReset();
+  await loadCompanies(); S.sel = S.realSel || S.sel; S.tab = 'overview'; render();
+}
 async function pick(id){ S.srcDraft = null; S.sel = id; S.tab = TABS(co(id))[0][0]; S.showDet = true; render(); window.scrollTo(0,0); }
 async function setTab(t){
   S.tab = t; S.srcDraft = null;
@@ -236,6 +247,12 @@ function render(){
     ${VIEWS().map(([k,n]) => `<button class="navb ${S.view===k?'on':''}" onclick="go('${k}')">${n}${k==='tasks' && S.taskCount ? ` <span class="tag s-pause" style="padding:0 7px">${S.taskCount}</span>` : ''}</button>`).join('')}
     <div class="who">${esc(S.me.name)}<br><span class="meta">${ROLES[role()]}</span>${isOwner() ? `<br><span class="meta" style="font-size:11px">сервер: ${esc(S.me.server_version || 'старая версия')}</span>` : ''}</div>`;
   const m = $('main');
+  if(S.viewAs){   // 05.11.2026: владелец смотрит глазами администратора клиента
+    m.innerHTML = `<div class="note warn" style="margin:0 0 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+      <span><b>Вы смотрите глазами администратора клиента.</b> Права и лимиты — как у клиента; изменения сохраняются по-настоящему.</span>
+      <button onclick="viewAsExit()">Выйти</button></div>` + (S.view === 'log' ? renderLog() : renderCompanies());
+    return;
+  }
   if(S.view === 'team') m.innerHTML = renderTeam();
   else if(S.view === 'log') m.innerHTML = renderLog();
   else if(S.view === 'sales') m.innerHTML = renderSales();
@@ -288,7 +305,7 @@ function renderDetail(c){
   const body = S.tab === 'onb' ? tabOnb(c) : S.tab === 'overview' ? tabOverview(c) : S.tab === 'cfg' ? tabCfg(c) : S.tab === 'data' ? tabData(c) : S.tab === 'pay' ? tabPay(c) : S.tab === 'ctasks' ? tabCTasks(c) : S.tab === 'pos' ? tabPos(c) : tabLog();
   return `${isCl() && S.companies.length === 1 ? '' : '<button class="back" onclick="S.showDet=false;render()">← Все компании</button>'}
   <div class="dhead"><div><h2>${esc(c.name || c.company_id)}</h2><div class="meta">${esc(c.company_id)} · ${esc(c.timezone)}</div></div>
-  <span class="tag s-${c.stage}">${esc(c.stage_name)}</span></div>
+  <span style="display:flex;gap:8px;align-items:center">${isOwner() && !S.viewAs ? `<button style="padding:4px 10px;font-size:13px" onclick="viewAs('${esc(c.company_id)}')">👁 Глазами клиента</button>` : ''}<span class="tag s-${c.stage}">${esc(c.stage_name || '')}</span></span></div>
   <div class="tabs">${tabs.map(([k,n]) => `<button class="tab ${S.tab===k?'on':''}" onclick="setTab('${k}')">${n}${k === 'cfg' && brNeed(c.company_id) ? ' <span title="Есть ли у компании филиалы? Выберите уровень или «нет»." style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);vertical-align:middle"></span>' : ''}</button>`).join('')}</div>${body}`;
 }
 
