@@ -375,9 +375,10 @@ function tabCfg(c){
     <div style="margin-top:12px"><p class="lbl">Язык приложения и бота</p><select id="f_lang" ${dis(ours)} onchange="setCompanyLang('${esc(c.company_id)}', this.value)">${[['ru','Русский'],['uk','Українська'],['uz','Oʻzbekcha (lotin)']].map(([k,n]) => `<option value="${k}" ${(c.lang||'ru')===k?'selected':''}>${n}</option>`).join('')}</select>
       <p class="small">Язык по умолчанию для всех сотрудников компании. Каждый может сменить его для себя кнопкой 🌐 в приложении. Данные клиента (точки, адреса, категории) не переводятся.</p></div></div>
   <div class="sec"><h3>Расписание</h3>
-    <div class="grid3"><div><p class="lbl">Часовой пояс</p><select id="f_tz" ${dis(e)} onchange="cfgPreview()">${opts(tzs, c.timezone)}</select></div>
-    <div><p class="lbl">Утренний отчёт</p><select id="f_m" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.morning_hour, hh)}</select></div>
-    <div><p class="lbl">Вечерний отчёт</p><select id="f_e" ${dis(e)} onchange="cfgPreview()">${opts(hours, c.evening_hour, hh)}</select></div></div>
+    <div class="grid3"><div><p class="lbl">Часовой пояс</p><select id="f_tz" ${dis(e)} onchange="cfgPreview();timeDirty()">${opts(tzs, c.timezone)}</select></div>
+    <div><p class="lbl">Утренний отчёт</p><select id="f_m" ${dis(e)} onchange="cfgPreview();timeDirty()">${timeOpts(c.morning_hour, c.morning_minute)}</select></div>
+    <div><p class="lbl">Вечерний отчёт</p><select id="f_e" ${dis(e)} onchange="cfgPreview();timeDirty()">${timeOpts(c.evening_hour, c.evening_minute)}</select></div></div>
+    ${e ? `<div class="acts" style="margin-top:8px"><button class="pri" id="f_time_s" disabled onclick="saveTime('${esc(c.company_id)}')">Сохранить время</button><span class="small" id="f_time_ok" style="color:var(--ok)"></span></div>` : ''}
     <div id="br_box">${daysBlock(c, off, e)}</div>
     ${planDayBlock(c, e)}
     <div class="note" id="f_prev"></div></div>
@@ -679,6 +680,39 @@ function planDayBlock(c, e){
     <p class="small" id="f_pday_ok" style="color:var(--ok)"></p>
     <p class="small">Смена дней и перенос точек, пришедшие до этого числа, действуют с 1-го числа месяца. Позже — с 1-го числа следующего. Утренний забор до 12:00 считается предыдущим днём: клиент мог выгрузить вечером. Новые точки и закрытые клиенты учитываются всегда сразу.</p>`;
 }
+// 06.11.2026: время отчётов с шагом 30 минут — значение списка = минуты от полуночи
+const tmin = (h, m) => (+h || 0) * 60 + (+m || 0);
+const tlab = t => hm(Math.floor(t / 60), t % 60);
+function timeOpts(h, m){
+  const cur = tmin(h, m), out = [];
+  for(let t = 0; t < 1440; t += 30) out.push(t);
+  if(!out.includes(cur)) out.push(cur), out.sort((a, b) => a - b);
+  return out.map(t => `<option value="${t}" ${t === cur ? 'selected' : ''}>${tlab(t)}</option>`).join('');
+}
+function timeDirty(){
+  const c = co(S.sel), b = $('f_time_s'); if(!c || !b) return;
+  const same = $('f_tz').value === c.timezone && +$('f_m').value === tmin(c.morning_hour, c.morning_minute)
+    && +$('f_e').value === tmin(c.evening_hour, c.evening_minute);
+  b.disabled = same; $('f_time_ok').textContent = same ? '' : 'Время изменено — нажмите «Сохранить время».';
+  $('f_time_ok').style.color = same ? 'var(--ok)' : 'var(--ink-2)';
+}
+// Своя кнопка у времени — сохраняется независимо от выходных и филиалов
+async function saveTime(id){
+  const c = co(id), m = +$('f_m').value, e = +$('f_e').value, b = $('f_time_s');
+  if(e <= m){ $('f_time_ok').textContent = 'Вечерний отчёт должен быть позже утреннего'; $('f_time_ok').style.color = 'var(--bad)'; return; }
+  const ch = {};
+  if($('f_tz').value !== c.timezone) ch.timezone = $('f_tz').value;
+  if(m !== tmin(c.morning_hour, c.morning_minute)){ ch.morning_hour = Math.floor(m / 60); ch.morning_minute = m % 60; }
+  if(e !== tmin(c.evening_hour, c.evening_minute)){ ch.evening_hour = Math.floor(e / 60); ch.evening_minute = e % 60; }
+  if(!Object.keys(ch).length){ toast('Изменений нет'); return; }
+  b.disabled = true;
+  try { const r = await api('/companies/' + encodeURIComponent(id), {method:'PATCH', body: ch});
+    Object.assign(c, r.company); delete S.health[id]; delete S.lim[id];
+    $('f_time_ok').style.color = 'var(--ok)';
+    $('f_time_ok').textContent = `✓ Сохранено: утро ${tlab(m)}, вечер ${tlab(e)}. Бот подхватит расписание в течение 10 минут.`;
+    toast('Время сохранено'); }
+  catch(err){ $('f_time_ok').style.color = 'var(--bad)'; $('f_time_ok').textContent = err.message; b.disabled = false; }
+}
 function cfgPreview(){
   const el = $('f_prev'); if(!el) return;
   const m = +$('f_m').value, e = +$('f_e').value, tz = $('f_tz').value;
@@ -686,13 +720,15 @@ function cfgPreview(){
   const work = DAYS.filter(d => !off.includes(d));
   el.className = 'note' + (e <= m ? ' bad' : '');
   el.textContent = e <= m ? 'Вечерний отчёт должен быть позже утреннего.'
-    : `Утренний отчёт в ${hh(m)}, вечерний в ${hh(e)} по времени ${tz}. Рабочие дни: ${work.join(', ') || 'нет'}.`;
+    : `Утренний отчёт в ${tlab(m)}, вечерний в ${tlab(e)} по времени ${tz}. Рабочие дни: ${work.join(', ') || 'нет'}.`;
 }
 function collectCfg(c){
   const ch = {};
   const put = (k, v) => { if(JSON.stringify(c[k] ?? '') !== JSON.stringify(v ?? '')) ch[k] = v; };
   put('name', $('f_name').value.trim()); put('timezone', $('f_tz').value);
-  put('morning_hour', +$('f_m').value); put('evening_hour', +$('f_e').value);
+  const m = +$('f_m').value, e = +$('f_e').value;   // 06.11.2026: минуты от полуночи
+  if(m !== tmin(c.morning_hour, c.morning_minute)){ ch.morning_hour = Math.floor(m / 60); ch.morning_minute = m % 60; }
+  if(e !== tmin(c.evening_hour, c.evening_minute)){ ch.evening_hour = Math.floor(e / 60); ch.evening_minute = e % 60; }
   put('days_off', [...document.querySelectorAll('#f_off .chip.on')].map(x => x.dataset.d).join(','));
   put('tech_contact_id', $('f_ti').value.trim()); put('launch_report', $('f_lr').checked);
   return ch;
@@ -780,7 +816,7 @@ function scheduleBlock(c){
   const noTg = hl.filter(x => /^Люди без Telegram ID/.test(x.title || ''));
   const alerts = [...dataBad.map(x => `${x.title}${x.hint ? ' — ' + x.hint : ''}`),
                   ...(spBad ? [`Последний забор Структуры и Плана из BigQuery — с ошибкой: ${bqLast.details || ''}`] : [])];
-  const mh = +c.morning_hour || 8, eh = +c.evening_hour || 19;
+  const mh = +c.morning_hour || 8, eh = +c.evening_hour || 19, mm = +c.morning_minute || 0, em = +c.evening_minute || 0;   // 06.11.2026: + минуты
   const btn = (label, js) => `<button style="white-space:nowrap" onclick="${js}">${label}</button>`;
   // 24.10.2026: кнопка показывает «Загружаю…» и результат прямо в своей строке
   if(src === 'bigquery') resumeRun(c.company_id, 'sp');
@@ -812,18 +848,18 @@ function scheduleBlock(c){
         last ? `последний раз: ${fdtz(last.at, tz)}${last.action.includes('ошибка') ? ' — с ошибкой' : ''}` : 'ещё не забирали',
         runBtn(c.company_id + ':sp', 'Загрузить сейчас', `bqSync('${id}', false)`)]);
   }
-  add('Утренний отчёт людям', [mh, 0], '', auto);
+  add('Утренний отчёт людям', [mh, mm], '', auto);
   if(src === 'bigquery' || src === 'api')
-    add('Заказы (Факт) из ' + (src === 'api' ? 'API' : 'BigQuery') + ' за сегодня', shiftHM(eh, 0, -15), '',
+    add('Заказы (Факт) из ' + (src === 'api' ? 'API' : 'BigQuery') + ' за сегодня', shiftHM(eh, em, -15), '',
         runBtn(c.company_id + ':ord', 'Загрузить сейчас', `reload('${id}')`));
   if(src === 'file')
-    add('Проверка: пришёл ли файл по ссылке', shiftHM(eh, 0, -20), 'файл записывается сразу при получении — в любое время',
+    add('Проверка: пришёл ли файл по ссылке', shiftHM(eh, em, -20), 'файл записывается сразу при получении — в любое время',
         '<span class="small">попросите IT клиента отправить файл по ссылке</span> ' + toLoad);
-  add('Вечерний отчёт людям', [eh, 0], '', auto);
+  add('Вечерний отчёт людям', [eh, em], '', auto);
   if(src === 'bigquery' || src === 'api')
-    add('Повтор загрузки заказов, если был сбой', shiftHM(eh, 40, 0), 'молчит, если всё пришло', '<span class="small">та же кнопка, что в строке «Заказы»</span>');
+    add('Повтор загрузки заказов, если был сбой', shiftHM(eh, em, 40), 'молчит, если всё пришло', '<span class="small">та же кнопка, что в строке «Заказы»</span>');
   if(src === 'file')
-    add('Повторная проверка файла', shiftHM(eh, 40, 0), 'файла нет — сообщение техконтакту', toLoad);
+    add('Повторная проверка файла', shiftHM(eh, em, 40), 'файла нет — сообщение техконтакту', toLoad);
   if(src === 'excel') rows.push(['Структура, План, Факт', '—', 'вручную', 'обновляются только когда вы загружаете файл', toLoad]);
   rows.push(['Закрытие прошлого месяца (итоги)', '02:00', '1-го числа', 'автоматически', btn('Закрыть заново ↓', "document.getElementById('xl_cards').scrollIntoView({behavior:'smooth'})")]);
 
