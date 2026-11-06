@@ -944,6 +944,12 @@ function tabData(c){
     `<button class="pri" style="width:100%" id="rl" ${(S.run[c.company_id + ':ord'] || {}).busy ? 'disabled' : ''} onclick="reload('${esc(c.company_id)}')">${(S.run[c.company_id + ':ord'] || {}).busy ? 'Загружаю…' : 'Загрузить данные сейчас'}</button>`,
     'Заберёт заказы из источника клиента прямо сейчас, не дожидаясь вечера.' + (role()==='manager' ? ' Для менеджера — ограниченное число запусков в сутки.' : ''),
     'Если источник отвечает ошибкой — проверьте адрес и соответствие полей. Не помогло — передайте техспециалисту.') : '';
+  // 06.11.2026: «Полная загрузка» — заказы с 1-го числа прошлого месяца порциями (только API; для новых филиалов/людей в Структуре)
+  const fullBusy = (S.run[c.company_id + ':full'] || {}).busy;
+  const fullCard = (src === 'api' && canMgr()) ? card(
+    `<button style="width:100%" id="rf" ${fullBusy ? 'disabled' : ''} onclick="reloadFull('${esc(c.company_id)}')">${fullBusy ? 'Загружаю по частям…' : 'Полная загрузка'}</button>`,
+    '<b>Для новых компаний и филиалов:</b> загружает заказы за весь прошлый месяц и текущий — чтобы можно было закрыть прошлый период. Нажимают один раз после подключения (несколько минут). Для обычной работы не нужна: свежие данные подтягиваются сами каждый день.',
+    'Сначала загрузите Структуру: агенты, которых в ней нет, пропускаются. Повторное нажатие безопасно.') : '';
   const pm = periodMonths();
   const closeCard = card(
     `<div style="display:flex;gap:8px"><select id="cm_m" style="flex:1" onchange="periodLabel()">${pm.map(([m,y],i) => `<option value="${m}.${y}" ${i===1?'selected':''}>${MONTHS_RU[m-1]} ${y}${i===0?' · идёт':''}</option>`).join('')}</select><button class="pri" id="cm_b" onclick="closePeriod('${esc(c.company_id)}')">Закрыть период</button></div>`,
@@ -952,7 +958,7 @@ function tabData(c){
   const cacheCard = card(`<button style="width:100%" onclick="reload('${esc(c.company_id)}', true)">Сбросить кеш</button>`,
     'Если дашборд показывает старые данные — сервер перечитает всё по компании при следующем открытии.');
   if(src === 'bigquery' && !S.bq[c.company_id]) loadBq(c.company_id);   // для «последний раз» в расписании
-  return `${src !== 'google' ? scheduleBlock(c) : ''}${srcBlock}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" id="xl_cards" style="margin-top:14px">${excelCard}${loadCard}${closeCard}${cacheCard}</div>
+  return `${src !== 'google' ? scheduleBlock(c) : ''}${srcBlock}${src !== 'google' && (c.plan_on_db || !c.spreadsheet_id) ? planBlock(c) : ''}<div class="grid2" id="xl_cards" style="margin-top:14px">${excelCard}${loadCard}${fullCard}${closeCard}${cacheCard}</div>
     <div id="xl_out"></div>${(src === 'bigquery' || src === 'api' || src === 'file') ? ingestBlock(c) : ''}`;
 }
 /* ---------- Журнал загрузок заказов (24.10.2026) ---------- */
@@ -1929,6 +1935,22 @@ async function reload(id, cacheOnly){
   toast(text);
   if(!cacheOnly){ delete S.ing[id]; delete S.lim[id];   // журнал — с новой попыткой
     S.run[key] = {ok, text, at: at || new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}; render(); }
+}
+async function reloadFull(id){
+  const key = id + ':full';
+  if((S.run[key] || {}).busy) return;
+  if(!confirm('Запустить полную загрузку заказов с 1-го числа прошлого месяца? Это займёт несколько минут.')) return;
+  S.run[key] = {busy:true}; render();
+  let ok = true, text = '';
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id) + '/reload-full', {method:'POST'});
+    if(r.queued_until){ S.run[key] = {busy:true, queued:r.queued_until}; toast(r.message); render(); return; }
+    if(r.status === 'started' || r.status === 'running'){ const st = await pollRun(id, 'full'); ok = !!st.ok; text = st.text || ''; }
+    else { text = r.message || 'Готово'; }
+    delete S.health[id];
+  } catch(e){ ok = false; text = e.message; }
+  toast(text); delete S.ing[id];
+  S.run[key] = {ok, text, at: new Date().toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'})}; render();
 }
 // 24.10.2026: долгая загрузка идёт на сервере в фоне — раз в 5 с спрашиваем, закончилась ли (до 15 мин)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
