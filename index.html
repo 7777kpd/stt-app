@@ -83,6 +83,45 @@ body {
 .v-cell-day { font-size: 9px; color: var(--muted); }
 .v-cell-future { background: #E4DCC8 !important; color: var(--muted) !important; font-size: 14px; }
 .v-cell-today { box-shadow: inset 0 0 0 2px #A39C87; }
+/* 16.11.2026: Маршрут одним списком — будущие визиты только рамкой, сегодня — чёрная рамка с точкой */
+.rt .v-cell-future { background: transparent !important; box-shadow: inset 0 0 0 1.5px #C9BFA6; }
+.rt .v-cell.today { width: auto; min-width: 30px; }
+.rt .v-cell-today { background: #fff !important; box-shadow: inset 0 0 0 2.5px #1F1F1F; color: #1F1F1F !important; font-size: 11px; font-weight: 800; }
+.rt .v-cell.today .v-cell-day { color: #1F1F1F; font-weight: 800; font-size: 9.5px; }
+.rt .card.level-yellow { border-left-color: #E59A00; }
+.rt .level-yellow .card-stt { color: #D98C00; }
+.rt-chips { display: flex; gap: 5px; padding: 10px 0 10px; flex-wrap: nowrap; overflow-x: auto; }
+.rt-chip { font-size: 12px; font-weight: 700; border-radius: 100px; padding: 4px 9px; cursor: pointer; border: 1px solid transparent; white-space: nowrap; font-family: inherit; }
+.rt-chip.all { background: #fff; color: var(--text); border-color: var(--border); }
+.rt-chip.red { background: #fee2e2; color: var(--red); } .rt-chip.yellow { background: #fef3c7; color: var(--yellow); } .rt-chip.green { background: #d1fae5; color: var(--green); }
+.rt-chip.prob { background: #fff; color: #B42318; border-color: #F3B8B2; }
+.rt-chip.on { border-color: currentColor; }
+.rt-cats { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+.rt-cat { font-size: 11.5px; font-weight: 600; border-radius: 7px; padding: 4px 7px; white-space: nowrap; }
+.rt-cat b { font-weight: 800; }
+.rt-cat.c-red { background: #FDE2E0; color: #B42318; } .rt-cat.c-yellow { background: #FFF1C9; color: #9A5B00; } .rt-cat.c-green { background: #E3F0DB; color: #2D5A1B; } .rt-cat.c-none { background: var(--bg); color: var(--muted); }
+.rt-tot { margin-left: auto; display: flex; align-items: center; gap: 5px; font-size: 15px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+.rt-tot b { font-size: 13px; font-weight: 800; color: #1F1F1F; border: 1.5px solid #1F1F1F; border-radius: 7px; padding: 2px 7px; background: #fff; }
+.pb { display: flex; align-items: center; gap: 8px; margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--border); min-height: 30px; }
+.pb-txt { flex: 1; font-size: 12.5px; font-weight: 700; color: #B42318; min-width: 0; }
+.pb-txt.remind { color: #8a5300; font-weight: 600; font-size: 12px; }
+.pb-btn { margin-left: auto; color: #B42318; border: 1px solid #F3B8B2; border-radius: 8px; padding: 4px 9px; background: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
+.pb-btn.none { color: var(--text); border-color: var(--border); margin-left: 0; }
+.pb-yb { margin: 10px 16px 0; background: #FFF4D6; border-radius: 10px; padding: 9px 11px; }
+.pb-yb-t { font-size: 12.5px; font-weight: 700; color: #8a5300; }
+.pb-yb-b { display: flex; gap: 6px; margin-top: 7px; } .pb-yb-b .pb-btn { margin-left: 0; }
+.pb-sheet-bg { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 100; display: flex; align-items: flex-end; }
+.pb-sheet { background: #fff; width: 100%; border-radius: 16px 16px 0 0; padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); max-height: 85vh; overflow-y: auto; }
+.pb-sheet h4 { margin: 0 0 2px; font-size: 16px; }
+.pb-sheet p { margin: 0 0 12px; font-size: 12px; color: var(--muted); }
+.pb-opt { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.pb-opt.on { border-color: #ef4444; background: #fef2f2; } .pb-opt input { accent-color: #ef4444; width: 16px; height: 16px; }
+.pb-was { margin-left: auto; font-size: 11px; font-weight: 700; color: #8a5300; background: #FFF4D6; border-radius: 6px; padding: 2px 6px; }
+.pb-btns { display: flex; gap: 8px; margin-top: 10px; }
+.pb-btns button { flex: 1; border: none; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+.pb-btns .cancel { background: var(--bg); color: var(--text); } .pb-btns .go { background: #1F1F1F; color: #fff; }
+.pb-toast { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); background: #1F1F1F; color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 10px; z-index: 110; opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap; }
+.pb-toast.show { opacity: 1; }
 
 /* HINT */
 .hint { font-size: 12px; margin-top: 7px; font-weight: 600; }
@@ -485,7 +524,191 @@ async function loadDataVersion(id) {
 }
 function refreshAll() {
   try { localStorage.removeItem(_cacheKey()); } catch (e) {}
+  try { if (_pbId) { _pb.d = ''; _pbStore(); } } catch (e) {}   // «Проблемы» спросить заново; неотправленное остаётся
   location.reload();
+}
+
+// ============================================================
+// 16.11.2026: «Проблемы клиентов» в Маршруте.
+// Агент у точки жмёт «＋ Проблема» и отмечает причины (список — из админки
+// компании). Отметка «на сегодня», к зарплате не привязана. На следующем визите
+// в карточке напоминание «Было 12.11: …»; осталось — агент отмечает снова.
+// Сервер: GET /problems один раз в день (причины, свои отметки, прошлые по
+// точкам), дальше всё живёт на телефоне. Отметки копятся в очереди на телефоне
+// и уходят пачкой POST, когда есть связь (без связи — уйдут позже сами).
+// Страховка: не отметил вчера — сегодня вверху Маршрута «Отметить за вчера»
+// (список вчерашних точек телефон хранит сам, сервер не считает).
+// ============================================================
+const PB_DEFAULT = ['Возврат', 'Пересорт', 'Брак', 'Недопоставка', 'Ошибка в документах', 'Опоздание доставки', 'Другое'];
+const PB_NONE = '__none__';
+let _pb = { d: '', reasons: PB_DEFAULT, marks: {}, prev: {}, ymarks: {}, closed: {}, q: [] };
+let _pbId = null, _pbCur = null, _pbDay = null, _pbSel = null, _pbSending = false, _pbYList = false;
+let _rtRender = null, _rtPoints = [];
+function _pbKey() { return 'sttp:' + API + ':' + _pbId; }
+function _pbRtKey() { return 'sttr:' + API + ':' + _pbId; }
+function _pbToday() { return _localDateStr(new Date()); }
+function _pbYday() { const d = new Date(); d.setDate(d.getDate() - 1); return _localDateStr(d); }
+function _pbEsc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function _pbStore() { if (!_pbId) return; try { localStorage.setItem(_pbKey(), JSON.stringify(_pb)); } catch (e) {} }
+function _pbDm(iso) { return iso ? iso.slice(8, 10) + '.' + iso.slice(5, 7) : ''; }
+function _pbRedraw() { if (_rtRender) _rtRender(); }
+function _pbMarks(day) { return day === _pbYday() ? (_pb.ymarks || (_pb.ymarks = {})) : (_pb.marks || (_pb.marks = {})); }
+
+// Список точек маршрута на телефоне: сегодняшний и вчерашний (для «Отметить за вчера»)
+function pbRememberRoute(points) {
+  if (!_pbId) return;
+  try {
+    const t = _pbToday(), o = JSON.parse(localStorage.getItem(_pbRtKey()) || 'null') || {};
+    const cur = { d: t, pts: points.map(p => ({ tt: p.tt || p.address, client: p.client || '', address: p.address || '' })) };
+    const y = o.d === t ? o.y : (o.d === _pbYday() ? { d: o.d, pts: o.pts } : null);
+    localStorage.setItem(_pbRtKey(), JSON.stringify(Object.assign(cur, { y })));
+  } catch (e) {}
+}
+function pbYRoute() {
+  try { const o = JSON.parse(localStorage.getItem(_pbRtKey()) || 'null'); return (o && o.y && o.y.d === _pbYday() && o.y.pts.length) ? o.y.pts : null; } catch (e) { return null; }
+}
+
+async function pbInit(id) {
+  _pbId = id;
+  try { const o = JSON.parse(localStorage.getItem(_pbKey()) || 'null'); if (o && o.marks) _pb = Object.assign(_pb, o); } catch (e) {}
+  if (!Array.isArray(_pb.q)) _pb.q = [];
+  const today = _pbToday(), yday = _pbYday();
+  if (_pb.d !== today) {
+    // новый день без связи: вчерашние свои отметки — «вчера» и «прошлые»
+    const wasY = _pb.d === yday;
+    _pb.ymarks = wasY ? (_pb.marks || {}) : {};
+    _pb.closed = { today: false, yday: wasY && !!(_pb.closed || {}).today };
+    for (const [tt, r] of Object.entries(_pb.marks || {})) if (r && r.length && _pb.d) _pb.prev[tt] = { day: _pb.d, r };
+    _pb.marks = {};
+    try {
+      const r = await fetch(`${API}/api/agent/${id}/problems?day=${today}`);
+      if (r.ok) {
+        const j = await r.json();
+        _pb.reasons = (j.reasons && j.reasons.length) ? j.reasons : PB_DEFAULT;
+        _pb.marks = j.marks || {}; _pb.prev = j.prev || {}; _pb.ymarks = j.ymarks || {};
+        _pb.closed = j.closed || { today: false, yday: false };
+        _pb.d = today;
+      }
+    } catch (e) { /* нет связи — работаем со своим, спросим при следующем открытии */ }
+    for (const it of _pb.q) {                                   // ещё не отправленное — главнее
+      if (it.tt === PB_NONE) { if (it.day === today) _pb.closed.today = true; if (it.day === yday) _pb.closed.yday = true; continue; }
+      if (it.day === today) _pb.marks[it.tt] = it.reasons;
+      if (it.day === yday) { _pb.ymarks[it.tt] = it.reasons; if (it.reasons.length) _pb.closed.yday = true; }
+    }
+    _pbStore();
+    _pbRedraw();
+  }
+  pbFlush();
+}
+
+async function pbFlush() {
+  if (!_pbId || _pbSending || !_pb.q.length) return;
+  _pbSending = true;
+  const batch = _pb.q.slice(0, 300);
+  try {
+    const r = await fetch(`${API}/api/agent/${_pbId}/problems`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: batch }) });
+    if (r.ok || r.status === 400 || r.status === 404) {          // принято (или не наше — не повторяем вечно)
+      const sent = new Set(batch.map(b => b.tt + '|' + b.day + '|' + b.ts));
+      _pb.q = _pb.q.filter(b => !sent.has(b.tt + '|' + b.day + '|' + b.ts));
+      _pbStore();
+    }
+  } catch (e) { /* нет связи — пачка остаётся на телефоне */ }
+  _pbSending = false;
+  if (_pb.q.length && navigator.onLine !== false) setTimeout(pbFlush, 30000);
+}
+window.addEventListener('online', () => pbFlush());
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') pbFlush(); });
+function _pbQueue(tt, day, reasons) {
+  _pb.q = _pb.q.filter(b => !(b.tt === tt && b.day === day));
+  _pb.q.push({ tt, day, reasons, ts: Date.now() });
+  _pbStore();
+  pbFlush();
+}
+
+function pbToday(pt) { return (_pb.marks || {})[pt.tt || pt.address] || []; }
+// Прошлая проблема видна до следующего визита: был визит после неё (кроме сегодня) — считаем решённой.
+function pbPrev(pt) {
+  const p = (_pb.prev || {})[pt.tt || pt.address];
+  if (!p || !p.r || !p.r.length) return null;
+  const td = new Date().getDate();
+  const pm = p.day.slice(0, 7), cm = _pbToday().slice(0, 7), pd = +p.day.slice(8, 10);
+  const days = [...(pt.visits || []).filter(v => !v.is_future && v.day != null).map(v => v.day), ...(pt.off_route_days || [])];
+  const after = days.some(d => d < td && (pm < cm || d > pd));
+  return after ? null : { d: _pbDm(p.day), r: p.r };
+}
+
+function pbRow(pt) {
+  const i = _rtPoints.indexOf(pt);
+  const btn = `<button class="pb-btn" onclick="pbOpen(${i})">＋ Проблема</button>`;
+  const t = pbToday(pt);
+  if (t.length) return `<div class="pb"><span class="pb-txt">⚠ ${t.map(_pbEsc).join(', ')}</span>${btn}</div>`;
+  const p = pbPrev(pt);
+  if (p) return `<div class="pb"><span class="pb-txt remind">Было ${p.d}: ${p.r.map(_pbEsc).join(', ')}</span>${btn}</div>`;
+  return `<div class="pb"><span></span>${btn}</div>`;
+}
+
+// Плашка «вчера не отмечено» вверху Маршрута
+function pbYBanner() {
+  const ys = pbYRoute();
+  if (!_pbId || !ys || _pb.d !== _pbToday() || (_pb.closed || {}).yday) return '';   // ждём ответ сервера, чтобы не мигало
+  return `<div class="pb-yb"><div class="pb-yb-t">Вчера, ${_pbDm(_pbYday())} — проблемы клиентов не отмечены</div>
+    <div class="pb-yb-b"><button class="pb-btn" onclick="pbYOpen()">Отметить за вчера</button><button class="pb-btn none" onclick="pbYNone()">Проблем не было</button></div></div>`;
+}
+function pbYOpen() { _pbYList = true; _pbCur = null; pbSheet(); }
+function pbYNone() {
+  _pb.closed.yday = true; _pbQueue(PB_NONE, _pbYday(), []);
+  _pbRedraw(); pbToast('Отмечено: вчера проблем не было');
+}
+
+function pbOpen(i) { _pbCur = _rtPoints[i]; _pbDay = _pbToday(); if (!_pbCur) return; _pbSel = new Set(pbToday(_pbCur)); pbSheet(); }
+function pbOpenY(i) { const ys = pbYRoute() || []; _pbCur = ys[i]; _pbDay = _pbYday(); if (!_pbCur) return; _pbSel = new Set(_pb.ymarks[_pbCur.tt] || []); pbSheet(); }
+function pbSheet() {
+  let el = document.getElementById('pb-sheet');
+  if (!el) { el = document.createElement('div'); el.id = 'pb-sheet'; document.body.appendChild(el); }
+  if (!_pbCur && _pbYList) {                                     // список вчерашних точек
+    const ys = pbYRoute() || [];
+    el.innerHTML = `<div class="pb-sheet-bg" onclick="if(event.target===this)pbYClose()"><div class="pb-sheet">
+      <h4>Проблемы за вчера, ${_pbDm(_pbYday())}</h4><p>Нажмите на точку, где была проблема</p>
+      ${ys.map((p, i) => { const m = _pb.ymarks[p.tt] || []; return `<div class="pb-opt" onclick="pbOpenY(${i})"><div style="min-width:0;flex:1"><div>${_pbEsc(p.client || p.address)}</div>${m.length ? `<div style="font-size:12px;color:#B42318;font-weight:700;margin-top:2px">⚠ ${m.map(_pbEsc).join(', ')}</div>` : `<div style="font-size:11.5px;color:var(--muted);font-weight:500;margin-top:1px">${_pbEsc(p.address)}</div>`}</div><span style="color:#B42318;font-weight:800">＋</span></div>`; }).join('')}
+      <div class="pb-btns"><button class="go" onclick="pbYClose()">Готово</button></div></div></div>`;
+    return;
+  }
+  if (!_pbCur) { el.innerHTML = ''; return; }
+  const isY = _pbDay === _pbYday();
+  const cur = (_pbMarks(_pbDay)[_pbCur.tt || _pbCur.address]) || [];
+  const p = isY ? null : pbPrev(_pbCur), had = cur.length > 0;
+  const prevR = p ? p.r : [];
+  el.innerHTML = `<div class="pb-sheet-bg" onclick="if(event.target===this)pbClose()"><div class="pb-sheet">
+    <h4>Проблема у клиента${isY ? ' · вчера' : ''}</h4><p>${_pbEsc(_pbCur.client || _pbCur.address)} · можно выбрать несколько</p>
+    ${(_pb.reasons || PB_DEFAULT).map((r, k) => `<label class="pb-opt ${_pbSel.has(r) ? 'on' : ''}"><input type="checkbox" ${_pbSel.has(r) ? 'checked' : ''} onchange="pbTog(${k})">${_pbEsc(r)}${prevR.includes(r) ? `<span class="pb-was">было ${p.d}</span>` : ''}</label>`).join('')}
+    <div class="pb-btns"><button class="cancel" onclick="${had ? 'pbSave(true)' : 'pbClose()'}">${had ? 'Проблем нет' : 'Отмена'}</button><button class="go" onclick="pbSave(false)">Сохранить</button></div>
+  </div></div>`;
+}
+function pbTog(k) { const r = (_pb.reasons || PB_DEFAULT)[k]; _pbSel.has(r) ? _pbSel.delete(r) : _pbSel.add(r); pbSheet(); }
+function pbClose() { _pbCur = null; pbSheet(); }
+function pbYClose() {
+  _pbYList = false; _pbCur = null;
+  if (Object.values(_pb.ymarks || {}).some(r => r && r.length)) { _pb.closed.yday = true; _pbStore(); }
+  pbSheet(); _pbRedraw();
+}
+function pbSave(clear) {
+  const pt = _pbCur; if (!pt) return;
+  const reasons = clear ? [] : (_pb.reasons || PB_DEFAULT).filter(r => _pbSel.has(r));
+  const tt = pt.tt || pt.address, day = _pbDay || _pbToday(), marks = _pbMarks(day);
+  const before = marks[tt] || [];
+  if (!clear && !reasons.length && !before.length) { pbClose(); return; }
+  marks[tt] = reasons;
+  if (day === _pbToday() && reasons.length) _pb.closed.today = true;
+  _pbQueue(tt, day, reasons);
+  pbClose();
+  _pbRedraw();
+  pbToast(reasons.length ? 'Отмечено: ' + (pt.client || pt.address) : 'Отметка снята');
+}
+function pbToast(t) {
+  let e = document.getElementById('pb-toast');
+  if (!e) { e = document.createElement('div'); e.id = 'pb-toast'; e.className = 'pb-toast'; document.body.appendChild(e); }
+  e.textContent = t; e.classList.add('show'); clearTimeout(e._t); e._t = setTimeout(() => e.classList.remove('show'), 1800);
 }
 
 const MONTHS = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -621,7 +844,7 @@ function renderVisits(pt) {
   if (futureDays && futureDays.length) {
     html += futureDays.map(day => {
       const isToday = day === today;
-      return `<div class="v-cell"><div class="v-cell-icon v-cell-future${isToday ? ' v-cell-today' : ''}"></div><span class="v-cell-day">${isToday ? 'сег.' : dayToWd(day)}</span></div>`;
+      return `<div class="v-cell${isToday ? ' today' : ''}"><div class="v-cell-icon v-cell-future${isToday ? ' v-cell-today' : ''}">${isToday ? '●' : ''}</div><span class="v-cell-day">${isToday ? 'сегодня' : dayToWd(day)}</span></div>`;
     }).join('');
   } else if (future.length) {
     html += future.map(() => `<div class="v-cell"><div class="v-cell-icon v-cell-future"></div><span class="v-cell-day">&nbsp;</span></div>`).join('');
@@ -673,9 +896,21 @@ function bucketOf(pt) {
   return pt.stt >= 75 ? 'green' : 'yellow';
 }
 
+// 16.11.2026: карточка Маршрута одним списком. Убраны строка «прошло N из M ·
+// пропуски» и подсказка 75% (пропуски видны по квадратам). Категории — плашками
+// в одну строку, в конце «= среднее» в чёрной рамке. Внизу — строка «Проблема».
+function renderRtCats(cats) {
+  if (!cats?.length) return '';
+  const vals = cats.filter(c => c.pct !== null && c.pct !== undefined).map(c => c.pct);
+  const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+  return '<div class="rt-cats">' + cats.map(c => {
+    const has = c.pct !== null && c.pct !== undefined;
+    return `<span class="rt-cat c-${has ? levelOf(c.pct) : 'none'}">${c.name} <b>${has ? c.pct + '%' : '—'}</b></span>`;
+  }).join('') + (avg !== null ? `<span class="rt-tot">=<b>${avg}%</b></span>` : '') + '</div>';
+}
+
 function renderCard(pt) {
   const lv = bucketOf(pt);
-  const offRoute = pt.off_schedule_orders || 0;
   const badgeLabel = lv === 'red' ? 'Не АКБ' : lv === 'yellow' ? 'АКБ' : 'СТТ';
   const sttBlock = lv === 'red'
     ? `<div class="card-stt" style="font-size:14px">Не АКБ</div>`
@@ -688,10 +923,9 @@ function renderCard(pt) {
       </div>
       <div class="card-stt-wrap">${sttBlock}</div>
     </div>
-    <div class="card-meta">прошло ${pt.visits_done} из ${pt.visits_total} · ${missLabel(pt.misses)}</div>
     ${renderVisits(pt)}
-    ${renderHint(pt)}
-    ${renderCats(pt.cats)}
+    ${renderRtCats(pt.cats)}
+    ${pbRow(pt)}
   </div>`;
 }
 
@@ -717,7 +951,9 @@ function buildRouteScreen(data) {
     calcMissedStreak(p.visits) >= 2 || (p.off_schedule_orders||0) > 0
   ).length;
 
-  let tab = grouped.red.length ? 'red' : grouped.yellow.length ? 'yellow' : 'green';
+  // 16.11.2026: одним списком (худшие сверху), фильтры вместо вкладок + «Проблемы»
+  let tab = 'all', _rtRemembered = false;
+  _rtRender = () => render();
   const agentName = data.agent || data.agent_name || '';
   const _badgeNameEl = document.getElementById('agentBadgeName');
   if (_badgeNameEl && agentName) _badgeNameEl.textContent = agentName;
@@ -762,24 +998,35 @@ function buildRouteScreen(data) {
     </div>` : '';
 
   function render() {
+    const ordered = [...sortWithFocus(grouped.red), ...sortWithFocus(grouped.yellow), ...sortWithFocus(grouped.green)];
+    _rtPoints = ordered;
+    if (!_rtRemembered) { _rtRemembered = true; pbRememberRoute(ordered); }
+    const probList = ordered.filter(p => pbToday(p).length || pbPrev(p))
+      .sort((a, b) => (pbToday(b).length ? 1 : 0) - (pbToday(a).length ? 1 : 0));
+    const shown = tab === 'all' ? ordered : tab === 'prob' ? probList : ordered.filter(p => bucketOf(p) === tab);
     document.getElementById('screen-route').innerHTML = `
       <div class="header">
         <div class="header-top">
           <div class="header-name">${agentName}</div>
           <div class="header-date">${formatDate()} <span onclick="refreshAll()" title="Обновить данные" style="cursor:pointer;margin-left:6px;font-size:15px;">↻</span></div>
         </div>
-        <div class="tabs" id="tabs">
-          <button class="tab ${tab==='red'?'active-red':''}" data-t="red">Не АКБ<span class="badge">${grouped.red.length}</span></button>
-          <button class="tab ${tab==='yellow'?'active-yellow':''}" data-t="yellow">АКБ<span class="badge">${grouped.yellow.length}</span></button>
-          <button class="tab ${tab==='green'?'active-green':''}" data-t="green">СТТ<span class="badge">${grouped.green.length}</span></button>
-        </div>
       </div>
 
+      ${pbYBanner()}
       ${focusBlockHtml}
-      <div id="tab-content">
-        ${grouped[tab].length
-          ? `<div class="cards">${grouped[tab].map(renderCard).join('')}</div>`
-          : `<div class="empty">Точки отсутствуют</div>`}
+      <div class="rt" style="padding:0 16px">
+        <div class="rt-chips" id="tabs">
+          <button class="rt-chip all ${tab==='all'?'on':''}" data-t="all">Все ${allPoints.length}</button>
+          <button class="rt-chip red ${tab==='red'?'on':''}" data-t="red">Не АКБ ${grouped.red.length}</button>
+          <button class="rt-chip yellow ${tab==='yellow'?'on':''}" data-t="yellow">АКБ ${grouped.yellow.length}</button>
+          <button class="rt-chip green ${tab==='green'?'on':''}" data-t="green">СТТ ${grouped.green.length}</button>
+          <button class="rt-chip prob ${tab==='prob'?'on':''}" data-t="prob">Проблемы ${probList.length}</button>
+        </div>
+      </div>
+      <div id="tab-content" class="rt">
+        ${shown.length
+          ? `<div class="cards" style="padding-top:0">${shown.map(renderCard).join('')}</div>`
+          : `<div class="empty">${tab === 'prob' ? 'Проблем нет' : 'Точки отсутствуют'}</div>`}
       </div>`;
 
     document.getElementById('tabs').addEventListener('click', e => {
@@ -1690,6 +1937,7 @@ async function main() {
   _telegramId = id;
   if (new URLSearchParams(window.location.search).get('screen') === 'day') trackItogi(id);
   await loadDataVersion(id);           // 16.11.2026: версия данных — решает, брать ли экраны с телефона
+  pbInit(id);                          // 16.11.2026: «Проблемы клиентов» — раз в день, без ожидания
   const todayKey = 'day:' + _localDateStr(new Date());
 
   // Load /day first to get cross-month focus points, then build route
