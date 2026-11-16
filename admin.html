@@ -388,10 +388,65 @@ function tabCfg(c){
     ${isCl() ? '' : `<div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div>`}</div>
     ${clientAdminsBlock(c)}
     <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>
+  ${pbSetBlock(c)}
   ${limitsBlock(c)}
   <p class="err" id="f_err"></p>
   ${e ? `<div class="acts"><button class="pri" id="f_save" ${brNeed(c.company_id) ? 'disabled title="Есть ли у компании филиалы? Выберите уровень или «нет»."' : ''} onclick="saveCfg('${esc(c.company_id)}')">Сохранить настройки</button><button onclick="S.brdD['${esc(c.company_id)}']={};render()">Отменить изменения</button></div>` : ''}
   ${viewersBlock(c)}`;
+}
+
+/* ---------- Проблемы клиентов (16.11.2026) ---------- */
+// Свой список причин компании и напоминание агентам. Видят и меняют наша команда и
+// администратор клиента. Сохраняется только кнопкой. Агенты получают новый список со
+// следующего дня (телефон берёт причины раз в день) или сразу после ↻ в Маршруте.
+S.pbs = {}; S.pbe = {};
+const PB_REM = [[30, 'За 30 минут до вечернего отчёта'], [60, 'За 60 минут до вечернего отчёта'], [90, 'За 90 минут до вечернего отчёта'], [0, 'Выключено']];
+function pbSetBlock(c){
+  const id = c.company_id, st = S.pbs[id];
+  if(st === undefined){ S.pbs[id] = 'loading'; api('/companies/' + encodeURIComponent(id) + '/problem-settings').then(x => { S.pbs[id] = x; S.pbe[id] = {r: [...x.reasons], m: x.remind_min, nr: ''}; if(S.sel === id) render(); }).catch(() => { S.pbs[id] = null; if(S.sel === id) render(); }); }
+  const head = `<h3>Проблемы клиентов</h3><p class="small">Агенты отмечают в Маршруте, на что жалуется клиент. На зарплату не влияет. Руководитель видит итог в «Сводке» и «Итогах месяца».</p>
+    <details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent);font-size:13px;font-weight:500">Как это работает ›</summary><div class="box" style="margin-top:6px;font-size:13px;color:var(--ink-2)">Агент у точки нажимает «＋ Проблема» и выбирает причины из этого списка. Если за день проблем не было — кнопка «Не было». Руководитель видит «Работу без проблем» — долю точек маршрута без жалоб — и какие причины встречаются чаще. Новый список агенты увидят со следующего дня (сразу — после ↻ в Маршруте). Удалённая причина остаётся в прошлых отметках.</div></details>`;
+  if(st === 'loading' || st === undefined) return `<div class="sec">${head}<p class="small">Загружаю…</p></div>`;
+  if(!st) return `<div class="sec">${head}<p class="err">Не удалось загрузить настройки. Обновите страницу.</p></div>`;
+  const E = S.pbe[id], can = canCfg(), dis = can ? '' : 'disabled';
+  const dirty = JSON.stringify(E.r) !== JSON.stringify(st.reasons) || +E.m !== +st.remind_min;
+  const rows = E.r.map((r, i) => `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+      <input style="flex:1;min-width:0;width:auto" value="${esc(r)}" maxlength="40" ${dis} oninput="S.pbe['${esc(id)}'].r[${i}]=this.value;pbDirty('${esc(id)}')">
+      ${can ? `<button title="Выше" ${i === 0 ? 'disabled' : ''} onclick="pbMv('${esc(id)}',${i},-1)">↑</button><button title="Ниже" ${i === E.r.length - 1 ? 'disabled' : ''} onclick="pbMv('${esc(id)}',${i},1)">↓</button><button class="danger" title="Удалить" onclick="S.pbe['${esc(id)}'].r.splice(${i},1);render()">✕</button>` : ''}</div>`).join('');
+  return `<div class="sec">${head}
+    <p class="lbl" style="margin-top:12px;display:flex;justify-content:space-between"><span>Причины</span><span>${E.r.length + 1} из ${st.max}</span></p>
+    ${rows}
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input style="flex:1;min-width:0;width:auto" value="Другое" disabled><span class="small" style="white-space:nowrap;margin:0">всегда последняя</span></div>
+    ${can && E.r.length < st.max - 1 ? `<div style="display:flex;gap:6px;margin-top:4px"><input style="flex:1;min-width:0;width:auto" id="pb_nr_${esc(id)}" maxlength="40" placeholder="Новая причина" value="${esc(E.nr)}" oninput="S.pbe['${esc(id)}'].nr=this.value"><button onclick="pbAdd('${esc(id)}')">Добавить</button></div>` : (can ? '<p class="small">Достигнут предел — 10 причин.</p>' : '')}
+    ${can ? `<div class="acts" style="margin-top:8px"><button onclick="S.pbe['${esc(id)}'].r=[...S.pbs['${esc(id)}'].default];render()">Вернуть стандартный список</button></div>` : ''}
+    <p class="lbl" style="margin-top:14px">Напоминание агентам</p>
+    <select ${dis} onchange="S.pbe['${esc(id)}'].m=+this.value;render()">${PB_REM.map(([k, t]) => `<option value="${k}" ${+E.m === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
+    <p class="small">Только тем, у кого сегодня маршрут и кто ничего не отметил.</p>
+    <p class="err" id="pb_err_${esc(id)}"></p>
+    ${can ? `<div class="acts" style="margin-top:4px"><button class="pri" id="pb_s_${esc(id)}" ${dirty ? '' : 'disabled'} onclick="pbSave('${esc(id)}')">Сохранить</button><span class="small" id="pb_d_${esc(id)}" style="color:var(--warn)">${dirty ? 'Есть несохранённые изменения' : ''}</span></div>` : ''}
+  </div>`;
+}
+function pbDirty(id){
+  const E = S.pbe[id], st = S.pbs[id], b = $('pb_s_' + id), d = $('pb_d_' + id);
+  const dirty = JSON.stringify(E.r) !== JSON.stringify(st.reasons) || +E.m !== +st.remind_min;
+  if(b) b.disabled = !dirty;
+  if(d) d.textContent = dirty ? 'Есть несохранённые изменения' : '';
+}
+function pbMv(id, i, k){ const r = S.pbe[id].r, x = r[i]; r[i] = r[i + k]; r[i + k] = x; render(); }
+function pbAdd(id){
+  const E = S.pbe[id], v = (E.nr || '').trim().replace(/\s+/g, ' ');
+  if(!v) return;
+  if(v.toLowerCase() === 'другое' || E.r.some(x => x.trim().toLowerCase() === v.toLowerCase())){ toast('Такая причина уже есть'); return; }
+  E.r.push(v); E.nr = ''; render();
+}
+async function pbSave(id){
+  const E = S.pbe[id], b = $('pb_s_' + id), err = $('pb_err_' + id);
+  if(b) b.disabled = true; if(err) err.textContent = '';
+  try {
+    const x = await api('/companies/' + encodeURIComponent(id) + '/problem-settings', {method: 'POST', body: {reasons: E.r, remind_min: E.m}});
+    S.pbs[id] = x; S.pbe[id] = {r: [...x.reasons], m: x.remind_min, nr: ''};
+    render(); toast('Сохранено. Агенты увидят новый список со следующего дня.');
+  } catch(e){ if(err) err.textContent = e.message; if(b) b.disabled = false; }
 }
 
 /* ---------- Маршруты из API клиента (14.10.2026) ---------- */
