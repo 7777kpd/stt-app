@@ -433,6 +433,61 @@ function showRatingScope(i) {
 const API = new URLSearchParams(window.location.search).get('dev') === '1'
   ? 'https://develop-production-0a2d.up.railway.app'
   : 'https://upload.stt-navigator.com';
+// ============================================================
+// 16.11.2026: экраны агента храним на телефоне.
+// Маршрут, Итоги дня (сегодня и до 7 дней назад), Итоги месяца и Анализ ТТ
+// загружаются с сервера один раз и лежат в памяти телефона (localStorage).
+// При каждом открытии спрашиваем только «версию данных» компании (несколько
+// байт, /api/agent/{id}/version): пришли новые заказы, записался План или что-то
+// поменяли в админке — версия другая, экраны грузятся заново. Новый день — тоже.
+// Нет связи — показываем сохранённое за сегодня. Хранится одна копия на агента,
+// старые версии стираются сами (≈ 0,5–1 МБ). Кнопка «↻» в Маршруте — обновить вручную.
+// ============================================================
+const _CACHE_FMT = 1;
+let _dataVer = null, _verOffline = false;
+function _cacheKey() { return 'sttc:' + API + ':' + _telegramId; }
+function _cacheRead() {
+  try {
+    const o = JSON.parse(localStorage.getItem(_cacheKey()) || 'null');
+    if (!o || o.f !== _CACHE_FMT || o.d !== _localDateStr(new Date())) return null;
+    if (_verOffline) return o;                       // нет связи — своё за сегодня лучше, чем ошибка
+    return (_dataVer && o.v === _dataVer) ? o : null;
+  } catch (e) { return null; }
+}
+function _cacheWrite(k, data) {
+  if (!_dataVer) return;
+  try {
+    const o = _cacheRead() || { f: _CACHE_FMT, v: _dataVer, d: _localDateStr(new Date()), items: {} };
+    o.items[k] = data;
+    localStorage.setItem(_cacheKey(), JSON.stringify(o));
+  } catch (e) { try { localStorage.removeItem(_cacheKey()); } catch (_) {} }
+}
+async function getJSON(k, url) {
+  const o = _cacheRead();
+  if (o && o.items && o.items[k] !== undefined) return o.items[k];
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('bad response');
+  const data = await r.json();
+  _cacheWrite(k, data);
+  return data;
+}
+const _inflight = {};
+function getJSONonce(k, url) {                       // один запрос, даже если экран просят дважды
+  const p = _inflight[k] || (_inflight[k] = getJSON(k, url).finally(() => { delete _inflight[k]; }));
+  return p.then(d => JSON.parse(JSON.stringify(d)));   // каждому экрану своя копия — экраны правят данные под себя
+}
+async function loadDataVersion(id) {
+  try {
+    const r = await fetch(`${API}/api/agent/${id}/version`);
+    if (r.ok) { _dataVer = (await r.json()).v || null; _verOffline = false; }
+    else { _dataVer = null; }                         // старый сервер без /version — работаем как раньше
+  } catch (e) { _dataVer = null; _verOffline = true; }
+}
+function refreshAll() {
+  try { localStorage.removeItem(_cacheKey()); } catch (e) {}
+  location.reload();
+}
+
 const MONTHS = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
 function getTelegramId() {
@@ -711,7 +766,7 @@ function buildRouteScreen(data) {
       <div class="header">
         <div class="header-top">
           <div class="header-name">${agentName}</div>
-          <div class="header-date">${formatDate()}</div>
+          <div class="header-date">${formatDate()} <span onclick="refreshAll()" title="Обновить данные" style="cursor:pointer;margin-left:6px;font-size:15px;">↻</span></div>
         </div>
         <div class="tabs" id="tabs">
           <button class="tab ${tab==='red'?'active-red':''}" data-t="red">Не АКБ<span class="badge">${grouped.red.length}</span></button>
@@ -1470,9 +1525,7 @@ async function jumpToDay(dateStr) {
   const el = document.getElementById('screen-day');
   el.innerHTML = '<div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>';
   try {
-    const r = await fetch(`${API}/api/agent/${_telegramId}/day?d=${dateStr}`);
-    if (!r.ok) throw new Error('bad response');
-    buildDayScreen(await r.json());
+    buildDayScreen(await getJSON('day:' + dateStr, `${API}/api/agent/${_telegramId}/day?d=${dateStr}`));
   } catch (e) {
     el.innerHTML = '<div class="empty">⚠️ Ошибка загрузки итога дня</div>';
   }
@@ -1490,8 +1543,7 @@ function fetchAndBuildStt(offset) {
   }
   const now = new Date();
   const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-  fetch(`${API}/api/agent/${_telegramId}/stt?month=${d.getMonth()+1}&year=${d.getFullYear()}`)
-    .then(r => r.ok ? r.json() : Promise.reject())
+  getJSONonce('stt:' + (d.getMonth()+1) + '.' + d.getFullYear(), `${API}/api/agent/${_telegramId}/stt?month=${d.getMonth()+1}&year=${d.getFullYear()}`)
     .then(buildSttScreen)
     .catch(() => apiErr('screen-stt', 'Ошибка загрузки Итогов месяца'));
 }
@@ -1637,22 +1689,21 @@ async function main() {
   const err = (sid, msg) => apiErr(sid, msg);
   _telegramId = id;
   if (new URLSearchParams(window.location.search).get('screen') === 'day') trackItogi(id);
+  await loadDataVersion(id);           // 16.11.2026: версия данных — решает, брать ли экраны с телефона
+  const todayKey = 'day:' + _localDateStr(new Date());
 
   // Load /day first to get cross-month focus points, then build route
-  fetch(`${API}/api/agent/${id}/day`)
-    .then(r => r.ok ? r.json() : Promise.reject())
+  getJSONonce(todayKey, `${API}/api/agent/${id}/day`)
     .then(dayData => {
       _dayFocusPoints = dayData.focus_points || [];
-      return fetch(`${API}/api/agent/${id}/today`);
+      return getJSON('today', `${API}/api/agent/${id}/today`);
     })
-    .then(r => r.ok ? r.json() : Promise.reject())
     .then(buildRouteScreen)
     .catch(() => err('screen-route', 'Ошибка загрузки маршрута'));
 
   fetchAndBuildStt(0);
 
-  fetch(`${API}/api/agent/${id}/day`)
-    .then(r => r.ok ? r.json() : Promise.reject())
+  getJSONonce(todayKey, `${API}/api/agent/${id}/day`)      // тот же ответ, что для Маршрута, — один запрос
     .then(buildDayScreen)
     .catch(() => err('screen-day', 'Ошибка загрузки итога дня'));
 
@@ -1661,8 +1712,7 @@ async function main() {
   (() => {
     const now = new Date();
     const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    fetch(`${API}/api/agent/${id}/stt?month=${prev.getMonth() + 1}&year=${prev.getFullYear()}`)
-      .then(r => r.ok ? r.json() : Promise.reject())
+    getJSONonce('stt:' + (prev.getMonth() + 1) + '.' + prev.getFullYear(), `${API}/api/agent/${id}/stt?month=${prev.getMonth() + 1}&year=${prev.getFullYear()}`)
       .then(buildAttScreen)
       .catch(() => err('screen-att', 'Ошибка загрузки Анализа ТТ'));
   })();
