@@ -107,6 +107,11 @@ body {
 .pb-txt.remind { color: #8a5300; font-weight: 600; font-size: 12px; }
 .pb-btn { margin-left: auto; color: #B42318; border: 1px solid #F3B8B2; border-radius: 8px; padding: 4px 9px; background: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
 .pb-btn.none { color: var(--text); border-color: var(--border); margin-left: 0; }
+.pb-day { margin: 0 16px 10px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px 8px 12px; display: flex; align-items: center; gap: 10px; }
+.pb-day-l { flex: 1; min-width: 0; } .pb-day-q { font-size: 13px; font-weight: 700; } .pb-day-h { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.3; }
+.pb-day-btn { flex-shrink: 0; border: none; background: #2D7A3E; color: #fff; border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 13px; font-family: inherit; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.pb-day.done { background: #EEF8F1; border-color: #BFE0C8; color: #2D5A1B; font-weight: 700; font-size: 13px; justify-content: space-between; padding: 9px 12px; }
+.pb-day.done button { border: none; background: none; color: var(--muted); font-weight: 600; font-size: 12px; cursor: pointer; font-family: inherit; }
 .pb-yb { margin: 10px 16px 0; background: #FFF4D6; border-radius: 10px; padding: 9px 11px; }
 .pb-yb-t { font-size: 12.5px; font-weight: 700; color: #8a5300; }
 .pb-yb-b { display: flex; gap: 6px; margin-top: 7px; } .pb-yb-b .pb-btn { margin-left: 0; }
@@ -577,7 +582,7 @@ async function pbInit(id) {
     // новый день без связи: вчерашние свои отметки — «вчера» и «прошлые»
     const wasY = _pb.d === yday;
     _pb.ymarks = wasY ? (_pb.marks || {}) : {};
-    _pb.closed = { today: false, yday: wasY && !!(_pb.closed || {}).today };
+    _pb.closed = { today: false, none_today: false, yday: wasY && !!(_pb.closed || {}).today };
     for (const [tt, r] of Object.entries(_pb.marks || {})) if (r && r.length && _pb.d) _pb.prev[tt] = { day: _pb.d, r };
     _pb.marks = {};
     try {
@@ -591,7 +596,11 @@ async function pbInit(id) {
       }
     } catch (e) { /* нет связи — работаем со своим, спросим при следующем открытии */ }
     for (const it of _pb.q) {                                   // ещё не отправленное — главнее
-      if (it.tt === PB_NONE) { if (it.day === today) _pb.closed.today = true; if (it.day === yday) _pb.closed.yday = true; continue; }
+      if (it.tt === PB_NONE) {
+        if (it.day === today) { _pb.closed.none_today = !it.off; if (!it.off) _pb.closed.today = true; }
+        if (it.day === yday && !it.off) _pb.closed.yday = true;
+        continue;
+      }
       if (it.day === today) _pb.marks[it.tt] = it.reasons;
       if (it.day === yday) { _pb.ymarks[it.tt] = it.reasons; if (it.reasons.length) _pb.closed.yday = true; }
     }
@@ -646,6 +655,24 @@ function pbRow(pt) {
   const p = pbPrev(pt);
   if (p) return `<div class="pb"><span class="pb-txt remind">Было ${p.d}: ${p.r.map(_pbEsc).join(', ')}</span>${btn}</div>`;
   return `<div class="pb"><span></span>${btn}</div>`;
+}
+
+// 16.11.2026: «Проблемы у клиентов сегодня?» вверху Маршрута — «Не было» одним нажатием за весь день.
+// Отмечена проблема у точки — блока нет. Нажал — строка «✓ … не было» и «Отменить».
+function pbDayBlock() {
+  if (Object.values(_pb.marks || {}).some(r => r && r.length)) return '';
+  if ((_pb.closed || {}).none_today) return `<div class="pb-day done">✓ Сегодня проблем не было<button onclick="pbNoneToday(false)">Отменить</button></div>`;
+  return `<div class="pb-day"><div class="pb-day-l"><div class="pb-day-q">Проблемы у клиентов сегодня?</div><div class="pb-day-h">Если были — отметьте у какого клиента</div></div>
+    <button class="pb-day-btn" onclick="pbNoneToday(true)">Не было</button></div>`;
+}
+function pbNoneToday(on) {
+  _pb.closed = _pb.closed || {};
+  _pb.closed.none_today = on;
+  _pb.closed.today = on || Object.values(_pb.marks || {}).some(r => r && r.length);
+  _pb.q = _pb.q.filter(b => !(b.tt === PB_NONE && b.day === _pbToday()));
+  _pb.q.push({ tt: PB_NONE, day: _pbToday(), reasons: [], off: !on, ts: Date.now() });
+  _pbStore(); pbFlush(); _pbRedraw();
+  pbToast(on ? 'Отмечено: сегодня проблем не было' : 'Отметка снята');
 }
 
 // Плашка «вчера не отмечено» вверху Маршрута
@@ -1023,6 +1050,7 @@ function buildRouteScreen(data) {
           <button class="rt-chip prob ${tab==='prob'?'on':''}" data-t="prob">Проблемы ${probList.length}</button>
         </div>
       </div>
+      ${pbDayBlock()}
       <div id="tab-content" class="rt">
         ${shown.length
           ? `<div class="cards" style="padding-top:0">${shown.map(renderCard).join('')}</div>`
