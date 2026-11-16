@@ -36,6 +36,16 @@
   .collapsible-card[open] > summary::after { content: '▼'; }
   .sum-right { display: flex; align-items: baseline; gap: 8px; margin-left: auto; }
   .sum-val { font-size: 18px; font-weight: 800; }
+  /* 16.11.2026: «Работа без проблем» */
+  .pb-cov { font-size: 11px; font-weight: 700; margin-top: 3px; }
+  .pb-low { white-space: nowrap; font-size: 10px; font-weight: 700; color: #A9A296; background: var(--line); border-radius: 6px; padding: 1px 6px; }
+  .pb-pill { font-size: 11px; font-weight: 800; border-radius: 100px; padding: 3px 9px; white-space: nowrap; }
+  .pb-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; gap: 8px; }
+  .pb-row:last-child { border-bottom: none; } .pb-n { font-weight: 600; } .pb-m { font-size: 11px; color: var(--ink-soft); }
+  .pb-mini { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 14px 0 6px; }
+  .pb-bar { padding: 6px 0; border-bottom: 1px solid var(--line); } .pb-bar:last-child { border-bottom: none; }
+  .pb-bar-top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; gap: 8px; } .pb-bar-top small { color: var(--ink-soft); font-weight: 600; }
+  .pb-bar-track { height: 6px; background: var(--line); border-radius: 3px; margin-top: 5px; } .pb-bar-track i { display: block; height: 100%; border-radius: 3px; background: var(--red); }
 
   .hero { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--line); }
   .hero-label { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; }
@@ -852,7 +862,7 @@ function screenSummary() {
   setPill(b.pill);
   let html = '';   // 16.10.2026: «Как читать цифры» убрали — период и сравнение написаны в самом блоке
   html += cardsSummary(d.role === 'director' ? 'Среднее по компании' : 'Среднее по вашей зоне', b);
-  return html + routesBlock(S.sum.plan_changes) + alertsCard() + launchCard();
+  return html + pbCard() + routesBlock(S.sum.plan_changes) + alertsCard() + launchCard();   // 16.11.2026: «Работа без проблем»
 }
 
 // ---------- Динамика ----------
@@ -1010,6 +1020,97 @@ function top5Card(open) {
     <p class="card-note">Цель — 75% нормы.</p></details>`;
 }
 
+
+// ---------- «Работа без проблем» (16.11.2026) ----------
+// Отметки агентов в Маршруте: доля точек маршрута без проблемы. Рядом — охват
+// («отметились» агенты); меньше 50% — «мало отметок», процент серый.
+// Данные: /api/leader/{id}/problems (Сводка) и ?month=&year= (Итоги месяца).
+// Грузится отдельно и без хранения на телефоне: агенты дописывают «за вчера» утром.
+function pbColor(v) { return v == null ? 'var(--ink-soft)' : v >= 95 ? 'var(--green)' : v >= 90 ? 'var(--yellow)' : 'var(--red-dark)'; }
+function pbPill(v, low) {
+  if (low) return '<span class="pb-low">мало отметок</span>';
+  return `<span class="pb-pill" style="color:${pbColor(v)};background:${v == null ? 'var(--line)' : v >= 95 ? 'var(--green-bg)' : v >= 90 ? 'var(--yellow-bg)' : 'var(--red-bg)'}">${v == null ? '—' : v + '%'}</span>`;
+}
+function pbHead(title, t, d) {
+  const low = !t || t.low;
+  return `<summary><div><h3>${title}</h3>${t && t.cov != null ? `<div class="pb-cov" style="color:${low ? 'var(--red-dark)' : 'var(--green)'}">отметились ${t.cov}% агентов</div>` : ''}</div>
+    <span class="sum-right">${t && low ? '<span class="pb-low">мало отметок</span>' : (d != null ? delta(d) : '')}<span class="sum-val" style="color:${low ? '#A9A296' : pbColor(t.val)}">${t && t.val != null ? t.val + '%' : '—'}</span></span></summary>`;
+}
+function pbTiles(t, what, counts) {
+  return `<div class="day-tiles-row">
+    <div class="day-tile"><div class="val">${num(t.route)}</div><div class="lbl">точек ${what}</div></div>
+    <div class="day-tile"><div class="val" style="color:var(--red-dark)">${num(t.prob)}</div><div class="lbl">с проблемой</div></div>
+    <div class="day-tile"><div class="val" style="color:${t.low ? 'var(--red-dark)' : 'var(--green)'}">${t.cov ?? '—'}%</div><div class="lbl">отметились${counts ? ` · ${num(t.agents_cov)} из ${num(t.agents)}` : ' агентов'}</div></div></div>`;
+}
+function pbReasons(list, total, withDelta) {
+  if (!list || !list.length) return '';
+  const max = list[0][1] || 1;
+  return list.map(([r, n, ch]) => `<div class="pb-bar"><div class="pb-bar-top"><span>${esc(r)}${withDelta && ch ? ` <span class="rating-delta ${ch < 0 ? 'up' : 'down'}">${ch > 0 ? '+' : ''}${ch}</span>` : ''}</span><small>${num(n)} · ${total ? Math.round(n / total * 100) : 0}%</small></div>
+    <div class="pb-bar-track"><i style="width:${Math.round(n / max * 100)}%"></i></div></div>`).join('');
+}
+function pbKids(list, withPrev) {
+  return (list || []).map(k => `<div class="pb-row"><div><div class="pb-n">${esc(k.n)}</div><div class="pb-m">${num(k.route)} точек · <span style="${k.low ? 'color:var(--red-dark);font-weight:700' : ''}">отметились ${k.cov ?? '—'}%</span>${withPrev && k.prev != null ? ` · было ${k.prev}% ${delta(dif(k.val, k.prev))}` : ''}</div></div>${pbPill(k.val, k.low)}</div>`).join('');
+}
+const PB_HOW = `<details class="how-box"><summary>Как считаем ›</summary><ol>
+  <li>Берём точки маршрута за день — те же, что агент видел в Маршруте. «Работа без проблем» — точки без отметки проблемы ÷ все точки.</li>
+  <li>«Отметились» — агенты с маршрутом, которые отметили проблему у точки или нажали «Проблем не было».</li>
+  <li>Отметились меньше 50% агентов — цифре верить рано: вместо процента «мало отметок».</li></ol></details>`;
+function pbWait(P) {
+  if (P && P.started) return `<div class="period">Агенты отмечают проблемы клиентов с ${ddmm(P.started)}. Первые цифры — утром после первого дня отметок.</div>`;
+  return '<div class="period">Агенты ещё не отмечали проблемы клиентов. Цифры появятся утром после первого дня отметок.</div>';
+}
+function pbCard() {
+  const P = S.pb;
+  if (!P || P.error) return '';
+  const lbl = P.day && S.sum && P.day === pbYest() ? 'вчера' : (P.day ? ddmm(P.day) : 'вчера');
+  if (!P.y) return `<details class="day-card collapsible-card" ${S.open.pb ? 'open' : ''} ontoggle="S.open.pb=this.open">${pbHead('Работа без проблем · ' + lbl, null)}${pbWait(P)}${PB_HOW}</details>`;
+  const y = P.y, m = P.mtd, yp = P.yp, mon = new Date(P.day + 'T00:00:00');
+  const d = yp && !yp.low && !y.low ? dif(y.val, yp.val) : null;
+  return `<details class="day-card collapsible-card" ${S.open.pb ? 'open' : ''} ontoggle="S.open.pb=this.open">${pbHead('Работа без проблем · ' + lbl, y, d)}
+    ${pbTiles(y, 'по маршруту', true)}
+    <div class="pb-row" style="margin-top:8px"><div><div class="pb-n">С 1 ${MONTHS_GEN[mon.getMonth()]} по ${lbl}</div><div class="pb-m">${num(m.route)} точек · ${num(m.prob)} с проблемой · отметились ${m.cov ?? '—'}%</div></div>${pbPill(m.val, m.low)}</div>
+    ${PB_HOW}
+    ${P.reasons && P.reasons.length ? `<div class="pb-mini">Причины · с 1 ${MONTHS_GEN[mon.getMonth()]}</div>${pbReasons(P.reasons, m.prob)}` : ''}
+    ${P.children && P.children.length > 1 ? `<div class="pb-mini">${esc(P.child_level_name || '')} · с 1 ${MONTHS_GEN[mon.getMonth()]}</div>${pbKids(P.children)}` : ''}
+    ${P.repeats && P.repeats.length ? `<div class="pb-mini">Повторяются · 2+ раза за месяц</div>${P.repeats.map(r => `<div class="pb-row"><div><div class="pb-n">${esc(r.n)}</div><div class="pb-m">${esc(r.agent)} · ${r.reasons.map(esc).join(', ')}</div></div><span class="pb-pill" style="color:var(--red-dark);background:var(--red-bg)">${r.times}×</span></div>`).join('')}` : ''}
+  </details>`;
+}
+function pbYest() { const t = new Date(S.sum.today + 'T00:00:00'); t.setDate(t.getDate() - 1); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
+function pbMonthCard(m) {
+  const P = (S.pbm || {})[m.month + '.' + m.year];
+  if (!P || P.error) return '';
+  const mn = MONTHS[m.month - 1];
+  if (!P.m) return `<details class="day-card collapsible-card" ${S.open['m:pb'] ? 'open' : ''} ontoggle="S.open['m:pb']=this.open">${pbHead('Работа без проблем · ' + mn, null)}${pbWait(P)}${PB_HOW}</details>`;
+  const t = P.m, p = P.prev, d = p && !p.low && !t.low ? dif(t.val, p.val) : null;
+  const hs = (P.months || []).filter(x => x.val != null);
+  let chart = '';
+  if (hs.length > 1) {
+    const H = 110, lo = Math.max(0, Math.floor((Math.min(...hs.map(x => x.val)) - 5) / 10) * 10), y = v => H - (v - lo) / (100 - lo) * H, bw = 44, gap = 26, W = hs.length * (bw + gap);
+    chart = `<div class="pb-mini">Как менялся показатель</div><svg viewBox="-38 -8 ${W + 46} ${H + 28}" style="width:100%;height:auto;display:block">
+      ${[lo, Math.round((lo + 100) / 2), 100].map(v => `<line x1="0" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#ECE6D8"/><text x="-6" y="${y(v) + 4}" font-size="10" fill="#8B8578" text-anchor="end">${v}%</text>`).join('')}
+      ${hs.map((x, i) => { const X = i * (bw + gap) + gap / 2; return `<rect x="${X}" y="${y(x.val)}" width="${bw}" height="${H - y(x.val)}" rx="5" fill="${i === hs.length - 1 ? pbColor(x.val) : '#D9CFAE'}"/><text x="${X + bw / 2}" y="${y(x.val) - 5}" font-size="11" font-weight="700" fill="#2C2A26" text-anchor="middle">${x.val}%</text><text x="${X + bw / 2}" y="${H + 16}" font-size="11" fill="#8B8578" text-anchor="middle">${MONTHS[x.m - 1].slice(0, 3)}</text>`; }).join('')}</svg>`;
+  }
+  const pm = (m.month + 10) % 12;
+  return `<details class="day-card collapsible-card" ${S.open['m:pb'] ? 'open' : ''} ontoggle="S.open['m:pb']=this.open">${pbHead('Работа без проблем · ' + mn, t, d)}
+    ${pbTiles(t, 'по маршруту')}${chart}${PB_HOW}
+    ${P.reasons && P.reasons.length ? `<div class="pb-mini">Причины${p ? ' · к ' + MONTHS_DAT[pm] : ''}</div>${pbReasons(P.reasons, t.prob, !!p)}` : ''}
+    ${P.children && P.children.length > 1 ? `<div class="pb-mini">${esc(P.child_level_name || '')}${p ? ' · ' + mn + ' / ' + MONTHS[pm] : ''}</div>${pbKids(P.children, !!p)}` : ''}
+  </details>`;
+}
+async function loadPb() {
+  try { const r = await fetch(`${API}/api/leader/${S.id}/problems`); S.pb = r.ok ? await r.json() : { error: true }; }
+  catch (e) { S.pb = { error: true }; }
+  render();
+}
+async function loadPbMonth(month, year) {
+  S.pbm = S.pbm || {};
+  const k = month + '.' + year;
+  if (S.pbm[k]) return;
+  try { const r = await fetch(`${API}/api/leader/${S.id}/problems?month=${month}&year=${year}`); S.pbm[k] = r.ok ? await r.json() : { error: true }; }
+  catch (e) { S.pbm[k] = { error: true }; }
+  render();
+}
+
 // ---------- Итоги месяца ----------
 function mCard(k, title, inner, note, val) {
   return `<details class="day-card collapsible-card" ${S.open['m:' + k] ? 'open' : ''} ontoggle="S.open['m:${k}']=this.open">
@@ -1045,7 +1146,7 @@ function screenMonth() {
       'Доля заказов с категорией. Считаются только те, за кем категория закреплена. Цель — 90%.', t.pct.cats) : '') +
     mCard('tasks', 'Задачи СВ', rows('tasks', catColor), 'Точки с 2+ пропусками подряд, где СВ добился заказа в следующий плановый день. Цель — 90%.', t.pct.tasks) +
     mCard('top5', 'ТОП-5 отстающих', rows('top5', sysColor), `${t.top5_routes} самых отстающих маршрутов (по 5 у каждого ТМ). Чистые заказы ÷ норма (75% плана визитов). Цель — 75%.`, t.pct.top5) +
-    stabMonthCard(m) +
+    stabMonthCard(m) + pbMonthCard(m) +
     `<div class="day-card"><h3>Рейтинг по среднему</h3>
       <div class="rate-tabs">${levels.map(l => `<button class="${S.rLevel === l.key ? 'active' : ''}" onclick="S.rLevel='${l.key}';S.rShow=5;render()">${esc(l.name)}</button>`).join('')}</div>
       ${rl.length ? rl.slice(0, S.rShow).map((r, i) => `<div class="rate-row"><span class="rate-n ${i < 3 ? 'top' : ''}">${i + 1}</span>
@@ -1064,6 +1165,7 @@ async function shiftMonth(step) {
   month += step; if (month < 1) { month = 12; year--; } if (month > 12) { month = 1; year++; }
   S.month = null; render();
   await loadMonth(month, year); render();
+  if (S.month && S.month.month) loadPbMonth(S.month.month, S.month.year);
 }
 
 // ---------- Общее ----------
@@ -1086,6 +1188,7 @@ async function go(s, keepFrom) {
   document.getElementById('mainContent').scrollTop = 0;
   render();
   if (s === 'month' && !S.month) { await loadMonth(); render(); }
+  if (s === 'month' && S.month && S.month.month) loadPbMonth(S.month.month, S.month.year);
   if (s === 'routes' && !S.routes) { await loadRoutes(); render(); }
 }
 // 16.10.2026: «Маршруты» — отдельный запрос, только когда открыли вкладку
@@ -1129,6 +1232,7 @@ async function main() {
   document.getElementById('roleIcon').textContent = S.sum.role_name[0];
   document.getElementById('personName').textContent = S.sum.name;
   render();
+  loadPb();          // 16.11.2026: «Работа без проблем» — отдельно, экран не ждёт
 }
 if (window.Telegram?.WebApp) { try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch (e) {} }
 main();
