@@ -107,10 +107,10 @@ body {
 .pb-txt.remind { color: #8a5300; font-weight: 600; font-size: 12px; }
 .pb-btn { margin-left: auto; color: #B42318; border: 1px solid #F3B8B2; border-radius: 8px; padding: 4px 9px; background: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; white-space: nowrap; }
 .pb-btn.none { color: var(--text); border-color: var(--border); margin-left: 0; }
-.pb-day { margin: 0 16px 10px; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 8px 10px 8px 12px; display: flex; align-items: center; gap: 10px; }
-.pb-day-l { flex: 1; min-width: 0; } .pb-day-q { font-size: 13px; font-weight: 700; } .pb-day-h { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.3; }
-.pb-day-btn { flex-shrink: 0; border: none; background: #2D7A3E; color: #fff; border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 13px; font-family: inherit; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
-.pb-day.done { background: #EEF8F1; border-color: #BFE0C8; color: #2D5A1B; font-weight: 700; font-size: 13px; justify-content: space-between; padding: 9px 12px; }
+.pb-day { margin: 0 16px 10px; background: #fff; border: 2px solid #1F1F1F; border-radius: 12px; padding: 9px 10px 9px 12px; display: flex; align-items: center; gap: 10px; }
+.pb-day-l { flex: 1; min-width: 0; } .pb-day-q { font-size: 13.5px; font-weight: 800; color: #1F1F1F; } .pb-day-h { font-size: 11.5px; color: var(--muted); margin-top: 2px; line-height: 1.3; }
+.pb-day-btn { flex-shrink: 0; border: none; background: #1F1F1F; color: #fff; border-radius: 10px; padding: 8px 14px; font-weight: 700; font-size: 13px; font-family: inherit; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.pb-day.done { background: #fff; border: 1.5px solid #BFE0C8; color: #2D5A1B; font-weight: 700; font-size: 13px; justify-content: space-between; padding: 9px 12px; }
 .pb-day.done button { border: none; background: none; color: var(--muted); font-weight: 600; font-size: 12px; cursor: pointer; font-family: inherit; }
 .pb-yb { margin: 10px 16px 0; background: #FFF4D6; border-radius: 10px; padding: 9px 11px; }
 .pb-yb-t { font-size: 12.5px; font-weight: 700; color: #8a5300; }
@@ -535,7 +535,7 @@ function refreshAll() {
 
 // ============================================================
 // 16.11.2026: «Проблемы клиентов» в Маршруте.
-// Агент у точки жмёт «＋ Проблема» и отмечает причины (список — из админки
+// Агент у точки жмёт «Проблема» и отмечает причины (список — из админки
 // компании). Отметка «на сегодня», к зарплате не привязана. На следующем визите
 // в карточке напоминание «Было 12.11: …»; осталось — агент отмечает снова.
 // Сервер: GET /problems один раз в день (причины, свои отметки, прошлые по
@@ -649,7 +649,7 @@ function pbPrev(pt) {
 
 function pbRow(pt) {
   const i = _rtPoints.indexOf(pt);
-  const btn = `<button class="pb-btn" onclick="pbOpen(${i})">＋ Проблема</button>`;
+  const btn = `<button class="pb-btn" onclick="pbOpen(${i})">Проблема</button>`;
   const t = pbToday(pt);
   if (t.length) return `<div class="pb"><span class="pb-txt">⚠ ${t.map(_pbEsc).join(', ')}</span>${btn}</div>`;
   const p = pbPrev(pt);
