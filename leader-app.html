@@ -269,7 +269,7 @@
 <div class="phone">
   <div class="topbar">
     <div style="display:flex;flex-direction:column;min-width:0;">
-      <h1 id="topTitle" style="margin:0 0 6px;">Загрузка...</h1>
+      <div style="display:flex;align-items:center;gap:8px;"><h1 id="topTitle" style="margin:0 0 6px;">Загрузка...</h1><span onclick="refreshAll()" title="Обновить данные" style="cursor:pointer;font-size:17px;color:var(--ink-soft);margin-bottom:6px;">↻</span></div>
       <div style="display:flex;align-items:center;gap:8px;">
         <div id="roleIcon" style="width:22px;height:22px;border-radius:7px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;">Р</div>
         <div style="font-size:12px;color:var(--ink-soft);"><span id="roleName">Руководитель</span> <span id="personName" style="font-weight:600;color:var(--ink);"></span></div>
@@ -300,6 +300,57 @@ const goalOf = k => HI[k] ? 90 : 75;
 const API = new URLSearchParams(window.location.search).get('dev') === '1'
   ? 'https://develop-production-0a2d.up.railway.app'
   : 'https://upload.stt-navigator.com';
+
+// ============================================================
+// 16.11.2026: экраны храним на телефоне (как у агента в index.html).
+// Первое открытие за день грузит экраны с сервера и кладёт их в память
+// телефона; повторные — только «версия данных» компании (/api/agent/{id}/version,
+// несколько байт). Пришли заказы, записался План, что-то сделали в админке —
+// версия другая, экраны грузятся заново. Новый день — тоже. Ответ «ещё
+// считается» (pending) не храним. Нет связи — показываем сохранённое за сегодня.
+// Кнопка «↻» рядом с заголовком — обновить вручную.
+// ============================================================
+const _CACHE_PAGE = 'leader', _CACHE_FMT = 1;
+let _dataVer = null, _verOffline = false, _cacheId = null;
+function _cDay() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function _cacheKey() { return 'sttc:' + API + ':' + _CACHE_PAGE + ':' + _cacheId; }
+function _cacheRead() {
+  try {
+    const o = JSON.parse(localStorage.getItem(_cacheKey()) || 'null');
+    if (!o || o.f !== _CACHE_FMT || o.d !== _cDay()) return null;
+    if (_verOffline) return o;
+    return (_dataVer && o.v === _dataVer) ? o : null;
+  } catch (e) { return null; }
+}
+function _cacheWrite(k, data) {
+  if (!_dataVer || !data || data.pending) return;
+  try {
+    const o = _cacheRead() || { f: _CACHE_FMT, v: _dataVer, d: _cDay(), items: {} };
+    o.items[k] = data;
+    localStorage.setItem(_cacheKey(), JSON.stringify(o));
+  } catch (e) { try { localStorage.removeItem(_cacheKey()); } catch (_) {} }
+}
+async function getJSON(k, url) {
+  const o = _cacheRead();
+  if (o && o.items && o.items[k] !== undefined) return JSON.parse(JSON.stringify(o.items[k]));
+  const r = await fetch(url);
+  if (!r.ok) { const e = new Error('bad response'); e.status = r.status; throw e; }
+  const data = await r.json();
+  _cacheWrite(k, data);
+  return data;
+}
+async function loadDataVersion(id) {
+  _cacheId = id;
+  try {
+    const r = await fetch(`${API}/api/agent/${id}/version`);
+    if (r.ok) { _dataVer = (await r.json()).v || null; _verOffline = false; }
+    else { _dataVer = null; }
+  } catch (e) { _dataVer = null; _verOffline = true; }
+}
+function refreshAll() {
+  try { if (_cacheId) localStorage.removeItem(_cacheKey()); } catch (e) {}
+  location.reload();
+}
 function getTelegramId() {
   const p = new URLSearchParams(window.location.search);
   if (p.get('id')) return p.get('id');
@@ -1040,9 +1091,7 @@ async function go(s, keepFrom) {
 // 16.10.2026: «Маршруты» — отдельный запрос, только когда открыли вкладку
 async function loadRoutes() {
   try {
-    const r = await fetch(`${API}/api/leader/${S.id}/routes`);
-    if (!r.ok) throw new Error(r.status);
-    S.routes = await r.json();
+    S.routes = await getJSON('routes', `${API}/api/leader/${S.id}/routes`);
   } catch (e) { S.routes = { error: true }; }
 }
 function screenRoutes() {
@@ -1061,21 +1110,20 @@ function screenRoutes() {
 async function loadMonth(month, year) {
   try {
     const q = month ? `?month=${month}&year=${year}` : '';
-    const r = await fetch(`${API}/api/leader/${S.id}/month${q}`);
-    if (!r.ok) throw new Error(r.status);
-    S.month = await r.json();
+    S.month = await getJSON('month:' + (q || 'cur'), `${API}/api/leader/${S.id}/month${q}`);
   } catch (e) { S.month = { month: month || 1, year: year || 2026, closed: false }; }
 }
 async function main() {
   S.id = getTelegramId();
   const m = document.getElementById('mainContent');
   if (!S.id) { m.innerHTML = '<div class="empty">Откройте дашборд из бота</div>'; return; }
+  await loadDataVersion(S.id);   // 16.11.2026: версия данных — брать ли экраны с телефона
   try {
-    const r = await fetch(`${API}/api/leader/${S.id}/summary`);
-    if (r.status === 403) { m.innerHTML = '<div class="empty">Этот экран — для директора, руководителя филиала и руководителя продаж.</div>'; return; }
-    if (!r.ok) throw new Error(r.status);
-    S.sum = await r.json();
-  } catch (e) { m.innerHTML = '<div class="empty">⚠️ Не удалось загрузить данные. Попробуйте позже.</div>'; return; }
+    S.sum = await getJSON('summary', `${API}/api/leader/${S.id}/summary`);
+  } catch (e) {
+    if (e.status === 403) { m.innerHTML = '<div class="empty">Этот экран — для директора, руководителя филиала и руководителя продаж.</div>'; return; }
+    m.innerHTML = '<div class="empty">⚠️ Не удалось загрузить данные. Попробуйте позже.</div>'; return;
+  }
   document.getElementById('topTitle').textContent = S.sum.company;
   document.getElementById('roleName').textContent = S.sum.role_name;
   document.getElementById('roleIcon').textContent = S.sum.role_name[0];
