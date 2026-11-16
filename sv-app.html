@@ -327,7 +327,7 @@
   <div class="phone">
     <div class="topbar">
       <div style="display:flex;flex-direction:column;">
-        <h1 id="topTitle" style="margin:0 0 6px;">Загрузка...</h1>
+        <div style="display:flex;align-items:center;gap:8px;"><h1 id="topTitle" style="margin:0 0 6px;">Загрузка...</h1><span onclick="refreshAll()" title="Обновить данные" style="cursor:pointer;font-size:17px;color:var(--ink-soft);margin-bottom:6px;">↻</span></div>
         <div style="display:flex;align-items:center;gap:8px;">
           <div style="width:22px;height:22px;border-radius:7px;background:var(--ink-soft);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex-shrink:0;">С</div>
           <div style="font-size:12px;color:var(--ink-soft);">Супервайзер <span id="svName" style="font-weight:600;color:var(--ink);"></span></div>
@@ -400,6 +400,57 @@ function catChipsBlock(categories, opts) {
 const API = new URLSearchParams(window.location.search).get('dev') === '1'
   ? 'https://develop-production-0a2d.up.railway.app'
   : 'https://upload.stt-navigator.com';
+
+// ============================================================
+// 16.11.2026: экраны храним на телефоне (как у агента в index.html).
+// Первое открытие за день грузит экраны с сервера и кладёт их в память
+// телефона; повторные — только «версия данных» компании (/api/agent/{id}/version,
+// несколько байт). Пришли заказы, записался План, что-то сделали в админке —
+// версия другая, экраны грузятся заново. Новый день — тоже. Ответ «ещё
+// считается» (pending) не храним. Нет связи — показываем сохранённое за сегодня.
+// Кнопка «↻» рядом с заголовком — обновить вручную.
+// ============================================================
+const _CACHE_PAGE = 'sv', _CACHE_FMT = 1;
+let _dataVer = null, _verOffline = false, _cacheId = null;
+function _cDay() { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+function _cacheKey() { return 'sttc:' + API + ':' + _CACHE_PAGE + ':' + _cacheId; }
+function _cacheRead() {
+  try {
+    const o = JSON.parse(localStorage.getItem(_cacheKey()) || 'null');
+    if (!o || o.f !== _CACHE_FMT || o.d !== _cDay()) return null;
+    if (_verOffline) return o;
+    return (_dataVer && o.v === _dataVer) ? o : null;
+  } catch (e) { return null; }
+}
+function _cacheWrite(k, data) {
+  if (!_dataVer || !data || data.pending) return;
+  try {
+    const o = _cacheRead() || { f: _CACHE_FMT, v: _dataVer, d: _cDay(), items: {} };
+    o.items[k] = data;
+    localStorage.setItem(_cacheKey(), JSON.stringify(o));
+  } catch (e) { try { localStorage.removeItem(_cacheKey()); } catch (_) {} }
+}
+async function getJSON(k, url) {
+  const o = _cacheRead();
+  if (o && o.items && o.items[k] !== undefined) return JSON.parse(JSON.stringify(o.items[k]));
+  const r = await fetch(url);
+  if (!r.ok) { const e = new Error('bad response'); e.status = r.status; throw e; }
+  const data = await r.json();
+  _cacheWrite(k, data);
+  return data;
+}
+async function loadDataVersion(id) {
+  _cacheId = id;
+  try {
+    const r = await fetch(`${API}/api/agent/${id}/version`);
+    if (r.ok) { _dataVer = (await r.json()).v || null; _verOffline = false; }
+    else { _dataVer = null; }
+  } catch (e) { _dataVer = null; _verOffline = true; }
+}
+function refreshAll() {
+  try { if (_cacheId) localStorage.removeItem(_cacheKey()); } catch (e) {}
+  location.reload();
+}
 
 const screenMeta = {
   route:    { title: 'Улучшить систему', pill: () => formatDate() },
@@ -486,9 +537,7 @@ async function switchSttMonth(offset) {
   try {
     const now = new Date();
     const d = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    const r = await fetch(`${API}/api/sv/${_telegramId}/stt?month=${d.getMonth() + 1}&year=${d.getFullYear()}`);
-    if (!r.ok) throw new Error('bad response');
-    const data = await r.json();
+    const data = await getJSON('stt:' + (d.getMonth() + 1) + '.' + d.getFullYear(), `${API}/api/sv/${_telegramId}/stt?month=${d.getMonth() + 1}&year=${d.getFullYear()}`);
     el.innerHTML = renderStt(data);
     // Если сейчас открыт "Рейтинг СВ" — перезагрузить сразу, не дожидаясь
     // повторного переключения вкладки.
@@ -506,9 +555,7 @@ async function loadDay() {
   el.innerHTML = `<div class="loader"><div class="spinner"></div><span>Загрузка...</span></div>`;
   try {
     const ds = _localDateStr(_dayDate);
-    const r = await fetch(`${API}/api/sv/${_telegramId}/today?d=${ds}`);
-    if (!r.ok) throw new Error('bad response');
-    const data = await r.json();
+    const data = await getJSON('day:' + ds, `${API}/api/sv/${_telegramId}/today?d=${ds}`);
     el.innerHTML = renderDay(data);
   } catch (e) {
     el.innerHTML = `<div class="empty">⚠️ Ошибка загрузки итога дня</div>`;
@@ -1869,11 +1916,12 @@ async function main() {
   // запросом с явным month/year, без своего переключателя периода).
   const _now = new Date();
   const _prev = new Date(_now.getFullYear(), _now.getMonth() - 1, 1);
+  await loadDataVersion(_telegramId);   // 16.11.2026: версия данных — брать ли экраны с телефона
   const [routeRes, sttRes, dayRes, attRes] = await Promise.allSettled([
-    fetch(`${API}/api/sv/${_telegramId}/route`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/stt`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/today`).then(r => r.ok ? r.json() : Promise.reject()),
-    fetch(`${API}/api/sv/${_telegramId}/stt?month=${_prev.getMonth() + 1}&year=${_prev.getFullYear()}`).then(r => r.ok ? r.json() : Promise.reject()),
+    getJSON('route', `${API}/api/sv/${_telegramId}/route`),
+    getJSON('stt:' + (_now.getMonth() + 1) + '.' + _now.getFullYear(), `${API}/api/sv/${_telegramId}/stt`),
+    getJSON('day:' + _localDateStr(_now), `${API}/api/sv/${_telegramId}/today`),
+    getJSON('stt:' + (_prev.getMonth() + 1) + '.' + _prev.getFullYear(), `${API}/api/sv/${_telegramId}/stt?month=${_prev.getMonth() + 1}&year=${_prev.getFullYear()}`),
   ]);
 
   if (routeRes.status === 'fulfilled') {
