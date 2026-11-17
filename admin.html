@@ -130,7 +130,7 @@ const ROLES = {owner:'Владелец', manager:'Менеджер СТТ', tech
 const STAGES = {test:'Тест (Excel)', conn:'Подключение', work:'Работает', pause:'Приостановлена', off:'Отключена'};
 const DAYS = ['пн','вт','ср','чт','пт','сб','вс'];
 const TZS = ['Europe/Kiev','Europe/Moscow','Europe/Vienna','Asia/Tashkent','Asia/Almaty','Asia/Dushanbe','Asia/Ashgabat','Asia/Bishkek'];
-const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент']];
+const MAPF = [['agent_name','Агент'],['tt_code','Код ТТ'],['order_date','Дата заказа'],['category','Категория'],['amount','Сумма'],['client_name','Клиент'],['category2','Категория верхнего уровня']];   // 17.11.2026: category2 — необязательно
 
 const S = {me:null, companies:[], free:[], team:[], log:[], clog:[], view:'companies', sel:null, tab:null,
            filter:'all', showDet:false, newOpen:false, addOpen:false, busy:false, health:{}, srcDraft:null, upl:{}, mig:null, bq:{}, plan:{}, bill:{}, bset:null, sales:null, salesPer:'month', salesFrom:'', salesTo:'', payKind:'lic', tasks:null, tScope:'open', tSel:null, tDetail:null, tNew:null, people:[], ctasks:{}, taskCount:0, viewers:{}, routes:{}, rstat:{}, nd:{}, ob:{}};
@@ -327,6 +327,7 @@ function tabOverview(c){
     <div class="box"><p class="lbl">Отчёты</p><p class="val">${hh(c.morning_hour)} / ${hh(c.evening_hour)}</p><p class="small">${esc(c.timezone)}</p></div>
     <div class="box"><p class="lbl">Выходные</p><p class="val">${esc(c.days_off || 'нет')}</p></div>
     <div class="box"><p class="lbl">Источник данных</p><p class="val">${sourceName(c)}</p></div></div>
+  ${(c.bq_column_map || {}).category2 ? `<div class="note">Категории: подкатегории + верхний уровень (<span class="mono">${esc(c.bq_column_map.category2)}</span>). Заказ засчитывается и в подкатегорию, и в категорию — агенту в Структуре можно указать любую. Настройка: «Подключение» → «Категория верхнего уровня».</div>` : ''}
   ${c.deleted_at ? `<div class="note bad">Компания удалена ${fdt(c.deleted_at)}: данные клиента стёрты, оплаты, задачи и журнал сохранены.</div>${isOwner() ? `<div class="acts"><button onclick="restoreCompany('${esc(c.company_id)}')">Вернуть в список компаний</button></div>` : ''}`
     : c.stage==='off' ? `<div class="note bad">Компания отключена: бот её не обслуживает (отчёты не уходят, дашборды не открываются). Данные пока хранятся.</div>${canMgr() ? `<div class="acts" id="del_box"><button class="danger" onclick="deleteCompany('${esc(c.company_id)}')">Удалить компанию и данные</button></div><p class="small">Удаляются Структура, План, заказы, итоги месяцев и журнал запусков. Оплаты, задачи и журнал изменений остаются. Действие необратимо.</p>` : ''}`
     : c.stage==='pause' ? `<div class="note bad">Компания приостановлена: отчёты не уходят, дашборды закрыты. Внесите оплату во вкладке «Оплата» — всё включится сразу.</div>`
@@ -967,7 +968,8 @@ function tabData(c){
   const cmap = c.bq_column_map || {};
   const fields = cur === 'bigquery' ? `<div style="margin-top:12px"><p class="lbl">BigQuery: проект.датасет.представление</p><input id="f_bq" class="mono" value="${esc(c.bq_table_ref)}" ${canSrc?'':'disabled'}>
       <p class="lbl" style="margin-top:12px">Соответствие полей: наше поле → поле клиента</p>
-      <div class="grid3">${MAPF.map(([k,n]) => `<div><p class="lbl">${n}</p><input class="mono" data-mk="${k}" value="${esc(cmap[k] || '')}" placeholder="${k}" ${canSrc?'':'disabled'}></div>`).join('')}</div></div>`
+      <div class="grid3">${MAPF.map(([k,n]) => `<div><p class="lbl">${n}</p><input class="mono" data-mk="${k}" value="${esc(cmap[k] || '')}" placeholder="${k === 'category2' ? 'необязательно' : k}" ${canSrc?'':'disabled'}></div>`).join('')}</div>
+      <p class="small">«Категория верхнего уровня» — если у клиента категории с подкатегориями. Заказ засчитывается и в подкатегорию, и в категорию: в Структуре агенту можно указать любую из них. После сохранения перезагрузите заказы с 1-го числа.</p></div>`
     : cur === 'api' ? `<div style="margin-top:12px"><p class="lbl">Адрес API</p><input id="f_rest" class="mono" value="${esc(c.rest_base_url)}" placeholder="https://…" ${canSrc?'':'disabled'}></div>` : '';
   const changed = cur !== srcKey(c) || cur === 'bigquery' || cur === 'api';
   let linkBlock = srcKey(c) === 'file' && cur === 'file' ? fileLinkBlock(c) : '';
