@@ -45,6 +45,13 @@
   .pb-mini { font-size: 10px; font-weight: 700; color: var(--ink-soft); text-transform: uppercase; letter-spacing: .02em; margin: 14px 0 6px; }
   .pb-bar { padding: 6px 0; border-bottom: 1px solid var(--line); } .pb-bar:last-child { border-bottom: none; }
   .pb-bar-top { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; gap: 8px; } .pb-bar-top small { color: var(--ink-soft); font-weight: 600; }
+  .pb-top { font-size: 12px; font-weight: 700; color: var(--red-dark); margin-top: 1px; } .pb-top span { color: var(--ink-soft); font-weight: 600; }
+  .pb-click-row { cursor: pointer; }
+  .pb-click { cursor: pointer; box-shadow: inset 0 0 0 1.5px #F0B3AC; }
+  .pb-full { margin-top: 12px; } .pb-full-top { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; }
+  .pb-full-bar { height: 8px; background: #D6D1C6; border-radius: 5px; margin-top: 5px; overflow: hidden; } .pb-full-bar i { display: block; height: 100%; border-radius: 5px; }
+  .pb-full-bot { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--ink-soft); margin-top: 3px; }
+  .pb-res { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; } .pb-res p { margin: 3px 0 0; font-size: 11.5px; color: var(--ink-soft); }
   .pb-bar-track { height: 6px; background: var(--line); border-radius: 3px; margin-top: 5px; } .pb-bar-track i { display: block; height: 100%; border-radius: 3px; background: var(--red); }
 
   .hero { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 10px; border: 1px solid var(--line); }
@@ -1027,20 +1034,26 @@ function top5Card(open) {
 // Данные: /api/leader/{id}/problems (Сводка) и ?month=&year= (Итоги месяца).
 // Грузится отдельно и без хранения на телефоне: агенты дописывают «за вчера» утром.
 function pbColor(v) { return v == null ? 'var(--ink-soft)' : v >= 95 ? 'var(--green)' : v >= 90 ? 'var(--yellow)' : 'var(--red-dark)'; }
-function pbPill(v, low) {
-  if (low) return '<span class="pb-low">мало отметок</span>';
+function pbPill(v) {
   return `<span class="pb-pill" style="color:${pbColor(v)};background:${v == null ? 'var(--line)' : v >= 95 ? 'var(--green-bg)' : v >= 90 ? 'var(--yellow-bg)' : 'var(--red-bg)'}">${v == null ? '—' : v + '%'}</span>`;
 }
+// 18.11.2026: «без проблем» — по точкам отчитавшихся агентов; рядом полнота отчётности по точкам.
+// Порога нет — любая цифра сигнал; низкая полнота подсвечена красным в строке «отчитались».
+const pbCovColor = c => c == null ? 'var(--ink-soft)' : c >= 50 ? 'var(--green)' : 'var(--red-dark)';
 function pbHead(title, t, d) {
-  const low = !t || t.low;
-  return `<summary><div><h3>${title}</h3>${t && t.cov != null ? `<div class="pb-cov" style="color:${low ? 'var(--red-dark)' : 'var(--green)'}">отметились ${t.cov}% агентов</div>` : ''}</div>
-    <span class="sum-right">${t && low ? '<span class="pb-low">мало отметок</span>' : (d != null ? delta(d) : '')}<span class="sum-val" style="color:${low ? '#A9A296' : pbColor(t.val)}">${t && t.val != null ? t.val + '%' : '—'}</span></span></summary>`;
+  return `<summary><div><h3>${title}</h3>${t && t.cov != null ? `<div class="pb-cov" style="color:${pbCovColor(t.cov)}">отчитались ${t.cov}% точек</div>` : ''}</div>
+    <span class="sum-right">${d != null ? delta(d) : ''}<span class="sum-val" style="color:${pbColor(t && t.val)}">${t && t.val != null ? t.val + '%' : '—'}</span></span></summary>`;
 }
-function pbTiles(t, what, counts) {
+function pbTiles(t, key, counts) {
+  const open = S.open[key + ':r'], has = t.reasons && t.reasons.length;
   return `<div class="day-tiles-row">
-    <div class="day-tile"><div class="val">${num(t.route)}</div><div class="lbl">точек ${what}</div></div>
-    <div class="day-tile"><div class="val" style="color:var(--red-dark)">${num(t.prob)}</div><div class="lbl">с проблемой</div></div>
-    <div class="day-tile"><div class="val" style="color:${t.low ? 'var(--red-dark)' : 'var(--green)'}">${t.cov ?? '—'}%</div><div class="lbl">отметились${counts ? ` · ${num(t.agents_cov)} из ${num(t.agents)}` : ' агентов'}</div></div></div>`;
+    <div class="day-tile"><div class="val">${num(t.route)}</div><div class="lbl">точек по маршрутам</div></div>
+    <div class="day-tile ${has ? 'pb-click' : ''}" ${has ? `onclick="S.open['${key}:r']=!S.open['${key}:r'];render()"` : ''}><div class="val" style="color:var(--red-dark)">${num(t.prob)}</div><div class="lbl">${has ? (open ? 'проблем ▲' : 'проблем ▼') : 'отмечено проблем'}</div></div>
+    ${counts ? `<div class="day-tile"><div class="val">${num(t.agents_cov)}<span style="font-size:11px;color:var(--ink-soft);font-weight:600"> из ${num(t.agents)}</span></div><div class="lbl">агентов отчитались</div></div>`
+             : `<div class="day-tile"><div class="val" style="color:${pbCovColor(t.cov)}">${t.cov ?? '—'}%</div><div class="lbl">точек отчитались</div></div>`}</div>
+    ${open && has ? `<div class="pb-mini">Какие проблемы · ${num(t.prob)}</div>${pbReasons(t.reasons, t.prob)}` : ''}
+    <div class="pb-full"><div class="pb-full-top"><span>Отчитались</span><b>${num(t.cov_route)} из ${num(t.route)} точек</b></div>
+      <div class="pb-full-bar"><i style="width:${Math.min(100, t.cov || 0)}%;background:${(t.cov || 0) >= 50 ? 'var(--green)' : 'var(--red)'}"></i></div></div>`;
 }
 function pbReasons(list, total, withDelta) {
   if (!list || !list.length) return '';
@@ -1048,13 +1061,20 @@ function pbReasons(list, total, withDelta) {
   return list.map(([r, n, ch]) => `<div class="pb-bar"><div class="pb-bar-top"><span>${esc(r)}${withDelta && ch ? ` <span class="rating-delta ${ch < 0 ? 'up' : 'down'}">${ch > 0 ? '+' : ''}${ch}</span>` : ''}</span><small>${num(n)} · ${total ? Math.round(n / total * 100) : 0}%</small></div>
     <div class="pb-bar-track"><i style="width:${Math.round(n / max * 100)}%"></i></div></div>`).join('');
 }
-function pbKids(list, withPrev) {
-  return (list || []).map(k => `<div class="pb-row"><div><div class="pb-n">${esc(k.n)}</div><div class="pb-m">${num(k.route)} точек · <span style="${k.low ? 'color:var(--red-dark);font-weight:700' : ''}">отметились ${k.cov ?? '—'}%</span>${withPrev && k.prev != null ? ` · было ${k.prev}% ${delta(dif(k.val, k.prev))}` : ''}</div></div>${pbPill(k.val, k.low)}</div>`).join('');
+// 18.11.2026: у каждого филиала/команды — главная проблема; нажатие раскрывает все его причины
+function pbKids(list, withPrev, key) {
+  key = key || 'k';
+  return (list || []).map((k, i) => {
+    const rs = k.reasons || [], top = rs[0], open = S.open['pbk:' + key + i];
+    return `<div class="pb-row ${rs.length ? 'pb-click-row' : ''}" ${rs.length ? `onclick="S.open['pbk:${key}${i}']=!S.open['pbk:${key}${i}'];render()"` : ''}><div><div class="pb-n">${esc(k.n)}</div>
+      ${top ? `<div class="pb-top">⚠ ${esc(top[0])} · ${num(top[1])}${rs.length > 1 ? ` <span>+${rs.length - 1} ${open ? '▲' : '▼'}</span>` : ''}</div>` : ''}
+      <div class="pb-m">${num(k.cov_route)} из ${num(k.route)} точек · <span style="color:${pbCovColor(k.cov)};font-weight:700">отчитались ${k.cov ?? '—'}%</span>${withPrev && k.prev != null ? ` · было ${k.prev}% ${delta(dif(k.val, k.prev))}` : ''}</div></div>${pbPill(k.val)}</div>
+      ${open && rs.length > 1 ? `<div style="padding:0 0 6px 10px">${pbReasons(rs, k.prob)}</div>` : ''}`;
+  }).join('');
 }
 const PB_HOW = `<details class="how-box"><summary>Как считаем ›</summary><ol>
-  <li>Берём точки маршрута за день — те же, что агент видел в Маршруте. «Работа без проблем» — точки без отметки проблемы ÷ все точки.</li>
-  <li>«Отметились» — агенты с маршрутом, которые отметили проблему у точки или нажали «Проблем не было».</li>
-  <li>Отметились меньше 50% агентов — цифре верить рано: вместо процента «мало отметок».</li></ol></details>`;
+  <li>«Без проблем» — только по точкам агентов, которые отчитались: отметили проблему или нажали «Не было».</li>
+  <li>Точки неотчитавшихся — «нет данных», не «без проблем».</li></ol></details>`;
 function pbWait(P) {
   if (P && P.started) return `<div class="period">Агенты отмечают проблемы клиентов с ${ddmm(P.started)}. Первые цифры — утром после первого дня отметок.</div>`;
   return '<div class="period">Агенты ещё не отмечали проблемы клиентов. Цифры появятся утром после первого дня отметок.</div>';
@@ -1065,14 +1085,12 @@ function pbCard() {
   const lbl = P.day && S.sum && P.day === pbYest() ? 'вчера' : (P.day ? ddmm(P.day) : 'вчера');
   if (!P.y) return `<details class="day-card collapsible-card" ${S.open.pb ? 'open' : ''} ontoggle="S.open.pb=this.open">${pbHead('Работа без проблем · ' + lbl, null)}${pbWait(P)}${PB_HOW}</details>`;
   const y = P.y, m = P.mtd, yp = P.yp, mon = new Date(P.day + 'T00:00:00');
-  const d = yp && !yp.low && !y.low ? dif(y.val, yp.val) : null;
+  const d = yp ? dif(y.val, yp.val) : null;
   return `<details class="day-card collapsible-card" ${S.open.pb ? 'open' : ''} ontoggle="S.open.pb=this.open">${pbHead('Работа без проблем · ' + lbl, y, d)}
-    ${pbTiles(y, 'по маршруту', true)}
-    <div class="pb-row" style="margin-top:8px"><div><div class="pb-n">С 1 ${MONTHS_GEN[mon.getMonth()]} по ${lbl}</div><div class="pb-m">${num(m.route)} точек · ${num(m.prob)} с проблемой · отметились ${m.cov ?? '—'}%</div></div>${pbPill(m.val, m.low)}</div>
-    ${PB_HOW}
-    ${P.reasons && P.reasons.length ? `<div class="pb-mini">Причины · с 1 ${MONTHS_GEN[mon.getMonth()]}</div>${pbReasons(P.reasons, m.prob)}` : ''}
-    ${P.children && P.children.length > 1 ? `<div class="pb-mini">${esc(P.child_level_name || '')} · с 1 ${MONTHS_GEN[mon.getMonth()]}</div>${pbKids(P.children)}` : ''}
+    ${pbTiles(y, 'pby', true)}
+    ${P.children && P.children.length > 1 ? `<div class="pb-mini">${esc(P.child_level_name || '')} · ${lbl}</div>${pbKids(P.children)}` : ''}
     ${P.repeats && P.repeats.length ? `<div class="pb-mini">Повторяются · 2+ раза за месяц</div>${P.repeats.map(r => `<div class="pb-row"><div><div class="pb-n">${esc(r.n)}</div><div class="pb-m">${esc(r.agent)} · ${r.reasons.map(esc).join(', ')}</div></div><span class="pb-pill" style="color:var(--red-dark);background:var(--red-bg)">${r.times}×</span></div>`).join('')}` : ''}
+    ${PB_HOW}
   </details>`;
 }
 function pbYest() { const t = new Date(S.sum.today + 'T00:00:00'); t.setDate(t.getDate() - 1); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`; }
@@ -1081,20 +1099,18 @@ function pbMonthCard(m) {
   if (!P || P.error) return '';
   const mn = MONTHS[m.month - 1];
   if (!P.m) return `<details class="day-card collapsible-card" ${S.open['m:pb'] ? 'open' : ''} ontoggle="S.open['m:pb']=this.open">${pbHead('Работа без проблем · ' + mn, null)}${pbWait(P)}${PB_HOW}</details>`;
-  const t = P.m, p = P.prev, d = p && !p.low && !t.low ? dif(t.val, p.val) : null;
+  const t = P.m, p = P.prev, d = p ? dif(t.val, p.val) : null;
   const hs = (P.months || []).filter(x => x.val != null);
   let chart = '';
   if (hs.length > 1) {
     const H = 110, lo = Math.max(0, Math.floor((Math.min(...hs.map(x => x.val)) - 5) / 10) * 10), y = v => H - (v - lo) / (100 - lo) * H, bw = 44, gap = 26, W = hs.length * (bw + gap);
-    chart = `<div class="pb-mini">Как менялся показатель</div><svg viewBox="-38 -8 ${W + 46} ${H + 28}" style="width:100%;height:auto;display:block">
+    chart = `<div class="pb-mini">Как менялся показатель</div><svg viewBox="-38 -8 ${W + 46} ${H + 28}" style="width:100%;max-width:${hs.length * 85 + 50}px;height:auto;display:block">
       ${[lo, Math.round((lo + 100) / 2), 100].map(v => `<line x1="0" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#ECE6D8"/><text x="-6" y="${y(v) + 4}" font-size="10" fill="#8B8578" text-anchor="end">${v}%</text>`).join('')}
       ${hs.map((x, i) => { const X = i * (bw + gap) + gap / 2; return `<rect x="${X}" y="${y(x.val)}" width="${bw}" height="${H - y(x.val)}" rx="5" fill="${i === hs.length - 1 ? pbColor(x.val) : '#D9CFAE'}"/><text x="${X + bw / 2}" y="${y(x.val) - 5}" font-size="11" font-weight="700" fill="#2C2A26" text-anchor="middle">${x.val}%</text><text x="${X + bw / 2}" y="${H + 16}" font-size="11" fill="#8B8578" text-anchor="middle">${MONTHS[x.m - 1].slice(0, 3)}</text>`; }).join('')}</svg>`;
   }
-  const pm = (m.month + 10) % 12;
+  // 18.11.2026: в «Итогах месяца» — только итог и динамика по месяцам; разбор проблем — в «Сводке» (горячий показатель)
   return `<details class="day-card collapsible-card" ${S.open['m:pb'] ? 'open' : ''} ontoggle="S.open['m:pb']=this.open">${pbHead('Работа без проблем · ' + mn, t, d)}
-    ${pbTiles(t, 'по маршруту')}${chart}${PB_HOW}
-    ${P.reasons && P.reasons.length ? `<div class="pb-mini">Причины${p ? ' · к ' + MONTHS_DAT[pm] : ''}</div>${pbReasons(P.reasons, t.prob, !!p)}` : ''}
-    ${P.children && P.children.length > 1 ? `<div class="pb-mini">${esc(P.child_level_name || '')}${p ? ' · ' + mn + ' / ' + MONTHS[pm] : ''}</div>${pbKids(P.children, !!p)}` : ''}
+    ${chart || '<div class="period">Динамика появится, когда будет хотя бы два месяца с отметками.</div>'}${PB_HOW}
   </details>`;
 }
 async function loadPb() {
