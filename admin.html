@@ -111,11 +111,18 @@ td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 .pos .x:hover{color:var(--accent)}
 .pos tr.manual td{background:var(--surface-2)}
 /* 23.11.2026 «Золотой заказ и приоритет», «Причины отсутствия заказа» */
-details.blk>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+details.blk{border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+details.blk>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:10px}
+details.blk>summary h3{white-space:nowrap}details.blk>summary .tag{min-width:0;overflow:hidden;text-overflow:ellipsis}
+details.blk>summary:hover{background:var(--surface-2)}
 details.blk>summary::-webkit-details-marker{display:none}
 details.blk>summary h3{margin:0}
-details.blk>summary::after{content:'▸';margin-left:auto;color:var(--ink-3)}
-details.blk[open]>summary::after{content:'▾'}
+details.blk>summary::before{content:'▸';color:var(--accent);font-size:14px;width:12px}
+details.blk[open]>summary::before{content:'▾'}
+details.blk>summary::after{content:'Раскрыть';font-size:13px;color:var(--accent);font-weight:500;margin-left:auto;white-space:nowrap}
+details.blk[open]>summary::after{content:'Свернуть'}
+details.blk[open]>summary{border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+details.blk>.bd{padding:4px 14px 14px}
 details.sub2{margin-top:12px}details.sub2>summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:500}
 .gsw{position:relative;width:42px;height:24px;border-radius:999px;background:var(--line);border:0;padding:0;flex:none;transition:background .15s}
 .gsw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
@@ -430,16 +437,18 @@ const PB_REM = [[30, 'За 30 минут до вечернего отчёта'],
 function pbSetBlock(c){
   const id = c.company_id, st = S.pbs[id];
   if(st === undefined){ S.pbs[id] = 'loading'; api('/companies/' + encodeURIComponent(id) + '/problem-settings').then(x => { S.pbs[id] = x; S.pbe[id] = {r: [...x.reasons], m: x.remind_min, nr: ''}; if(S.sel === id) render(); }).catch(() => { S.pbs[id] = null; if(S.sel === id) render(); }); }
-  const head = `<h3>Проблемы клиентов</h3><p class="small">Агенты отмечают в Маршруте, на что жалуется клиент. На зарплату не влияет. Руководитель видит итог в «Сводке» и «Итогах месяца».</p>
+  const head = `<p class="small">Агенты отмечают в Маршруте, на что жалуется клиент. На зарплату не влияет. Руководитель видит итог в «Сводке» и «Итогах месяца».</p>
     <details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent);font-size:13px;font-weight:500">Как это работает ›</summary><div class="box" style="margin-top:6px;font-size:13px;color:var(--ink-2)">Агент у точки нажимает «Проблема» и выбирает причины из этого списка. Если за день проблем не было — кнопка «Не было». Руководитель видит «Работу без проблем» — долю точек маршрута без жалоб — и какие причины встречаются чаще. Новый список агенты увидят со следующего дня (сразу — после ↻ в Маршруте). Удалённая причина остаётся в прошлых отметках.</div></details>`;
-  if(st === 'loading' || st === undefined) return `<div class="sec">${head}<p class="small">Загружаю…</p></div>`;
-  if(!st) return `<div class="sec">${head}<p class="err">Не удалось загрузить настройки. Обновите страницу.</p></div>`;
+  // 23.11.2026: блок свёрнут, как «Причины отсутствия заказа» и «Золотой заказ»
+  const wrap = (chip, inner) => `<div class="sec"><details class="blk" ${opAttr('pb_' + id)}><summary><h3>Проблемы клиентов</h3>${chip}</summary><div class="bd">${inner}</div></details></div>`;
+  if(st === 'loading' || st === undefined) return wrap('', head + '<p class="small">Загружаю…</p>');
+  if(!st) return wrap('', head + '<p class="err">Не удалось загрузить настройки. Обновите страницу.</p>');
   const E = S.pbe[id], can = canCfg(), dis = can ? '' : 'disabled';
   const dirty = JSON.stringify(E.r) !== JSON.stringify(st.reasons) || +E.m !== +st.remind_min;
   const rows = E.r.map((r, i) => `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
       <input style="flex:1;min-width:0;width:auto" value="${esc(r)}" maxlength="40" ${dis} oninput="S.pbe['${esc(id)}'].r[${i}]=this.value;pbDirty('${esc(id)}')">
       ${can ? `<button title="Выше" ${i === 0 ? 'disabled' : ''} onclick="pbMv('${esc(id)}',${i},-1)">↑</button><button title="Ниже" ${i === E.r.length - 1 ? 'disabled' : ''} onclick="pbMv('${esc(id)}',${i},1)">↓</button><button class="danger" title="Удалить" onclick="S.pbe['${esc(id)}'].r.splice(${i},1);render()">✕</button>` : ''}</div>`).join('');
-  return `<div class="sec">${head}
+  return wrap(`<span class="tag s-work">${E.r.length + 1} причин</span>`, `${head}
     <p class="lbl" style="margin-top:12px;display:flex;justify-content:space-between"><span>Причины</span><span>${E.r.length + 1} из ${st.max}</span></p>
     ${rows}
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input style="flex:1;min-width:0;width:auto" value="Другое" disabled><span class="small" style="white-space:nowrap;margin:0">всегда последняя</span></div>
@@ -450,7 +459,7 @@ function pbSetBlock(c){
     <p class="small">Только тем, у кого сегодня маршрут и кто ничего не отметил.</p>
     <p class="err" id="pb_err_${esc(id)}"></p>
     ${can ? `<div class="acts" style="margin-top:4px"><button class="pri" id="pb_s_${esc(id)}" ${dirty ? '' : 'disabled'} onclick="pbSave('${esc(id)}')">Сохранить</button><span class="small" id="pb_d_${esc(id)}" style="color:var(--warn)">${dirty ? 'Есть несохранённые изменения' : ''}</span></div>` : ''}
-  </div>`;
+  `);
 }
 function pbDirty(id){
   const E = S.pbe[id], st = S.pbs[id], b = $('pb_s_' + id), d = $('pb_d_' + id);
@@ -485,7 +494,7 @@ function nrBlock(c){
   const id = c.company_id, st = S.nrs[id], k = 'nr_' + id;
   if(st === undefined){ S.nrs[id] = 'loading'; api('/companies/' + encodeURIComponent(id) + '/order-reasons').then(x => { S.nrs[id] = x; S.nre[id] = {r: x.reasons.map(r => ({...r})), ed: -1, del: -1, nt: ''}; if(S.sel === id) render(); }).catch(() => { S.nrs[id] = null; if(S.sel === id) render(); }); }
   const ready = st && st !== 'loading';
-  const chip = ready ? `<span class="tag ${st.own ? 's-conn' : 's-work'}">${st.own ? 'свой список · ' + st.reasons.length : st.reasons.length + ' по умолчанию'}</span>` : '';
+  const chip = ready ? `<span class="tag ${st.own ? 's-conn' : 's-work'}">${st.own ? 'свои · ' + st.reasons.length : st.reasons.length + ' причин'}</span>` : (st === null ? '<span class="tag s-pause">не загрузилось</span>' : '');
   let body;
   if(!ready) body = st === null ? '<p class="err">Не удалось загрузить. Обновите страницу.</p>' : '<p class="small">Загружаю…</p>';
   else {
@@ -507,7 +516,7 @@ function nrBlock(c){
         <button onclick="S.nre[${q}]={r:S.nrs[${q}].default.map(r=>({...r})),ed:-1,del:-1,nt:''};render()">Вернуть список по умолчанию</button>
         ${dirty ? '<span class="small" style="color:var(--warn)">Есть несохранённые изменения</span>' : ''}</div>` : ''}`;
   }
-  return `<div class="sec"><details class="blk" ${opAttr(k)}><summary><h3>Причины отсутствия заказа</h3>${chip}</summary>${body}</details></div>`;
+  return `<div class="sec"><details class="blk" ${opAttr(k)}><summary><h3>Причины отсутствия заказа</h3>${chip}</summary><div class="bd">${body}</div></details></div>`;
 }
 function nrEdOk(id){
   const E = S.nre[id], e = $('nr_e_' + id), v = (e ? e.value : '').trim().replace(/\s+/g, ' ');
@@ -580,7 +589,7 @@ function goldBlock(c){
         <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">По умолчанию у всех ячеек выключено: агенты видят прежний дашборд с категориями. Включённая ячейка показывает агентам золотой заказ и приоритет вместо категорий. Переключатель филиала включает все его ячейки, где есть данные. Если у ячейки нет данных или в приоритете меньше ${g.prio_min} позиций, переключатель недоступен, агенты остаются на прежнем дашборде. Если у территории нет своей матрицы, действует матрица филиала. Выключение возвращает прежний дашборд сразу, данные не теряются. Состав золотого заказа и список приоритета берутся из справочника, утверждённого по ленте ассортимента.</div>
       </details>`;
   }
-  return `<div class="sec"><details class="blk" ${opAttr(k)}><summary><h3>Золотой заказ и приоритет</h3><span class="tag s-conn" id="gold_cnt_${esc(id)}">${cnt}</span></summary>${body}</details></div>`;
+  return `<div class="sec"><details class="blk" ${opAttr(k)}><summary><h3>Золотой заказ и приоритет</h3><span class="tag s-conn" id="gold_cnt_${esc(id)}">${cnt}</span></summary><div class="bd">${body}</div></details></div>`;
 }
 function goldLoad(id){
   api('/companies/' + encodeURIComponent(id) + '/gold').then(x => { S.gold[id] = x; if(S.sel === id) render(); })
@@ -588,7 +597,7 @@ function goldLoad(id){
 }
 function goldCount(g){
   const ok = g.cells.filter(c => c.state === 'ok');
-  return `Включено ${ok.filter(c => c.on).length} из ${ok.length} ячеек`;
+  return `вкл. ${ok.filter(c => c.on).length} из ${ok.length}`;
 }
 const goldThrTxt = (v, k) => `${v}% (≈${Math.max(1, Math.ceil(k * v / 100))} из ${k})`;
 function goldRows(id){
