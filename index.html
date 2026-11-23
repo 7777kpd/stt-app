@@ -114,6 +114,25 @@ body {
 .nr-lr:first-child { border-top: 0; } .nr-lr .nm { flex: 1; min-width: 0; } .nr-lr b { font-variant-numeric: tabular-nums; }
 .nr-lr .bb { flex: none; width: 64px; height: 6px; background: #F1ECE4; border-radius: 3px; overflow: hidden; } .nr-lr .bb i { display: block; height: 100%; background: #D2534C; }
 .nr-lr.na { color: var(--muted); } .nr-lr.na .bb i { background: #C9C3B8; }
+/* 23.11.2026 «Золотой заказ» и «Приоритет» — макет «Агент: золотая матрица» */
+body.gold-on .cat-card { display: none; }
+.gm-prev { margin: 10px 16px 0; background: #FFF1CC; color: #8B6914; border-radius: 10px; padding: 8px 12px; font-size: 12.5px; font-weight: 700; line-height: 1.35; }
+.gm-mx { margin: 10px 16px 0; background: var(--card); border-radius: 14px; padding: 10px 12px; border: 1.5px solid #4E8B2E; }
+.gm-t b { display: block; font-size: 14px; font-weight: 800; } .gm-t span { display: block; font-size: 12.5px; margin-top: 1px; }
+.gm-two { display: flex; gap: 10px; margin-top: 8px; align-items: flex-start; } .gm-two > div { flex: 1; min-width: 0; }
+.gm-lbl { display: block; font-size: 10.5px; font-weight: 900; letter-spacing: .03em; white-space: nowrap; }
+.gm-big { display: block; font-size: 26px; line-height: 1.1; margin-top: 2px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.gm-bar { height: 7px; background: #ECE5DC; border-radius: 4px; overflow: hidden; margin-top: 8px; } .gm-bar i { display: block; height: 100%; border-radius: 4px; }
+.gm-tb { font: inherit; font-weight: 700; font-size: 12px; margin-top: 8px; padding: 5px 10px; border-radius: 9px; border: 1.5px solid #E4DCD3; background: transparent; cursor: pointer; }
+.gm-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #E4DCD3; }
+.gm-c { font-size: 12px; font-weight: 800; padding: 5px 9px; border-radius: 9px; background: #ECE5DC; }
+.gm-c.ok { background: #E3EFD8; color: #3B6A1C; } .gm-c.no { background: #F8DCDA; color: #B3342C; } .gm-c.go::before { content: "★ "; }
+.gm-h { width: 100%; font-size: 12px; color: var(--muted); }
+.gm-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; letter-spacing: .06em; margin-top: 8px; }
+.gm-row > b { font-weight: 900; } .gm-tot b { border: 1.5px solid #2B2B2B; border-radius: 9px; padding: 2px 9px; font-size: 14px; letter-spacing: 0; }
+.gm-seg { display: flex; margin-top: 6px; } .gm-seg button { flex: 1; font: inherit; font-weight: 800; font-size: 13px; padding: 8px 10px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; display: flex; justify-content: space-between; background: #F8DCDA; color: #B3342C; }
+.gm-nd { font-size: 12px; color: var(--muted); font-weight: 600; letter-spacing: 0; }
+.gm-g { color: #4E8B2E; } .gm-a { color: #D9A03A; } .gm-r { color: #B3342C; }
 .rt-chip.on { border-color: currentColor; }
 .rt-cats { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 /* 17.11.2026: последняя плашка и «= среднее» неразрывны — среднее никогда не стоит одно в пустой строке */
@@ -763,6 +782,8 @@ function pbSave(clear) {
 // Хранение и отправка — та же очередь, что у «Проблем» (sttp2:, POST /problems).
 // ============================================================
 let _nrOpen = null;     // 'tt|day' — открытый список причин
+// 23.11.2026: руководитель смотрит дашборд агента (viewer) — только чтение: причины не меняет
+const _nrViewer = !!new URLSearchParams(window.location.search).get('viewer');
 function _nrTt(pt) { return pt.tt || pt.address; }
 function _nrIso(day) { const n = new Date(); return _localDateStr(new Date(n.getFullYear(), n.getMonth(), day)); }
 function nrTodayOpen(pt) {
@@ -796,7 +817,7 @@ function nrPrev(pt) {
   const d = nrLastMiss(pt);
   if (!d) return '';
   const iso = _nrIso(d), r = _nrReasonOn(pt, iso), i = _rtPoints.indexOf(pt);
-  const canY = iso === _pbYday();          // вчерашний — ещё можно указать
+  const canY = iso === _pbYday() && !_nrViewer;          // вчерашний — ещё можно указать
   const btn = canY ? `<button class="nr-y" onclick="nrToggle(${i},'${iso}')">${r ? '✎' : 'Указать ▾'}</button>` : '';
   const html = r
     ? `<div class="nr-last"><span>Прошлый визит без заказа: <b>${_pbEsc(r)}</b></span>${btn}</div>`
@@ -805,6 +826,7 @@ function nrPrev(pt) {
 }
 function nrRow(pt) {
   if (!nrTodayOpen(pt) || !(_pb.reasons || []).length) return '';
+  if (_nrViewer) { const r0 = _nrReasonOn(pt, _pbToday()); return r0 ? `<div class="nr-ft"><span class="nr-btn set" style="cursor:default">Причина: ${_pbEsc(r0)}</span></div>` : ''; }
   const iso = _pbToday(), r = _nrReasonOn(pt, iso), i = _rtPoints.indexOf(pt);
   const btn = r ? `<button class="nr-btn set" onclick="nrToggle(${i},'${iso}')">Причина: ${_pbEsc(r)} ✎</button>`
                 : `<button class="nr-btn" onclick="nrToggle(${i},'${iso}')">Нет заказа, укажи причину ▾</button>`;
@@ -827,6 +849,65 @@ function nrPick(i, iso, k) {
   _nrOpen = null;
   _pbRedraw();
   pbToast(reasons.length ? 'Причина записана: ' + (pt.client || pt.address) : 'Причина снята');
+}
+
+// ============================================================
+// 23.11.2026: новый дашборд «Золотой заказ» и «Приоритет» (GET /gold). Включается по ячейке
+// агента в админке: «Агентам» — видит агент; «Просмотр» — только руководитель (viewer в адресе).
+// Вместо ряда категорий в карточке — золотой заказ «N из M дней» и приоритет «N из размера списка».
+// Пока ночного расчёта нет — «данные ещё не пришли», состав показан из справочника.
+// ============================================================
+let _gold = null, _goldOpen = {};
+const _gCol = v => v == null ? '' : v >= 75 ? 'gm-g' : v >= 50 ? 'gm-a' : 'gm-r';
+const _gBar = v => v == null ? '#ECE5DC' : v >= 75 ? '#4E8B2E' : v >= 50 ? '#D9A03A' : '#D2534C';
+function goldOn() { return !!(_gold && _gold.show); }
+function goldTop() {
+  if (!goldOn()) return '';
+  const g = _gold, t = g.top || {}, nd = g.nodata;
+  const big = v => nd || v == null ? '<span class="gm-big" style="font-size:15px;color:var(--muted)">нет данных</span>' : `<span class="gm-big ${_gCol(v)}">${v}%</span>`;
+  const list = _goldOpen.top === 'gold'
+    ? `<div class="gm-list"><span class="gm-h">Золотой заказ: золото и рядом от ${g.need} из ${g.set.length}</span>${g.gold_item ? `<span class="gm-c go">${_pbEsc(g.gold_item)}</span>` : ''}${g.set.map(n => `<span class="gm-c">${_pbEsc(n)}</span>`).join('')}</div>`
+    : _goldOpen.top === 'prio' ? `<div class="gm-list"><span class="gm-h">Приоритет: список на месяц · ${g.prio.length} позиций</span>${g.prio.map(n => `<span class="gm-c">${_pbEsc(n)}</span>`).join('')}</div>` : '';
+  return `${g.preview ? `<div class="gm-prev">Просмотр: так увидит агент, когда ячейку «${_pbEsc(g.cell.t || g.cell.b)} · ${_pbEsc(g.cell.c)}» откроют агентам. Сейчас агент на прежнем дашборде.</div>` : ''}
+  <div class="gm-mx"><div class="gm-t"><b>На начало дня</b><span>по ${t.route || 0} точкам маршрута${nd ? ' · данные ещё не пришли' : ''}</span></div>
+   <div class="gm-two">
+    <div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${big(t.gold)}<div class="gm-bar"><i style="width:${nd ? 0 : t.gold || 0}%;background:${_gBar(t.gold)}"></i></div><button class="gm-tb" onclick="goldTog('top','gold')">Состав ${_goldOpen.top === 'gold' ? '▴' : '▾'}</button></div>
+    <div><span class="gm-lbl">ПРИОРИТЕТ</span>${big(t.prio)}<div class="gm-bar"><i style="width:${nd ? 0 : t.prio || 0}%;background:${_gBar(t.prio)}"></i></div><button class="gm-tb" onclick="goldTog('top','prio')">Состав ${_goldOpen.top === 'prio' ? '▴' : '▾'}</button></div>
+   </div>${list}</div>`;
+}
+function goldCard(pt) {
+  const g = _gold, tt = _nrTt(pt), p = (g.points || {})[tt] || { days: 0, gold: 0, taken: [] }, nd = g.nodata;
+  const gp = p.days ? Math.round(p.gold / p.days * 100) : null;
+  const left = g.prio.filter(n => !p.taken.includes(n)), i = _rtPoints.indexOf(pt), open = _goldOpen['p' + tt];
+  const gTot = nd ? '<span class="gm-nd">данные ещё не пришли</span>' : `<span class="gm-tot"><b class="${_gCol(gp)}">${p.gold} из ${p.days} дн.</b></span>`;
+  const pTot = nd ? '<span class="gm-nd">данные ещё не пришли</span>' : `<span class="gm-tot"><b>${p.taken.length} из ${g.prio.length}</b></span>`;
+  const lst = open && nd ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${g.prio.map(n => `<span class="gm-c">${_pbEsc(n)}</span>`).join('')}</div>`
+    : open ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${left.map(n => `<span class="gm-c no">${_pbEsc(n)}</span>`).join('')}${p.taken.length ? (_goldOpen['t' + tt] ? p.taken.map(n => `<span class="gm-c ok">${_pbEsc(n)}</span>`).join('') : `<span class="gm-c ok" style="cursor:pointer" onclick="goldTk(${i})">+ ещё ${p.taken.length} взяли</span>`) : ''}</div>` : '';
+  return `<div class="gm-row"><b>ЗОЛОТОЙ ЗАКАЗ</b>${gTot}</div>
+    <div class="gm-row"><b>ПРИОРИТЕТ</b>${pTot}</div>
+    ${g.prio.length ? `<div class="gm-seg"><button onclick="goldPt(${i})"><span>${nd ? 'Список приоритета' : 'Осталось ' + left.length}</span><span>${open ? '▴' : '▾'}</span></button></div>${lst}` : ''}`;
+}
+function goldTog(k, v) { if (k === 'top') _goldOpen.top = _goldOpen.top === v ? null : v; else _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
+function goldTk(i) { const pt = _rtPoints[i]; if (!pt) return; const k = 't' + _nrTt(pt); _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
+function goldPt(i) { const pt = _rtPoints[i]; if (!pt) return; const k = 'p' + _nrTt(pt); _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
+function goldItogCard(elId, kind) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  if (!goldOn()) { el.innerHTML = ''; return; }
+  const g = _gold, nd = g.nodata;
+  let a, b, sa, sb;
+  if (kind === 'day') {
+    const d = (g.by_day || {})[_localDateStr(_dayDate)] || [0, 0];
+    a = d[1] ? Math.round(d[0] / d[1] * 100) : null; sa = `${d[0]} из ${d[1]} точек с заказом`;
+    b = (g.month || {}).gold; sb = 'за месяц';
+  } else {
+    a = (g.month || {}).gold; sa = `дней с золотым заказом · ${(g.month || {}).gold_points || 0} точек`;
+    b = (g.month || {}).prio; sb = `в среднем по ${(g.month || {}).base || 0} точкам базы`;
+  }
+  const v = x => nd || x == null ? '<span class="gm-big" style="font-size:15px;color:var(--muted)">нет данных</span>' : `<span class="gm-big ${_gCol(x)}">${x}%</span>`;
+  el.innerHTML = `<div class="gm-mx" style="margin:0 0 12px"><div class="gm-t"><b>${kind === 'day' ? 'День' : 'Месяц'}</b><span>${nd ? 'данные ещё не пришли — появятся после ночного расчёта' : _pbEsc(g.cell.t + ' · ' + g.cell.c)}</span></div>
+    <div class="gm-two"><div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${v(a)}<span style="font-size:12px">${nd ? '' : sa}</span></div>
+    <div><span class="gm-lbl">${kind === 'day' ? 'ЗОЛОТОЙ · МЕСЯЦ' : 'ПРИОРИТЕТ'}</span>${v(b)}<span style="font-size:12px">${nd ? '' : sb}</span></div></div></div>`;
 }
 
 // «Визиты без заказа» — карточка в Итогах дня и Итогах месяца (GET /noorder)
@@ -1071,7 +1152,7 @@ function renderCard(pt) {
     </div>
     ${renderVisits(pt)}
     ${nrPrev(pt)}
-    ${renderRtCats(pt.cats)}
+    ${goldOn() ? goldCard(pt) : renderRtCats(pt.cats)}
     ${nrRow(pt)}
   </div>`;
 }
@@ -1164,6 +1245,7 @@ function buildRouteScreen(data) {
       </div>
 
       ${focusBlockHtml}
+      ${goldTop()}
       <div class="rt" style="padding:0 16px">
         <div class="rt-chips" id="tabs">
           <button class="rt-chip all ${tab==='all'?'on':''}" data-t="all">Все ${allPoints.length}</button>
@@ -1331,7 +1413,8 @@ function buildSttScreen(data) {
 
       <div id="nr-month"></div>
 
-      ${catsData.length ? `<details class="stt-card c-purple">
+      <div id="gold-month"></div>
+      ${catsData.length ? `<details class="stt-card c-purple cat-card">
         <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
           <span class="stt-card-head" style="margin:0"><span>🏷️</span><span class="stt-card-title">Категории</span></span>
           <span style="display:flex;align-items:center;gap:8px;">
@@ -1389,7 +1472,8 @@ function buildSttScreen(data) {
     });
   });
   { const _nm = new Date(new Date().getFullYear(), new Date().getMonth() - _sttMonthOffset, 1);   // 23.11.2026: «Визиты без заказа»
-    nrFill('nr-month', `month=${_nm.getMonth() + 1}&year=${_nm.getFullYear()}`); }
+    nrFill('nr-month', `month=${_nm.getMonth() + 1}&year=${_nm.getFullYear()}`);
+    if (_sttMonthOffset === 0) goldItogCard('gold-month', 'month'); }
 }
 
 // ============================================================
@@ -1852,9 +1936,10 @@ function buildDayScreen(data) {
         <div style="padding-top:10px">${myHtml}</div>
       </details>
 
+      <div id="gold-day"></div>
       <div id="nr-day"></div>
 
-      <details style="${cardStyle}border-left:3px solid #7c4fbf">
+      <details class="cat-card" style="${cardStyle}border-left:3px solid #7c4fbf">
         <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
           <div style="display:flex;align-items:center;gap:8px;"><span>🏷️</span><span style="font-size:11px;font-weight:700;color:#7c4fbf;text-transform:uppercase;letter-spacing:.06em;">Категории</span></div>
           <div style="display:flex;align-items:center;gap:6px"><span style="font-size:18px;font-weight:700;color:${myCatAvgColor}">${myCatAvg!=null?myCatAvg+'%':'—'}</span><span style="font-size:10px;color:var(--muted)">▶</span></div>
@@ -1886,11 +1971,12 @@ function buildDayScreen(data) {
       </div>
     </div>`;
   nrFill('nr-day', 'day=' + _localDateStr(_dayDate));     // 23.11.2026: «Визиты без заказа»
+  goldItogCard('gold-day', 'day');
 }
 
 
 function activateScreen(name) {
-  if (name === 'day') trackItogi(_telegramId);
+  if (name === 'day' && !_nrViewer) trackItogi(_telegramId);
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -2092,23 +2178,31 @@ async function main() {
 
   const err = (sid, msg) => apiErr(sid, msg);
   _telegramId = id;
-  if (new URLSearchParams(window.location.search).get('screen') === 'day') trackItogi(id);
-  await loadDataVersion(id);           // 16.11.2026: версия данных — решает, брать ли экраны с телефона
+  const _isViewer = !!new URLSearchParams(window.location.search).get('viewer');   // 23.11.2026: руководитель — не считаем запуском агента
+  if (!_isViewer && new URLSearchParams(window.location.search).get('screen') === 'day') trackItogi(id);
+  if (!_isViewer) await loadDataVersion(id);           // 16.11.2026: версия данных — решает, брать ли экраны с телефона
   pbInit(id);                          // 16.11.2026: «Проблемы клиентов» — раз в день, без ожидания
   const todayKey = 'day:' + _localDateStr(new Date());
 
   // Load /day first to get cross-month focus points, then build route
+  // 23.11.2026: «Золотой заказ» — свежим запросом (не из кеша телефона); viewer — руководитель в просмотре
+  const _viewer = new URLSearchParams(window.location.search).get('viewer');
+  const goldP = fetch(`${API}/api/agent/${id}/gold${_viewer ? '?viewer=' + encodeURIComponent(_viewer) : ''}`)
+    .then(r => r.ok ? r.json() : null).catch(() => null)
+    .then(g => { _gold = g; document.body.classList.toggle('gold-on', goldOn()); return g; });
   getJSONonce(todayKey, `${API}/api/agent/${id}/day`)
     .then(dayData => {
       _dayFocusPoints = dayData.focus_points || [];
       return getJSON('today', `${API}/api/agent/${id}/today`);
     })
+    .then(async d => { await goldP; return d; })
     .then(buildRouteScreen)
     .catch(() => err('screen-route', 'Ошибка загрузки маршрута'));
 
-  fetchAndBuildStt(0);
+  goldP.then(() => fetchAndBuildStt(0));
 
   getJSONonce(todayKey, `${API}/api/agent/${id}/day`)      // тот же ответ, что для Маршрута, — один запрос
+    .then(async d => { await goldP; return d; })
     .then(buildDayScreen)
     .catch(() => err('screen-day', 'Ошибка загрузки итога дня'));
 
