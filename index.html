@@ -95,6 +95,25 @@ body {
 .rt-chip.all { background: #fff; color: var(--text); border-color: var(--border); }
 .rt-chip.red { background: #fee2e2; color: var(--red); } .rt-chip.yellow { background: #fef3c7; color: var(--yellow); } .rt-chip.green { background: #d1fae5; color: var(--green); }
 .rt-chip.prob { background: #fff; color: #B42318; border-color: #F3B8B2; }
+/* 23.11.2026 причины отсутствия заказа — по макету «Агент: золотая матрица» */
+.nr-last { background: #FBE3E1; border-radius: 9px; padding: 6px 9px; font-size: 12px; color: #B42318; line-height: 1.35; font-weight: 600; margin-top: 8px; display: flex; gap: 8px; align-items: flex-start; }
+.nr-last b { font-weight: 800; } .nr-last.none { background: #F1EEE8; color: var(--muted); }
+.nr-last .nr-y { margin-left: auto; white-space: nowrap; font-weight: 800; color: #1F1F1F; cursor: pointer; border: none; background: none; font: inherit; font-weight: 800; padding: 0; }
+.nr-ft { display: flex; justify-content: flex-end; border-top: 1px dashed var(--border); padding-top: 8px; margin-top: 9px; }
+.nr-btn { background: transparent; border: 1.5px solid #1F1F1F; color: #1F1F1F; font-weight: 700; border-radius: 10px; padding: 6px 12px; font-size: 12.5px; font-family: inherit; cursor: pointer; text-align: left; }
+.nr-btn.set { border-color: #B42318; color: #B42318; background: #FDF1F0; }
+.nr-rs { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 8px; }
+.nr-rs button { font: inherit; font-size: 12px; font-weight: 700; padding: 7px 10px; border-radius: 9px; background: #F1ECE4; border: none; color: #1F1F1F; cursor: pointer; text-align: left; }
+.nr-rs button.on { background: #B42318; color: #fff; }
+.nr-rs button.clr { background: transparent; border: 1.5px dashed #9ca3af; color: var(--muted); }
+.nr-rs .nr-h { width: 100%; font-size: 11.5px; color: var(--muted); font-weight: 600; }
+.nr-card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); border-left: 3px solid #B42318; }
+.nr-card summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; }
+.nr-card summary::-webkit-details-marker { display: none; }
+.nr-lr { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--border); font-size: 13px; align-items: center; }
+.nr-lr:first-child { border-top: 0; } .nr-lr .nm { flex: 1; min-width: 0; } .nr-lr b { font-variant-numeric: tabular-nums; }
+.nr-lr .bb { flex: none; width: 64px; height: 6px; background: #F1ECE4; border-radius: 3px; overflow: hidden; } .nr-lr .bb i { display: block; height: 100%; background: #D2534C; }
+.nr-lr.na { color: var(--muted); } .nr-lr.na .bb i { background: #C9C3B8; }
 .rt-chip.on { border-color: currentColor; }
 .rt-cats { display: flex; gap: 4px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
 /* 17.11.2026: последняя плашка и «= среднее» неразрывны — среднее никогда не стоит одно в пустой строке */
@@ -551,7 +570,7 @@ const PB_NONE = '__none__';
 let _pb = { d: '', reasons: PB_DEFAULT, marks: {}, prev: {}, ymarks: {}, closed: {}, q: [] };
 let _pbId = null, _pbCur = null, _pbDay = null, _pbSel = null, _pbSending = false, _pbYList = false;
 let _rtRender = null, _rtPoints = [];
-function _pbKey() { return 'sttp:' + API + ':' + _pbId; }
+function _pbKey() { return 'sttp2:' + API + ':' + _pbId; }   // 23.11.2026: причины отсутствия заказа — новый кеш
 function _pbRtKey() { return 'sttr:' + API + ':' + _pbId; }
 function _pbToday() { return _localDateStr(new Date()); }
 function _pbYday() { const d = new Date(); d.setDate(d.getDate() - 1); return _localDateStr(d); }
@@ -734,6 +753,103 @@ function pbSave(clear) {
   _pbRedraw();
   pbToast(reasons.length ? 'Отмечено: ' + (pt.client || pt.address) : 'Отметка снята');
 }
+// ============================================================
+// 23.11.2026: причины отсутствия заказа (макет «Агент: золотая матрица»). Вместо «Проблема».
+// Визит сегодня без заказа (сегодня в Плане, заказа ещё нет) — «Нет заказа, укажи причину ▾»,
+// список прямо в карточке, одна причина; выбрал — «Причина: … ✎». Пришёл заказ — кнопка
+// пропадает, причина не считается (сервер сверяет с заказами).
+// Прошлый визит без заказа (красный квадрат) — плашка с причиной, указанной тогда.
+// Вчерашний визит без причины — «Указать ▾» прямо в плашке (страховка).
+// Хранение и отправка — та же очередь, что у «Проблем» (sttp2:, POST /problems).
+// ============================================================
+let _nrOpen = null;     // 'tt|day' — открытый список причин
+function _nrTt(pt) { return pt.tt || pt.address; }
+function _nrIso(day) { const n = new Date(); return _localDateStr(new Date(n.getFullYear(), n.getMonth(), day)); }
+function nrTodayOpen(pt) {
+  const today = new Date().getDate();
+  return Array.isArray(pt.remaining_days) && pt.remaining_days.includes(today)
+    && !(pt.visits || []).some(v => !v.is_future && v.day === today && v.has_order);
+}
+function nrLastMiss(pt) {
+  const today = new Date().getDate();
+  const past = (pt.visits || []).filter(v => !v.is_future && v.day != null && v.day < today);
+  const off = (pt.off_route_days || []).filter(d => d < today);
+  if (!past.length) return null;
+  const last = past.reduce((a, b) => (b.day > a.day ? b : a));
+  if (last.has_order || off.some(d => d >= last.day)) return null;   // после него был заказ вне маршрута
+  return last.day;
+}
+function _nrReasonOn(pt, iso) {
+  const tt = _nrTt(pt);
+  if (iso === _pbToday()) return ((_pb.marks || {})[tt] || [])[0] || '';
+  if (iso === _pbYday() && (_pb.ymarks || {})[tt]) return ((_pb.ymarks || {})[tt] || [])[0] || '';
+  const p = (_pb.prev || {})[tt];
+  return p && p.day === iso && p.r && p.r.length ? p.r[0] : '';
+}
+function _nrList(pt, iso) {
+  const tt = _nrTt(pt), cur = _nrReasonOn(pt, iso), i = _rtPoints.indexOf(pt);
+  if (_nrOpen !== tt + '|' + iso) return '';
+  const rs = (_pb.reasons || []).map((r, k) => `<button class="${r === cur ? 'on' : ''}" onclick="nrPick(${i},'${iso}',${k})">${_pbEsc(r)}</button>`).join('');
+  return `<div class="nr-rs">${iso !== _pbToday() ? `<span class="nr-h">Визит ${_pbDm(iso)} — почему не было заказа?</span>` : ''}${rs}${cur ? `<button class="clr" onclick="nrPick(${i},'${iso}',-1)">Заказ был — убрать</button>` : ''}</div>`;
+}
+function nrPrev(pt) {
+  const d = nrLastMiss(pt);
+  if (!d) return '';
+  const iso = _nrIso(d), r = _nrReasonOn(pt, iso), i = _rtPoints.indexOf(pt);
+  const canY = iso === _pbYday();          // вчерашний — ещё можно указать
+  const btn = canY ? `<button class="nr-y" onclick="nrToggle(${i},'${iso}')">${r ? '✎' : 'Указать ▾'}</button>` : '';
+  const html = r
+    ? `<div class="nr-last"><span>Прошлый визит без заказа: <b>${_pbEsc(r)}</b></span>${btn}</div>`
+    : `<div class="nr-last none"><span>Прошлый визит без заказа: причина не указана</span>${btn}</div>`;
+  return html + (canY ? _nrList(pt, iso) : '');
+}
+function nrRow(pt) {
+  if (!nrTodayOpen(pt) || !(_pb.reasons || []).length) return '';
+  const iso = _pbToday(), r = _nrReasonOn(pt, iso), i = _rtPoints.indexOf(pt);
+  const btn = r ? `<button class="nr-btn set" onclick="nrToggle(${i},'${iso}')">Причина: ${_pbEsc(r)} ✎</button>`
+                : `<button class="nr-btn" onclick="nrToggle(${i},'${iso}')">Нет заказа, укажи причину ▾</button>`;
+  return `<div class="nr-ft">${btn}</div>${_nrList(pt, iso)}`;
+}
+function nrToggle(i, iso) {
+  const pt = _rtPoints[i]; if (!pt) return;
+  const k = _nrTt(pt) + '|' + iso;
+  _nrOpen = _nrOpen === k ? null : k;
+  _pbRedraw();
+}
+function nrPick(i, iso, k) {
+  const pt = _rtPoints[i]; if (!pt) return;
+  const tt = _nrTt(pt), reasons = k < 0 ? [] : [(_pb.reasons || [])[k]];
+  if (iso === _pbToday()) (_pb.marks || (_pb.marks = {}))[tt] = reasons;
+  else if (iso === _pbYday()) (_pb.ymarks || (_pb.ymarks = {}))[tt] = reasons;
+  if (reasons.length) (_pb.prev || (_pb.prev = {}))[tt] = { day: iso, r: reasons };
+  else if ((_pb.prev || {})[tt] && _pb.prev[tt].day === iso) delete _pb.prev[tt];
+  _pbQueue(tt, iso, reasons);
+  _nrOpen = null;
+  _pbRedraw();
+  pbToast(reasons.length ? 'Причина записана: ' + (pt.client || pt.address) : 'Причина снята');
+}
+
+// «Визиты без заказа» — карточка в Итогах дня и Итогах месяца (GET /noorder)
+async function nrFill(elId, query) {
+  const el = document.getElementById(elId);
+  if (!el || !_telegramId) return;
+  try {
+    const r = await fetch(`${API}/api/agent/${_telegramId}/noorder?${query}`);
+    if (!r.ok) { el.innerHTML = ''; return; }
+    const j = await r.json();
+    if (document.getElementById(elId) !== el) return;
+    if (!j.visits) { el.innerHTML = ''; return; }
+    const mx = Math.max(1, j.none, ...j.reasons.map(x => x[1]));
+    const rows = j.reasons.map(([n, v]) => `<div class="nr-lr"><span class="nm">${_pbEsc(n)}</span><span class="bb"><i style="width:${v / mx * 100}%"></i></span><b>${v}</b></div>`).join('')
+      + (j.none ? `<div class="nr-lr na"><span class="nm">Причина не указана</span><span class="bb"><i style="width:${j.none / mx * 100}%"></i></span><b>${j.none}</b></div>` : '');
+    el.innerHTML = `<details class="nr-card"><summary>
+        <span style="font-size:11px;font-weight:700;color:#B42318;text-transform:uppercase;letter-spacing:.06em;">✕ Визиты без заказа</span>
+        <span style="display:flex;align-items:center;gap:6px"><span style="font-size:13px;color:var(--muted);font-weight:600">${j.without} из ${j.visits}</span><span style="font-size:10px;color:var(--muted)">▶</span></span></summary>
+      <div style="padding-top:10px">${j.partial ? '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">Заказы сегодня загрузятся вечером — до этого цифра предварительная.</div>' : ''}
+      ${j.without ? rows : '<div style="font-size:13px;color:var(--muted)">Все визиты с заказом.</div>'}</div></details>`;
+  } catch (e) { el.innerHTML = ''; }
+}
+
 function pbToast(t) {
   let e = document.getElementById('pb-toast');
   if (!e) { e = document.createElement('div'); e.id = 'pb-toast'; e.className = 'pb-toast'; document.body.appendChild(e); }
@@ -954,8 +1070,9 @@ function renderCard(pt) {
       <div class="card-stt-wrap">${sttBlock}</div>
     </div>
     ${renderVisits(pt)}
+    ${nrPrev(pt)}
     ${renderRtCats(pt.cats)}
-    ${pbRow(pt)}
+    ${nrRow(pt)}
   </div>`;
 }
 
@@ -1034,8 +1151,9 @@ function buildRouteScreen(data) {
     const ordered = [...sortWithFocus(grouped.red), ...sortWithFocus(grouped.yellow), ...sortWithFocus(grouped.green)];
     _rtPoints = ordered;
     if (!_rtRemembered) { _rtRemembered = true; pbRememberRoute(ordered); }
-    const probList = ordered.filter(p => pbToday(p).length || pbPrev(p))
-      .sort((a, b) => (pbToday(b).length ? 1 : 0) - (pbToday(a).length ? 1 : 0));
+    // 23.11.2026: «Без заказа» — визит сегодня без заказа или прошлый визит без заказа
+    const probList = ordered.filter(p => nrTodayOpen(p) || nrLastMiss(p))
+      .sort((a, b) => (nrTodayOpen(b) ? 1 : 0) - (nrTodayOpen(a) ? 1 : 0));
     const shown = tab === 'all' ? ordered : tab === 'prob' ? probList : ordered.filter(p => bucketOf(p) === tab);
     document.getElementById('screen-route').innerHTML = `
       <div class="header">
@@ -1045,7 +1163,6 @@ function buildRouteScreen(data) {
         </div>
       </div>
 
-      ${pbYBanner()}
       ${focusBlockHtml}
       <div class="rt" style="padding:0 16px">
         <div class="rt-chips" id="tabs">
@@ -1053,14 +1170,13 @@ function buildRouteScreen(data) {
           <button class="rt-chip red ${tab==='red'?'on':''}" data-t="red">Не АКБ ${grouped.red.length}</button>
           <button class="rt-chip yellow ${tab==='yellow'?'on':''}" data-t="yellow">АКБ ${grouped.yellow.length}</button>
           <button class="rt-chip green ${tab==='green'?'on':''}" data-t="green">СТТ ${grouped.green.length}</button>
-          <button class="rt-chip prob ${tab==='prob'?'on':''}" data-t="prob">Проблемы ${probList.length}</button>
+          <button class="rt-chip prob ${tab==='prob'?'on':''}" data-t="prob">Без заказа ${probList.length}</button>
         </div>
       </div>
-      ${pbDayBlock()}
       <div id="tab-content" class="rt">
         ${shown.length
           ? `<div class="cards" style="padding-top:0">${shown.map(renderCard).join('')}</div>`
-          : `<div class="empty">${tab === 'prob' ? 'Проблем нет' : 'Точки отсутствуют'}</div>`}
+          : `<div class="empty">${tab === 'prob' ? 'Визитов без заказа нет' : 'Точки отсутствуют'}</div>`}
       </div>`;
 
     document.getElementById('tabs').addEventListener('click', e => {
@@ -1213,6 +1329,8 @@ function buildSttScreen(data) {
         </div>
       </details>
 
+      <div id="nr-month"></div>
+
       ${catsData.length ? `<details class="stt-card c-purple">
         <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;">
           <span class="stt-card-head" style="margin:0"><span>🏷️</span><span class="stt-card-title">Категории</span></span>
@@ -1270,6 +1388,8 @@ function buildSttScreen(data) {
       buildSttScreen(_lastSttData);
     });
   });
+  { const _nm = new Date(new Date().getFullYear(), new Date().getMonth() - _sttMonthOffset, 1);   // 23.11.2026: «Визиты без заказа»
+    nrFill('nr-month', `month=${_nm.getMonth() + 1}&year=${_nm.getFullYear()}`); }
 }
 
 // ============================================================
@@ -1732,6 +1852,8 @@ function buildDayScreen(data) {
         <div style="padding-top:10px">${myHtml}</div>
       </details>
 
+      <div id="nr-day"></div>
+
       <details style="${cardStyle}border-left:3px solid #7c4fbf">
         <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
           <div style="display:flex;align-items:center;gap:8px;"><span>🏷️</span><span style="font-size:11px;font-weight:700;color:#7c4fbf;text-transform:uppercase;letter-spacing:.06em;">Категории</span></div>
@@ -1763,6 +1885,7 @@ function buildDayScreen(data) {
         </details>
       </div>
     </div>`;
+  nrFill('nr-day', 'day=' + _localDateStr(_dayDate));     // 23.11.2026: «Визиты без заказа»
 }
 
 
