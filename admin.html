@@ -595,6 +595,9 @@ function goldBlock(c){
         ${g.history.length ? `<div class="tw"><table style="min-width:520px"><thead><tr><th>Дата</th><th>Ячейка</th><th>Что изменено</th><th>Подтвердил</th></tr></thead><tbody>
           ${g.history.map(h => `<tr><td>${esc(fdt(h.at))}</td><td>${esc(h.cell)}</td><td>${esc(h.what)}</td><td>${esc(h.who)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small">Изменений пока нет.</p>'}
       </details>
+      ${can ? `<details class="sub2" ${opAttr('gpeek_' + id)}><summary>Проверить представление заказов с товарами</summary>
+        <div class="acts" style="margin-top:8px"><input id="gpk_${esc(id)}" style="flex:1;min-width:220px;width:auto" placeholder="проект.датасет.представление" value="${esc(S.gpk || 'optimal-cogency-432307-k1.DWH_Reports.Orders_Assortmant')}"><button onclick="goldPeek('${esc(id)}')">Прочитать 5 строк</button></div>
+        <div id="gpk_out_${esc(id)}"></div></details>` : ''}
       <details class="sub2" ${opAttr('ghow_' + id)}><summary>Как это работает</summary>
         <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">Три положения ячейки. «Выкл» — все видят прежний дашборд с категориями. «Просмотр» — агенты на прежнем дашборде, а руководители открывают дашборд агента и видят новый экран на реальных данных: так проверяем перед запуском. «Агентам» — агенты видят золотой заказ и приоритет вместо категорий. Переключатель филиала меняет все его ячейки с данными. Если у ячейки нет данных или в приоритете меньше ${g.prio_min} позиций, переключатель недоступен, агенты остаются на прежнем дашборде. Если у территории нет своей матрицы, действует матрица филиала. Выключение возвращает прежний дашборд сразу, данные не теряются. Состав золотого заказа и список приоритета берутся из справочника, утверждённого по ленте ассортимента.</div>
       </details>`;
@@ -658,6 +661,15 @@ function goldMode(id, keys, mode){ goldSet(id, keys.map(k => ({key: k, mode})));
 function goldAll(id, mode){
   const g = S.gold[id];
   goldSet(id, g.cells.filter(c => c.state === 'ok' && c.mode !== mode).map(c => ({key: c.key, mode})));
+}
+async function goldPeek(id){
+  const inp = $('gpk_' + id), out = $('gpk_out_' + id);
+  S.gpk = inp.value.trim(); out.innerHTML = '<p class="small">Читаю… до минуты.</p>';
+  try {
+    const x = await api('/companies/' + encodeURIComponent(id) + '/bq-peek', {method: 'POST', body: {ref: S.gpk}});
+    const txt = 'Колонки: ' + x.columns.join(', ') + '\n\n' + x.rows.map(r => JSON.stringify(r)).join('\n');
+    out.innerHTML = `<textarea readonly style="width:100%;height:220px;margin-top:8px;font:12px var(--mono);border:1px solid var(--line);border-radius:6px;padding:8px">${esc(txt)}</textarea><p class="small">Скопируйте текст целиком и пришлите в чат.</p>`;
+  } catch(e){ out.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
 }
 function goldThrLbl(id, key, v){
   const t = S.gold[id].teams.find(x => x.key === key), e = $('gthr_' + id + '_' + key);
