@@ -869,7 +869,7 @@ function screenSummary() {
   setPill(b.pill);
   let html = '';   // 16.10.2026: «Как читать цифры» убрали — период и сравнение написаны в самом блоке
   html += cardsSummary(d.role === 'director' ? 'Среднее по компании' : 'Среднее по вашей зоне', b);
-  return html + pbCard() + routesBlock(S.sum.plan_changes) + alertsCard() + launchCard();   // 16.11.2026: «Работа без проблем»
+  return html + goldPrevCard() + pbCard() + routesBlock(S.sum.plan_changes) + alertsCard() + launchCard();   // 16.11.2026: «Работа без проблем»
 }
 
 // ---------- Динамика ----------
@@ -1113,6 +1113,32 @@ function pbMonthCard(m) {
     ${chart || '<div class="period">Динамика появится, когда будет хотя бы два месяца с отметками.</div>'}${PB_HOW}
   </details>`;
 }
+// 23.11.2026: «Золотой заказ · просмотр» — ячейки зоны руководителя в положении «Просмотр» или
+// «Агентам» (админка). Руководитель открывает дашборд агента в новом виде до запуска агентам.
+S.gp = null; S.gpOpen = {};
+async function loadGoldPrev() {
+  try { const r = await fetch(`${API}/api/leader/${S.id}/gold-preview`); S.gp = r.ok ? await r.json() : null; }
+  catch (e) { S.gp = null; }
+  render();
+}
+function goldPrevCard() {
+  const cells = (S.gp && S.gp.cells) || [];
+  if (!cells.length) return '';
+  const dev = new URLSearchParams(window.location.search).get('dev') === '1' ? '&dev=1' : '';
+  const rows = cells.map((c, i) => {
+    const open = S.gpOpen[i];
+    const ag = open ? c.agents.map(a => `<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px dashed var(--line);font-size:13px">
+        <span>${esc(a.n)}</span>${a.tid ? `<a href="index.html?id=${encodeURIComponent(a.tid)}&viewer=${encodeURIComponent(S.id)}${dev}" style="font-weight:700;color:var(--ink);text-decoration:none;border:1.5px solid var(--ink);border-radius:9px;padding:3px 10px">Открыть</a>` : '<span style="color:var(--ink-soft);font-size:12px">нет Telegram ID</span>'}</div>`).join('') : '';
+    return `<div style="padding:9px 0;border-top:1px solid var(--line)">
+      <div onclick="S.gpOpen[${i}]=!S.gpOpen[${i}];render()" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-size:13.5px;font-weight:700">
+        <span>${esc(c.n)} <span style="font-size:11px;font-weight:700;border-radius:100px;padding:2px 8px;${c.mode === 'agents' ? 'background:#E6F4EC;color:#3FAE6A">у агентов' : 'background:#FBF1DF;color:#B8862B">просмотр'}</span></span>
+        <span style="color:var(--ink-soft);font-weight:600;font-size:12px">${c.agents.length} агент. ${open ? '▾' : '›'}</span></div>${ag}</div>`;
+  }).join('');
+  return `<div class="day-card" style="background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 16px;margin-bottom:10px">
+    <h3 style="font-size:12px;font-weight:700;color:var(--ink-soft);margin:0 0 4px;text-transform:uppercase;letter-spacing:.02em">Золотой заказ · просмотр</h3>
+    <div style="font-size:12px;color:var(--ink-soft);margin-bottom:6px">Как агенты увидят новый дашборд. Пока ячейка в просмотре, агенты работают в прежнем.</div>${rows}</div>`;
+}
+
 async function loadPb() {
   try { const r = await fetch(`${API}/api/leader/${S.id}/problems`); S.pb = r.ok ? await r.json() : { error: true }; }
   catch (e) { S.pb = { error: true }; }
@@ -1249,6 +1275,7 @@ async function main() {
   document.getElementById('personName').textContent = S.sum.name;
   render();
   loadPb();          // 16.11.2026: «Работа без проблем» — отдельно, экран не ждёт
+  loadGoldPrev();    // 23.11.2026: «Золотой заказ · просмотр»
 }
 if (window.Telegram?.WebApp) { try { Telegram.WebApp.ready(); Telegram.WebApp.expand(); } catch (e) {} }
 main();
