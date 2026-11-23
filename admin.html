@@ -129,6 +129,12 @@ details.sub2{margin-top:12px}details.sub2>summary{cursor:pointer;color:var(--acc
 .gsw[aria-checked="true"]{background:var(--accent)}.gsw[aria-checked="true"]::after{transform:translateX(18px)}
 .gsw:disabled{opacity:.4;cursor:not-allowed}
 .gtg{display:flex;align-items:center;gap:8px}
+.gm{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;flex:none}
+.gm button{border:0;border-radius:0;padding:5px 9px;font-size:12.5px;background:var(--surface);color:var(--ink-2)}
+.gm button+button{border-left:1px solid var(--line)}
+.gm button.on{background:var(--accent);color:var(--on-accent);font-weight:600}
+.gm button.on.pv{background:var(--warn-bg);color:var(--warn)}
+.gm button:disabled{opacity:.4}
 table.gold{min-width:620px}table.gold td{vertical-align:middle}
 table.gold tr.br td{background:var(--surface-2);font-weight:600;cursor:pointer}
 table.gold tr.cl td:first-child{padding-left:26px}
@@ -437,10 +443,12 @@ const PB_REM = [[30, 'За 30 минут до вечернего отчёта'],
 function pbSetBlock(c){
   const id = c.company_id, st = S.pbs[id];
   if(st === undefined){ S.pbs[id] = 'loading'; api('/companies/' + encodeURIComponent(id) + '/problem-settings').then(x => { S.pbs[id] = x; S.pbe[id] = {r: [...x.reasons], m: x.remind_min, nr: ''}; if(S.sel === id) render(); }).catch(() => { S.pbs[id] = null; if(S.sel === id) render(); }); }
-  const head = `<p class="small">Агенты отмечают в Маршруте, на что жалуется клиент. На зарплату не влияет. Руководитель видит итог в «Сводке» и «Итогах месяца».</p>
-    <details style="margin-top:6px"><summary style="cursor:pointer;color:var(--accent);font-size:13px;font-weight:500">Как это работает ›</summary><div class="box" style="margin-top:6px;font-size:13px;color:var(--ink-2)">Агент у точки нажимает «Проблема» и выбирает причины из этого списка. Если за день проблем не было — кнопка «Не было». Руководитель видит «Работу без проблем» — долю точек маршрута без жалоб — и какие причины встречаются чаще. Новый список агенты увидят со следующего дня (сразу — после ↻ в Маршруте). Удалённая причина остаётся в прошлых отметках.</div></details>`;
+  // 23.11.2026: вместо «Проблем клиентов» агенты указывают причины отсутствия заказа (блок выше).
+  // Здесь остаётся только напоминание; старый список причин больше не используется.
+  const head = `<p class="small">Напоминание агентам, у которых есть визиты сегодня без заказа и без указанной причины.</p>
+    `;
   // 23.11.2026: блок свёрнут, как «Причины отсутствия заказа» и «Золотой заказ»
-  const wrap = (chip, inner) => `<div class="sec"><details class="blk" ${opAttr('pb_' + id)}><summary><h3>Проблемы клиентов</h3>${chip}</summary><div class="bd">${inner}</div></details></div>`;
+  const wrap = (chip, inner) => `<div class="sec"><details class="blk" ${opAttr('pb_' + id)}><summary><h3>Напоминание агентам</h3>${chip}</summary><div class="bd">${inner}</div></details></div>`;
   if(st === 'loading' || st === undefined) return wrap('', head + '<p class="small">Загружаю…</p>');
   if(!st) return wrap('', head + '<p class="err">Не удалось загрузить настройки. Обновите страницу.</p>');
   const E = S.pbe[id], can = canCfg(), dis = can ? '' : 'disabled';
@@ -448,15 +456,17 @@ function pbSetBlock(c){
   const rows = E.r.map((r, i) => `<div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
       <input style="flex:1;min-width:0;width:auto" value="${esc(r)}" maxlength="40" ${dis} oninput="S.pbe['${esc(id)}'].r[${i}]=this.value;pbDirty('${esc(id)}')">
       ${can ? `<button title="Выше" ${i === 0 ? 'disabled' : ''} onclick="pbMv('${esc(id)}',${i},-1)">↑</button><button title="Ниже" ${i === E.r.length - 1 ? 'disabled' : ''} onclick="pbMv('${esc(id)}',${i},1)">↓</button><button class="danger" title="Удалить" onclick="S.pbe['${esc(id)}'].r.splice(${i},1);render()">✕</button>` : ''}</div>`).join('');
-  return wrap(`<span class="tag s-work">${E.r.length + 1} причин</span>`, `${head}
+  return wrap(`<span class="tag s-work">${+E.m ? 'за ' + E.m + ' мин' : 'выкл.'}</span>`, `${head}
+    <div style="display:none">
     <p class="lbl" style="margin-top:12px;display:flex;justify-content:space-between"><span>Причины</span><span>${E.r.length + 1} из ${st.max}</span></p>
     ${rows}
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px"><input style="flex:1;min-width:0;width:auto" value="Другое" disabled><span class="small" style="white-space:nowrap;margin:0">всегда последняя</span></div>
     ${can && E.r.length < st.max - 1 ? `<div style="display:flex;gap:6px;margin-top:4px"><input style="flex:1;min-width:0;width:auto" id="pb_nr_${esc(id)}" maxlength="40" placeholder="Новая причина" value="${esc(E.nr)}" oninput="S.pbe['${esc(id)}'].nr=this.value"><button onclick="pbAdd('${esc(id)}')">Добавить</button></div>` : (can ? '<p class="small">Достигнут предел — 10 причин.</p>' : '')}
     ${can ? `<div class="acts" style="margin-top:8px"><button onclick="S.pbe['${esc(id)}'].r=[...S.pbs['${esc(id)}'].default];render()">Вернуть стандартный список</button></div>` : ''}
-    <p class="lbl" style="margin-top:14px">Напоминание агентам</p>
+    </div>
+    <p class="lbl" style="margin-top:14px">Когда напоминать</p>
     <select ${dis} onchange="S.pbe['${esc(id)}'].m=+this.value;render()">${PB_REM.map(([k, t]) => `<option value="${k}" ${+E.m === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
-    <p class="small">Только тем, у кого сегодня маршрут и кто ничего не отметил.</p>
+    <p class="small">Только тем, у кого сегодня есть визиты без заказа и без причины.</p>
     <p class="err" id="pb_err_${esc(id)}"></p>
     ${can ? `<div class="acts" style="margin-top:4px"><button class="pri" id="pb_s_${esc(id)}" ${dirty ? '' : 'disabled'} onclick="pbSave('${esc(id)}')">Сохранить</button><span class="small" id="pb_d_${esc(id)}" style="color:var(--warn)">${dirty ? 'Есть несохранённые изменения' : ''}</span></div>` : ''}
   `);
@@ -480,7 +490,7 @@ async function pbSave(id){
   try {
     const x = await api('/companies/' + encodeURIComponent(id) + '/problem-settings', {method: 'POST', body: {reasons: E.r, remind_min: E.m}});
     S.pbs[id] = x; S.pbe[id] = {r: [...x.reasons], m: x.remind_min, nr: ''};
-    render(); toast('Сохранено. Агенты увидят новый список со следующего дня.');
+    render(); toast('Сохранено.');
   } catch(e){ if(err) err.textContent = e.message; if(b) b.disabled = false; }
 }
 
@@ -567,9 +577,9 @@ function goldBlock(c){
       <p class="small" style="margin-top:10px">${esc(geo)}${can ? '' : ' Включать ячейки может менеджер СТТ.'}</p>
       ${can ? `<div class="acts" style="margin-top:10px;align-items:center">
         <input style="flex:1;min-width:200px;width:auto" placeholder="Поиск: филиал, территория или команда" value="${esc(S.gq[id] || '')}" oninput="S.gq[${q}]=this.value;goldDraw(${q})">
-        <button class="pri" onclick="goldAll(${q},true)">Включить все</button><button onclick="goldAll(${q},false)">Выключить все</button></div>`
+        <button onclick="goldAll(${q},'preview')">Всё в просмотр</button><button class="pri" onclick="goldAll(${q},'agents')">Всё агентам</button><button onclick="goldAll(${q},'off')">Выключить все</button></div>`
         : `<div class="acts" style="margin-top:10px"><input style="flex:1;min-width:200px;width:auto" placeholder="Поиск: филиал, территория или команда" value="${esc(S.gq[id] || '')}" oninput="S.gq[${q}]=this.value;goldDraw(${q})"></div>`}
-      <div class="tw" style="margin-top:10px"><table class="gold"><thead><tr><th>Филиал / территория</th><th>Команда</th><th>Агентов</th><th>Золотой заказ</th><th>Приоритет</th><th>Включить</th></tr></thead>
+      <div class="tw" style="margin-top:10px"><table class="gold"><thead><tr><th>Филиал / территория</th><th>Команда</th><th>Агентов</th><th>Золотой заказ</th><th>Приоритет</th><th>Кому показывать</th></tr></thead>
         <tbody id="gold_tb_${esc(id)}">${goldRows(id)}</tbody></table></div>
       <details class="sub2" ${opAttr('gthr_' + id)}><summary>Настройки расчёта</summary>
         <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">Порог золотого заказа: какую долю состава (позиций рядом с золотом) агент должен набрать в заказе. Задаётся для каждой команды отдельно, потому что у команд разный размер заказа.</div>
@@ -586,7 +596,7 @@ function goldBlock(c){
           ${g.history.map(h => `<tr><td>${esc(fdt(h.at))}</td><td>${esc(h.cell)}</td><td>${esc(h.what)}</td><td>${esc(h.who)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small">Изменений пока нет.</p>'}
       </details>
       <details class="sub2" ${opAttr('ghow_' + id)}><summary>Как это работает</summary>
-        <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">По умолчанию у всех ячеек выключено: агенты видят прежний дашборд с категориями. Включённая ячейка показывает агентам золотой заказ и приоритет вместо категорий. Переключатель филиала включает все его ячейки, где есть данные. Если у ячейки нет данных или в приоритете меньше ${g.prio_min} позиций, переключатель недоступен, агенты остаются на прежнем дашборде. Если у территории нет своей матрицы, действует матрица филиала. Выключение возвращает прежний дашборд сразу, данные не теряются. Состав золотого заказа и список приоритета берутся из справочника, утверждённого по ленте ассортимента.</div>
+        <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">Три положения ячейки. «Выкл» — все видят прежний дашборд с категориями. «Просмотр» — агенты на прежнем дашборде, а руководители открывают дашборд агента и видят новый экран на реальных данных: так проверяем перед запуском. «Агентам» — агенты видят золотой заказ и приоритет вместо категорий. Переключатель филиала меняет все его ячейки с данными. Если у ячейки нет данных или в приоритете меньше ${g.prio_min} позиций, переключатель недоступен, агенты остаются на прежнем дашборде. Если у территории нет своей матрицы, действует матрица филиала. Выключение возвращает прежний дашборд сразу, данные не теряются. Состав золотого заказа и список приоритета берутся из справочника, утверждённого по ленте ассортимента.</div>
       </details>`;
   }
   return `<div class="sec"><details class="blk" ${opAttr(k)}><summary><h3>Золотой заказ и приоритет</h3><span class="tag s-conn" id="gold_cnt_${esc(id)}">${cnt}</span></summary><div class="bd">${body}</div></details></div>`;
@@ -597,25 +607,33 @@ function goldLoad(id){
 }
 function goldCount(g){
   const ok = g.cells.filter(c => c.state === 'ok');
-  return `вкл. ${ok.filter(c => c.on).length} из ${ok.length}`;
+  const pv = ok.filter(c => c.mode === 'preview').length, ag = ok.filter(c => c.mode === 'agents').length;
+  return `вкл. ${ag + pv} из ${ok.length}`;
 }
 const goldThrTxt = (v, k) => `${v}% (≈${Math.max(1, Math.ceil(k * v / 100))} из ${k})`;
+const G_MODES = [['off', 'Выкл'], ['preview', 'Просмотр'], ['agents', 'Агентам']];
+function goldSeg(id, keys, cur, can){
+  const qk = esc(JSON.stringify(keys));
+  return `<span class="gm" role="group">${G_MODES.map(([m, t]) => `<button class="${cur === m ? 'on' + (m === 'preview' ? ' pv' : '') : ''}" ${can ? '' : 'disabled'} onclick="event.stopPropagation();goldMode('${esc(id)}',${qk},'${m}')">${t}</button>`).join('')}</span>`;
+}
 function goldRows(id){
   const g = S.gold[id], q = (S.gq[id] || '').toLowerCase().trim(), op = S.gopen[id] || (S.gopen[id] = {}), can = g.can;
   const branches = [...new Set(g.cells.map(c => c.b))];
   let h = '';
   branches.forEach(b => {
-    const all = g.cells.filter(c => c.b === b), ok = all.filter(c => c.state === 'ok'), on = ok.filter(c => c.on).length;
+    const all = g.cells.filter(c => c.b === b), ok = all.filter(c => c.state === 'ok');
+    const ag = ok.filter(c => c.mode === 'agents').length, pv = ok.filter(c => c.mode === 'preview').length;
     const vis = all.filter(c => !q || (c.b + ' ' + c.t + ' ' + c.c).toLowerCase().includes(q));
     if(!vis.length) return;
     const open = op[b] || !!q, qa = `'${esc(id)}'`, qb = esc(JSON.stringify(b));
-    h += `<tr class="br" onclick="if(!event.target.closest('.gsw')){S.gopen[${qa}][${qb}]=!S.gopen[${qa}][${qb}];goldDraw(${qa})}"><td colspan="5">${open ? '▾' : '▸'} ${esc(b)} <span class="small" style="font-weight:400">включено ${on} из ${ok.length}</span></td>
-      <td><button class="gsw" role="switch" aria-label="Весь филиал: ${esc(b)}" aria-checked="${ok.length > 0 && on === ok.length}" ${can && ok.length ? '' : 'disabled'} onclick="goldBranch(${qa},${qb})"></button></td></tr>`;
+    const same = ok.length && ok.every(c => c.mode === ok[0].mode) ? ok[0].mode : '';
+    h += `<tr class="br" onclick="if(!event.target.closest('.gm')){S.gopen[${qa}][${qb}]=!S.gopen[${qa}][${qb}];goldDraw(${qa})}"><td colspan="5">${open ? '▾' : '▸'} ${esc(b)} <span class="small" style="font-weight:400">агентам ${ag} · просмотр ${pv} из ${ok.length}</span></td>
+      <td>${ok.length ? goldSeg(id, ok.map(c => c.key), same, can) : ''}</td></tr>`;
     if(!open) return;
     vis.forEach(c => {
       const pr = c.state === 'nodata' || c.state === 'gone' ? `<span class="tag s-off">${G_ST[c.state]}</span>` : (c.state === 'small' ? `<span class="tag s-test">${c.prio} · мало</span>` : `<b>${c.prio}</b> поз.`);
       h += `<tr class="cl"><td class="${c.state === 'ok' ? '' : 'dis'}">${esc(c.t)}</td><td>${esc(c.c)}</td><td>${c.agents || (g.structure && g.structure.with_geo ? 0 : '—')}</td><td>${c.gold ? c.gold + ' поз.' : '—'}</td><td>${pr}</td>
-        <td><div class="gtg"><button class="gsw" role="switch" aria-label="Золотой заказ: ${esc(c.b + ', ' + c.t + ', ' + c.c)}" aria-checked="${c.on}" ${can && c.state === 'ok' ? '' : 'disabled'} onclick="goldSet('${esc(id)}',[{key:${esc(JSON.stringify(c.key))},on:${!c.on}}])"></button>${c.state === 'ok' ? '' : '<span class="small" style="margin:0">старый дашборд</span>'}</div></td></tr>`;
+        <td>${c.state === 'ok' ? goldSeg(id, [c.key], c.mode, can) : '<span class="small" style="margin:0">старый дашборд</span>'}</td></tr>`;
     });
   });
   return h || '<tr><td colspan="6" class="small">Ничего не найдено.</td></tr>';
@@ -629,20 +647,17 @@ async function goldSet(id, cells){
   const g = S.gold[id];
   if(!cells.length) return;
   const keep = g.cells.map(c => ({...c}));
-  cells.forEach(ch => { const c = g.cells.find(x => x.key === ch.key); if(c && (!ch.on || c.state === 'ok')) c.on = ch.on; });
+  cells.forEach(ch => { const c = g.cells.find(x => x.key === ch.key); if(c && (ch.mode === 'off' || c.state === 'ok')) c.mode = ch.mode; });
   goldDraw(id);
   try {
     const x = await api('/companies/' + encodeURIComponent(id) + '/gold/cells', {method: 'POST', body: {cells}});
     x.can = true; S.gold[id] = x; goldDraw(id);
   } catch(e){ g.cells = keep; goldDraw(id); toast(e.message); }
 }
-function goldBranch(id, b){
-  const ok = S.gold[id].cells.filter(c => c.b === b && c.state === 'ok'), all = ok.every(c => c.on);
-  goldSet(id, ok.map(c => ({key: c.key, on: !all})));
-}
-function goldAll(id, on){
+function goldMode(id, keys, mode){ goldSet(id, keys.map(k => ({key: k, mode}))); }
+function goldAll(id, mode){
   const g = S.gold[id];
-  goldSet(id, g.cells.filter(c => c.state === 'ok' && c.on !== on).map(c => ({key: c.key, on})));
+  goldSet(id, g.cells.filter(c => c.state === 'ok' && c.mode !== mode).map(c => ({key: c.key, mode})));
 }
 function goldThrLbl(id, key, v){
   const t = S.gold[id].teams.find(x => x.key === key), e = $('gthr_' + id + '_' + key);
