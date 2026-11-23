@@ -575,11 +575,12 @@ function goldBlock(c){
         : 'В Структуре пока нет колонок «Филиал» и «Территория» — число агентов появится, когда клиент их добавит.');
     body = `${g.matrix_rows ? '' : '<div class="note warn">Справочник золота и приоритета для компании ещё не заполнен — все ячейки «нет данных».</div>'}
       <p class="small" style="margin-top:10px">${esc(geo)}${can ? '' : ' Включать ячейки может менеджер СТТ.'}</p>
+      <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)"><b>Выкл</b> — у всех прежний дашборд. <b>Просмотр</b> — агенты на прежнем, руководители видят новый. <b>Агентам</b> — новый видят агенты. Переключатель в строке филиала меняет все его ячейки; нажмите на филиал, чтобы менять ячейки по одной.</div>
       ${can ? `<div class="acts" style="margin-top:10px;align-items:center">
         <input style="flex:1;min-width:200px;width:auto" placeholder="Поиск: филиал, территория или команда" value="${esc(S.gq[id] || '')}" oninput="S.gq[${q}]=this.value;goldDraw(${q})">
-        <button onclick="goldAll(${q},'preview')">Всё в просмотр</button><button class="pri" onclick="goldAll(${q},'agents')">Всё агентам</button><button onclick="goldAll(${q},'off')">Выключить все</button></div>`
+        </div>`
         : `<div class="acts" style="margin-top:10px"><input style="flex:1;min-width:200px;width:auto" placeholder="Поиск: филиал, территория или команда" value="${esc(S.gq[id] || '')}" oninput="S.gq[${q}]=this.value;goldDraw(${q})"></div>`}
-      <div class="tw" style="margin-top:10px"><table class="gold"><thead><tr><th>Филиал / территория</th><th>Команда</th><th>Агентов</th><th>Золотой заказ</th><th>Приоритет</th><th>Кому показывать</th></tr></thead>
+      <div class="tw" style="margin-top:10px"><table class="gold"><thead><tr><th>Филиал / территория</th><th>Команда</th><th>Агентов</th><th>Золотой заказ</th><th>Приоритет</th><th>Кому показывать новый дашборд</th></tr></thead>
         <tbody id="gold_tb_${esc(id)}">${goldRows(id)}</tbody></table></div>
       <details class="sub2" ${opAttr('gthr_' + id)}><summary>Настройки расчёта</summary>
         <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">Порог золотого заказа: какую долю состава (позиций рядом с золотом) агент должен набрать в заказе. Задаётся для каждой команды отдельно, потому что у команд разный размер заказа.</div>
