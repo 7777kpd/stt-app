@@ -890,24 +890,58 @@ function goldCard(pt) {
 function goldTog(k, v) { if (k === 'top') _goldOpen.top = _goldOpen.top === v ? null : v; else _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
 function goldTk(i) { const pt = _rtPoints[i]; if (!pt) return; const k = 't' + _nrTt(pt); _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
 function goldPt(i) { const pt = _rtPoints[i]; if (!pt) return; const k = 'p' + _nrTt(pt); _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
-function goldItogCard(elId, kind) {
+function goldItogCard(elId, kind, team) {
   const el = document.getElementById(elId);
   if (!el) return;
   if (!goldOn()) { el.innerHTML = ''; return; }
-  const g = _gold, nd = g.nodata;
-  let a, b, sa, sb;
-  if (kind === 'day') {
-    const d = (g.by_day || {})[_localDateStr(_dayDate)] || [0, 0];
-    a = d[1] ? Math.round(d[0] / d[1] * 100) : null; sa = `${d[0]} из ${d[1]} точек с заказом`;
-    b = (g.month || {}).gold; sb = 'за месяц';
-  } else {
-    a = (g.month || {}).gold; sa = `дней с золотым заказом · ${(g.month || {}).gold_points || 0} точек`;
-    b = (g.month || {}).prio; sb = `в среднем по ${(g.month || {}).base || 0} точкам базы`;
-  }
+  const g = _gold, nd = g.nodata, N = (g.prio || []).length || 1, P = v => v == null ? null : Math.round(v);
   const v = x => nd || x == null ? '<span class="gm-big" style="font-size:15px;color:var(--muted)">нет данных</span>' : `<span class="gm-big ${_gCol(x)}">${x}%</span>`;
-  el.innerHTML = `<div class="gm-mx" style="margin:0 0 12px"><div class="gm-t"><b>${kind === 'day' ? 'День' : 'Месяц'}</b><span>${nd ? 'данные ещё не пришли — появятся после ночного расчёта' : _pbEsc(g.cell.t + ' · ' + g.cell.c)}</span></div>
-    <div class="gm-two"><div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${v(a)}<span style="font-size:12px">${nd ? '' : sa}</span></div>
-    <div><span class="gm-lbl">${kind === 'day' ? 'ЗОЛОТОЙ · МЕСЯЦ' : 'ПРИОРИТЕТ'}</span>${v(b)}<span style="font-size:12px">${nd ? '' : sb}</span></div></div></div>`;
+  const bar = x => `<div class="gm-bar"><i style="width:${nd ? 0 : x || 0}%;background:${_gBar(x)}"></i></div>`;
+  const card = (t, h) => `<div class="gm-mx" style="margin:0 0 12px;border-color:#E4DCD3"><div class="gm-t"><b>${t}</b></div>${h}</div>`;
+  if (kind === 'day') {
+    // Итоги дня — только этот день
+    const iso = _localDateStr(_dayDate), d = (g.by_day || {})[iso] || [0, 0, 0];
+    const a = d[1] ? P(d[0] / d[1] * 100) : null, b = d[1] ? P(d[2] / (d[1] * N) * 100) : null;
+    const avg = d[1] ? (d[2] / d[1]).toFixed(1).replace('.0', '') : 0;
+    let h = `<div class="gm-mx" style="margin:0 0 12px"><div class="gm-t"><b>За день</b><span>${nd ? 'данные ещё не пришли — появятся после ночного расчёта' : d[1] + ' точек с заказом'}</span></div>
+      <div class="gm-two"><div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${v(a)}${bar(a)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : d[0] + ' золотых из ' + d[1] + ' заказов'}</span></div>
+      <div><span class="gm-lbl">ПРИОРИТЕТ</span>${v(b)}${bar(b)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : 'в заказе в среднем ' + avg + ' из ' + N + ' позиций'}</span></div></div></div>`;
+    el.innerHTML = h;
+    const tEl = document.getElementById('gold-team');
+    if (tEl) {
+      const td = (g.team || {}).days || {};
+      const cell = x => x == null ? '<td style="text-align:right;color:var(--muted)">—</td>' : `<td style="text-align:right;font-weight:800" class="${_gCol(x)}">${x}%</td>`;
+      const rows = (team || []).map(a => {
+        const x = (td[a.name] || {})[iso];
+        const gg = x && x[1] ? P(x[0] / x[1] * 100) : null, pp = x && x[1] ? P(x[2] / (x[1] * N) * 100) : null;
+        return `<tr style="${a.is_me ? 'background:#E3EFD8' : ''}"><td style="padding:6px 0;border-top:1px dashed #E4DCD3">${_pbEsc(a.name.split(' ').slice(0, 2).join(' '))}${a.is_me ? ' (вы)' : ''}</td>${cell(a.sys_stt)}${cell(a.clean_stt)}${cell(nd ? null : gg)}${cell(nd ? null : pp)}</tr>`;
+      }).join('');
+      tEl.innerHTML = `<div class="gm-mx" style="margin:0 0 12px;border-color:#E4DCD3"><div class="gm-t"><b>👥 Команда сегодня</b></div>
+        <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:6px"><tr style="font-size:10.5px;color:var(--muted)"><th style="text-align:left">Агент</th><th style="text-align:right">Сист.</th><th style="text-align:right">Чист.</th><th style="text-align:right">Золото</th><th style="text-align:right">Приор.</th></tr>${rows}</table>
+        <div style="font-size:11px;color:var(--muted);margin-top:6px">Золото и приоритет — у агентов той же ячейки, у остальных «—».</div></div>`;
+    }
+    return;
+  }
+  // Итоги месяца — накопительно с 1-го числа
+  const m = g.month || {}, w = g.where || {}, rk = (g.team || {}).rank || {};
+  const top = `<div class="gm-mx" style="margin:0 0 12px"><div class="gm-t"><b>Месяц</b><span>${nd ? 'данные ещё не пришли — появятся после ночного расчёта' : 'вся база агента: ' + (m.base || 0) + ' точек · накопительно с 1-го числа'}</span></div>
+    <div class="gm-two"><div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${v(m.gold)}${bar(m.gold)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : 'дней с золотым заказом'}</span></div>
+    <div><span class="gm-lbl">ПРИОРИТЕТ</span>${v(m.prio)}${bar(m.prio)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : 'в среднем по точкам базы'}</span></div></div></div>`;
+  if (nd) { el.innerHTML = top; return; }
+  const lst = (arr, f, key) => {
+    const open = _goldOpen[key], sh = open ? arr : arr.slice(0, 5);
+    return sh.map(f).join('') + (arr.length > 5 ? `<div class="nr-lr na" style="cursor:pointer" onclick="_goldOpen['${key}']=!_goldOpen['${key}'];goldItogCard('gold-month','month')"><span class="nm">${open ? 'Свернуть' : '+ ещё ' + (arr.length - 5)}</span><span>${open ? '▴' : '▾'}</span></div>` : '');
+  };
+  const where = card('Где добрать', `
+    <div style="font-size:11px;font-weight:800;color:#B3342C;margin:6px 0 2px">ЗОЛОТОЙ ЗАКАЗ НИ РАЗУ · ${(w.no_gold || []).length}</div>
+    ${(w.no_gold || []).length ? lst(w.no_gold, x => `<div class="nr-lr"><span class="nm">${_pbEsc(x[0])}</span><span style="color:var(--muted);font-size:12px">${x[1]} дн. с заказом</span></div>`, 'wg') : '<div style="font-size:12.5px;color:var(--muted)">Таких точек нет</div>'}
+    <div style="font-size:11px;font-weight:800;color:#B3342C;margin:10px 0 2px;padding-top:8px;border-top:1px dashed #E4DCD3">ПРИОРИТЕТ МЕНЬШЕ 50% · ${(w.low_prio || []).length}</div>
+    ${(w.low_prio || []).length ? lst(w.low_prio, x => `<div class="nr-lr"><span class="nm">${_pbEsc(x[0])}</span><b class="gm-r">${x[1]} из ${w.size}</b></div>`, 'wp') : '<div style="font-size:12.5px;color:var(--muted)">Таких точек нет</div>'}`);
+  const weeks = (g.weeks || []).length ? card('Золотой заказ по неделям', `<div style="display:flex;gap:10px;align-items:flex-end;height:92px;margin-top:6px">${g.weeks.map(x => `<div style="flex:1;text-align:center;font-size:10.5px;color:var(--muted);display:flex;flex-direction:column;justify-content:flex-end;gap:3px;height:100%"><b style="font-size:12px;color:var(--ink)">${x.gold == null ? '—' : x.gold + '%'}</b><i style="display:block;border-radius:5px 5px 0 0;height:${Math.max(4, (x.gold || 0) * 0.8)}px;background:${_gBar(x.gold)};${x.cur ? 'opacity:.5' : ''}"></i>${x.w} нед${x.cur ? ' (идёт)' : ''}</div>`).join('')}</div>`) : '';
+  const rr = x => x && x.place ? `<b class="${_gCol(x.val)}">${x.place} из ${x.of}</b>` : '<b style="color:var(--muted)">—</b>';
+  const cellN = g.cell ? _pbEsc((g.cell.t || g.cell.b) + ' · ' + g.cell.c) : '';
+  const rating = card('🏆 Место в ячейке', `<div class="nr-lr"><span class="nm">По золотому заказу · ${cellN}</span>${rr(rk.gold)}</div><div class="nr-lr"><span class="nm">По приоритету · ${cellN}</span>${rr(rk.prio)}</div>`);
+  el.innerHTML = top + where + weeks + rating;
 }
 
 // «Визиты без заказа» — карточка в Итогах дня и Итогах месяца (GET /noorder)
@@ -1960,7 +1994,8 @@ function buildDayScreen(data) {
         </details>
       </div>
 
-      <div style="background:#EEF2FF;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #C7D2FE;">
+      <div id="gold-team"></div>
+      <div class="cat-card" style="background:#EEF2FF;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #C7D2FE;">
         <details>
           <summary style="list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
             <span style="font-size:13px;font-weight:700;color:#3730A3">👥 Команда сегодня</span>
@@ -1971,7 +2006,7 @@ function buildDayScreen(data) {
       </div>
     </div>`;
   nrFill('nr-day', 'day=' + _localDateStr(_dayDate));     // 23.11.2026: «Визиты без заказа»
-  goldItogCard('gold-day', 'day');
+  goldItogCard('gold-day', 'day', team);
 }
 
 
@@ -2187,7 +2222,8 @@ async function main() {
   // Load /day first to get cross-month focus points, then build route
   // 23.11.2026: «Золотой заказ» — свежим запросом (не из кеша телефона); viewer — руководитель в просмотре
   const _viewer = new URLSearchParams(window.location.search).get('viewer');
-  const goldP = fetch(`${API}/api/agent/${id}/gold${_viewer ? '?viewer=' + encodeURIComponent(_viewer) : ''}`)
+  const _gcell = new URLSearchParams(window.location.search).get('cell');   // 23.11.2026: просмотр нашей командой без Филиала/Территории
+  const goldP = fetch(`${API}/api/agent/${id}/gold${_viewer ? '?viewer=' + encodeURIComponent(_viewer) + (_gcell ? '&cell=' + encodeURIComponent(_gcell) : '') : ''}`)
     .then(r => r.ok ? r.json() : null).catch(() => null)
     .then(g => { _gold = g; document.body.classList.toggle('gold-on', goldOn()); return g; });
   getJSONonce(todayKey, `${API}/api/agent/${id}/day`)
