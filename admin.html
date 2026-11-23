@@ -110,6 +110,29 @@ td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 .pos .x{border:0;background:transparent;color:var(--ink-3);font-size:15px;padding:2px 6px}
 .pos .x:hover{color:var(--accent)}
 .pos tr.manual td{background:var(--surface-2)}
+/* 23.11.2026 «Золотой заказ и приоритет», «Причины отсутствия заказа» */
+details.blk>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+details.blk>summary::-webkit-details-marker{display:none}
+details.blk>summary h3{margin:0}
+details.blk>summary::after{content:'▸';margin-left:auto;color:var(--ink-3)}
+details.blk[open]>summary::after{content:'▾'}
+details.sub2{margin-top:12px}details.sub2>summary{cursor:pointer;color:var(--accent);font-size:13px;font-weight:500}
+.gsw{position:relative;width:42px;height:24px;border-radius:999px;background:var(--line);border:0;padding:0;flex:none;transition:background .15s}
+.gsw::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:transform .15s}
+.gsw[aria-checked="true"]{background:var(--accent)}.gsw[aria-checked="true"]::after{transform:translateX(18px)}
+.gsw:disabled{opacity:.4;cursor:not-allowed}
+.gtg{display:flex;align-items:center;gap:8px}
+table.gold{min-width:620px}table.gold td{vertical-align:middle}
+table.gold tr.br td{background:var(--surface-2);font-weight:600;cursor:pointer}
+table.gold tr.cl td:first-child{padding-left:26px}
+table.gold td.dis{color:var(--ink-3)}
+.gthr{display:grid;grid-template-columns:110px minmax(0,1fr) 140px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.gthr input{accent-color:var(--accent);padding:0}
+.nr-row{display:flex;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.nr-row .t{flex:1;min-width:0}.nr-row .n{width:22px;color:var(--ink-3);font-size:13px}
+.nr-row .lk{border:0;background:transparent;color:var(--ink-3);padding:4px 6px;font-size:13px}
+.nr-row .lk:hover{color:var(--accent)}.nr-row .lk.del:hover{color:var(--bad)}
+@media (max-width:520px){.gthr{grid-template-columns:80px minmax(0,1fr);}.gthr span{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -389,6 +412,8 @@ function tabCfg(c){
     ${isCl() ? '' : `<div><p class="lbl">Менеджер СТТ</p><input value="${esc(c.manager_name || 'не закреплён')}" disabled title="Закрепляет владелец во вкладке «Обзор»"></div>`}</div>
     ${clientAdminsBlock(c)}
     <label class="check"><input type="checkbox" id="f_lr" ${c.launch_report?'checked':''} ${dis(e)}> Отчёт «кто не запустил приложение» руководителям</label></div>
+  ${nrBlock(c)}
+  ${goldBlock(c)}
   ${pbSetBlock(c)}
   ${limitsBlock(c)}
   <p class="err" id="f_err"></p>
@@ -449,6 +474,179 @@ async function pbSave(id){
     render(); toast('Сохранено. Агенты увидят новый список со следующего дня.');
   } catch(e){ if(err) err.textContent = e.message; if(b) b.disabled = false; }
 }
+
+/* ---------- Причины отсутствия заказа (23.11.2026) ---------- */
+// Агент выбирает причину в карточке точки при визите без заказа. Список по умолчанию —
+// 10 пунктов на языке компании. У причины постоянный код: переименование не ломает отчёты.
+// «Проблема с прошлым заказом» (past_order) питает «Работу без проблем» у руководителя.
+S.nrs = {}; S.nre = {}; S.op = S.op || {};
+const opAttr = k => `${S.op[k] ? 'open' : ''} ontoggle="S.op['${k}']=this.open"`;
+function nrBlock(c){
+  const id = c.company_id, st = S.nrs[id], k = 'nr_' + id;
+  if(st === undefined){ S.nrs[id] = 'loading'; api('/companies/' + encodeURIComponent(id) + '/order-reasons').then(x => { S.nrs[id] = x; S.nre[id] = {r: x.reasons.map(r => ({...r})), ed: -1, del: -1, nt: ''}; if(S.sel === id) render(); }).catch(() => { S.nrs[id] = null; if(S.sel === id) render(); }); }
+  const ready = st && st !== 'loading';
+  const chip = ready ? `<span class="tag ${st.own ? 's-conn' : 's-work'}">${st.own ? 'свой список · ' + st.reasons.length : st.reasons.length + ' по умолчанию'}</span>` : '';
+  let body;
+  if(!ready) body = st === null ? '<p class="err">Не удалось загрузить. Обновите страницу.</p>' : '<p class="small">Загружаю…</p>';
+  else {
+    const E = S.nre[id], can = canCfg(), q = `'${esc(id)}'`;
+    const dirty = JSON.stringify(E.r) !== JSON.stringify(st.reasons);
+    const rows = E.r.map((r, i) => {
+      if(E.ed === i) return `<div class="nr-row"><span class="n">${i + 1}</span><input class="t" id="nr_e_${esc(id)}" maxlength="${st.len}" value="${esc(r.t)}" onkeydown="if(event.key==='Enter')nrEdOk(${q})"><button onclick="nrEdOk(${q})">Готово</button><button onclick="S.nre[${q}].ed=-1;render()">Отмена</button></div>`;
+      if(E.del === i) return `<div class="nr-row" style="flex-wrap:wrap"><span class="n">${i + 1}</span><span class="t">${esc(r.t)}</span>
+        <div class="note warn" style="width:100%;margin:6px 0 0">Эта причина питает блок «Работа без проблем» у руководителя. Без неё блок перестанет получать данные. Удалить?
+        <div class="acts" style="margin-top:8px"><button class="danger" onclick="nrDel(${q},${i},true)">Удалить всё равно</button><button onclick="S.nre[${q}].del=-1;render()">Оставить</button></div></div></div>`;
+      return `<div class="nr-row"><span class="n">${i + 1}</span><span class="t">${esc(r.t)}${r.id === st.past_id ? ' <span class="tag s-conn" title="Питает «Работу без проблем»">Работа без проблем</span>' : ''}</span>
+        ${can ? `<button class="lk" onclick="S.nre[${q}].ed=${i};S.nre[${q}].del=-1;render();setTimeout(()=>{const e=$('nr_e_${esc(id)}');if(e)e.focus()},0)">✎ изменить</button><button class="lk del" onclick="nrDel(${q},${i},false)">✕ удалить</button>` : ''}</div>`;
+    }).join('');
+    body = `<div class="box" style="margin-top:10px;font-size:13px;color:var(--ink-2)">Список по умолчанию для всех компаний. Агент выбирает причину в карточке точки при визите без заказа. Можно изменить текст причины, удалить её или добавить свою — только для этой компании. Пункт «Проблема с прошлым заказом» питает блок «Работа без проблем», поэтому его лучше не удалять. В прошлых отметках причина остаётся как была.</div>
+      <div style="margin-top:8px">${rows}</div>
+      ${can && E.r.length < st.max ? `<div style="display:flex;gap:6px;margin-top:10px"><input style="flex:1;min-width:0;width:auto" maxlength="${st.len}" placeholder="Новая причина" value="${esc(E.nt)}" oninput="S.nre['${esc(id)}'].nt=this.value" onkeydown="if(event.key==='Enter')nrAdd(${q})"><button onclick="nrAdd(${q})">＋ Добавить причину</button></div>` : (can ? `<p class="small">Достигнут предел — ${st.max} причин.</p>` : '')}
+      <p class="err" id="nr_err_${esc(id)}"></p>
+      ${can ? `<div class="acts" style="margin-top:4px"><button class="pri" ${dirty ? '' : 'disabled'} onclick="nrSave(${q})">Сохранить</button>
+        <button onclick="S.nre[${q}]={r:S.nrs[${q}].default.map(r=>({...r})),ed:-1,del:-1,nt:''};render()">Вернуть список по умолчанию</button>
+        ${dirty ? '<span class="small" style="color:var(--warn)">Есть несохранённые изменения</span>' : ''}</div>` : ''}`;
+  }
+  return `<div class="sec"><details class="blk" ${opAttr(k)}><summary><h3>Причины отсутствия заказа</h3>${chip}</summary>${body}</details></div>`;
+}
+function nrEdOk(id){
+  const E = S.nre[id], e = $('nr_e_' + id), v = (e ? e.value : '').trim().replace(/\s+/g, ' ');
+  if(!v){ toast('Текст причины пустой'); return; }
+  if(E.r.some((r, j) => j !== E.ed && r.t.toLowerCase() === v.toLowerCase())){ toast('Такая причина уже есть'); return; }
+  E.r[E.ed] = {...E.r[E.ed], t: v}; E.ed = -1; render();
+}
+function nrDel(id, i, force){
+  const E = S.nre[id], st = S.nrs[id];
+  if(E.r[i].id === st.past_id && !force){ E.del = i; E.ed = -1; render(); return; }
+  E.r.splice(i, 1); E.del = -1; render();
+}
+function nrAdd(id){
+  const E = S.nre[id], v = (E.nt || '').trim().replace(/\s+/g, ' ');
+  if(!v) return;
+  if(E.r.some(r => r.t.toLowerCase() === v.toLowerCase())){ toast('Такая причина уже есть'); return; }
+  E.r.push({id: '', t: v}); E.nt = ''; render();
+}
+async function nrSave(id){
+  const E = S.nre[id], err = $('nr_err_' + id);
+  if(err) err.textContent = '';
+  try {
+    const x = await api('/companies/' + encodeURIComponent(id) + '/order-reasons', {method: 'POST', body: {reasons: E.r}});
+    S.nrs[id] = x; S.nre[id] = {r: x.reasons.map(r => ({...r})), ed: -1, del: -1, nt: ''};
+    render(); toast('Сохранено. Агенты увидят новый список со следующего дня.');
+  } catch(e){ if(err) err.textContent = e.message; }
+}
+
+/* ---------- Золотой заказ и приоритет (23.11.2026) ---------- */
+// Ячейки «филиал + территория + команда» из справочника и Структуры. По умолчанию всё
+// выключено. Включённая ячейка показывает агентам золотой заказ и приоритет вместо
+// категорий (новый дашборд агента — следующим этапом). Переключатель сохраняется сразу.
+S.gold = {}; S.gq = {}; S.gopen = {};
+const G_ST = {nodata: 'нет данных', small: 'мало', gone: 'нет в структуре'};
+function goldBlock(c){
+  const id = c.company_id, g = S.gold[id], k = 'gold_' + id;
+  if(g === undefined){ S.gold[id] = 'loading'; goldLoad(id); }
+  const ready = g && g !== 'loading';
+  const cnt = ready ? goldCount(g) : '';
+  let body;
+  if(!ready) body = g === null ? '<p class="err">Не удалось загрузить справочник. Обновите страницу.</p>' : '<p class="small">Загружаю…</p>';
+  else {
+    const q = `'${esc(id)}'`, can = g.can, s = g.structure || {};
+    const geo = !s.agents ? 'Структура компании не в нашей базе — число агентов по ячейкам не считается.'
+      : (s.with_geo ? `Агентов с филиалом или территорией в Структуре: ${s.with_geo} из ${s.agents}.`
+        : 'В Структуре пока нет колонок «Филиал» и «Территория» — число агентов появится, когда клиент их добавит.');
+    body = `${g.matrix_rows ? '' : '<div class="note warn">Справочник золота и приоритета для компании ещё не заполнен — все ячейки «нет данных».</div>'}
+      <p class="small" style="margin-top:10px">${esc(geo)}${can ? '' : ' Включать ячейки может менеджер СТТ.'}</p>
+      ${can ? `<div class="acts" style="margin-top:10px;align-items:center">
+        <input style="flex:1;min-width:200px;width:auto" placeholder="Поиск: филиал, территория или команда" value="${esc(S.gq[id] || '')}" oninput="S.gq[${q}]=this.value;goldDraw(${q})">
+        <button class="pri" onclick="goldAll(${q},true)">Включить все</button><button onclick="goldAll(${q},false)">Выключить все</button></div>`
+        : `<div class="acts" style="margin-top:10px"><input style="flex:1;min-width:200px;width:auto" placeholder="Поиск: филиал, территория или команда" value="${esc(S.gq[id] || '')}" oninput="S.gq[${q}]=this.value;goldDraw(${q})"></div>`}
+      <div class="tw" style="margin-top:10px"><table class="gold"><thead><tr><th>Филиал / территория</th><th>Команда</th><th>Агентов</th><th>Золотой заказ</th><th>Приоритет</th><th>Включить</th></tr></thead>
+        <tbody id="gold_tb_${esc(id)}">${goldRows(id)}</tbody></table></div>
+      <details class="sub2" ${opAttr('gthr_' + id)}><summary>Настройки расчёта</summary>
+        <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">Порог золотого заказа: какую долю состава (позиций рядом с золотом) агент должен набрать в заказе. Задаётся для каждой команды отдельно, потому что у команд разный размер заказа.</div>
+        ${g.teams.length ? g.teams.map(t => `<div class="gthr"><b>${esc(t.n)}</b>
+          <input type="range" min="10" max="100" step="5" value="${t.v}" ${can ? '' : 'disabled'} aria-label="Порог золотого заказа, ${esc(t.n)}"
+            oninput="goldThrLbl(${q},'${esc(t.key)}',this.value)" onchange="goldThr(${q},'${esc(t.key)}',this.value)">
+          <span id="gthr_${esc(id)}_${esc(t.key)}">${goldThrTxt(t.v, t.k)}</span></div>`).join('') : '<p class="small">Команд с составом пока нет — появятся после заполнения справочника.</p>'}
+        <div class="grid2" style="margin-top:12px"><div class="box"><p class="lbl">Размер приоритета</p><p class="val" style="font-weight:400;font-size:13px">Считается автоматически для каждой ячейки: среднее число SKU на точку за месяц минус золотой заказ</p></div>
+          <div class="box"><p class="lbl">Период оценки</p><p class="val" style="font-weight:400;font-size:13px">Календарный месяц</p></div></div>
+      </details>
+      <details class="sub2" ${opAttr('ghist_' + id)}><summary>История изменений списка</summary>
+        <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">Каждая замена позиции фиксируется. Замена действует с даты изменения, прошлые дни не пересчитываются. Если позиция вылетела из прайса, она убирается из приоритета, и размер списка уменьшается.</div>
+        ${g.history.length ? `<div class="tw"><table style="min-width:520px"><thead><tr><th>Дата</th><th>Ячейка</th><th>Что изменено</th><th>Подтвердил</th></tr></thead><tbody>
+          ${g.history.map(h => `<tr><td>${esc(fdt(h.at))}</td><td>${esc(h.cell)}</td><td>${esc(h.what)}</td><td>${esc(h.who)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small">Изменений пока нет.</p>'}
+      </details>
+      <details class="sub2" ${opAttr('ghow_' + id)}><summary>Как это работает</summary>
+        <div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">По умолчанию у всех ячеек выключено: агенты видят прежний дашборд с категориями. Включённая ячейка показывает агентам золотой заказ и приоритет вместо категорий. Переключатель филиала включает все его ячейки, где есть данные. Если у ячейки нет данных или в приоритете меньше ${g.prio_min} позиций, переключатель недоступен, агенты остаются на прежнем дашборде. Если у территории нет своей матрицы, действует матрица филиала. Выключение возвращает прежний дашборд сразу, данные не теряются. Состав золотого заказа и список приоритета берутся из справочника, утверждённого по ленте ассортимента.</div>
+      </details>`;
+  }
+  return `<div class="sec"><details class="blk" ${opAttr(k)}><summary><h3>Золотой заказ и приоритет</h3><span class="tag s-conn" id="gold_cnt_${esc(id)}">${cnt}</span></summary>${body}</details></div>`;
+}
+function goldLoad(id){
+  api('/companies/' + encodeURIComponent(id) + '/gold').then(x => { S.gold[id] = x; if(S.sel === id) render(); })
+    .catch(() => { S.gold[id] = null; if(S.sel === id) render(); });
+}
+function goldCount(g){
+  const ok = g.cells.filter(c => c.state === 'ok');
+  return `Включено ${ok.filter(c => c.on).length} из ${ok.length} ячеек`;
+}
+const goldThrTxt = (v, k) => `${v}% (≈${Math.max(1, Math.ceil(k * v / 100))} из ${k})`;
+function goldRows(id){
+  const g = S.gold[id], q = (S.gq[id] || '').toLowerCase().trim(), op = S.gopen[id] || (S.gopen[id] = {}), can = g.can;
+  const branches = [...new Set(g.cells.map(c => c.b))];
+  let h = '';
+  branches.forEach(b => {
+    const all = g.cells.filter(c => c.b === b), ok = all.filter(c => c.state === 'ok'), on = ok.filter(c => c.on).length;
+    const vis = all.filter(c => !q || (c.b + ' ' + c.t + ' ' + c.c).toLowerCase().includes(q));
+    if(!vis.length) return;
+    const open = op[b] || !!q, qa = `'${esc(id)}'`, qb = esc(JSON.stringify(b));
+    h += `<tr class="br" onclick="if(!event.target.closest('.gsw')){S.gopen[${qa}][${qb}]=!S.gopen[${qa}][${qb}];goldDraw(${qa})}"><td colspan="5">${open ? '▾' : '▸'} ${esc(b)} <span class="small" style="font-weight:400">включено ${on} из ${ok.length}</span></td>
+      <td><button class="gsw" role="switch" aria-label="Весь филиал: ${esc(b)}" aria-checked="${ok.length > 0 && on === ok.length}" ${can && ok.length ? '' : 'disabled'} onclick="goldBranch(${qa},${qb})"></button></td></tr>`;
+    if(!open) return;
+    vis.forEach(c => {
+      const pr = c.state === 'nodata' || c.state === 'gone' ? `<span class="tag s-off">${G_ST[c.state]}</span>` : (c.state === 'small' ? `<span class="tag s-test">${c.prio} · мало</span>` : `<b>${c.prio}</b> поз.`);
+      h += `<tr class="cl"><td class="${c.state === 'ok' ? '' : 'dis'}">${esc(c.t)}</td><td>${esc(c.c)}</td><td>${c.agents || (g.structure && g.structure.with_geo ? 0 : '—')}</td><td>${c.gold ? c.gold + ' поз.' : '—'}</td><td>${pr}</td>
+        <td><div class="gtg"><button class="gsw" role="switch" aria-label="Золотой заказ: ${esc(c.b + ', ' + c.t + ', ' + c.c)}" aria-checked="${c.on}" ${can && c.state === 'ok' ? '' : 'disabled'} onclick="goldSet('${esc(id)}',[{key:${esc(JSON.stringify(c.key))},on:${!c.on}}])"></button>${c.state === 'ok' ? '' : '<span class="small" style="margin:0">старый дашборд</span>'}</div></td></tr>`;
+    });
+  });
+  return h || '<tr><td colspan="6" class="small">Ничего не найдено.</td></tr>';
+}
+function goldDraw(id){
+  const tb = $('gold_tb_' + id), cn = $('gold_cnt_' + id);
+  if(tb) tb.innerHTML = goldRows(id);
+  if(cn) cn.textContent = goldCount(S.gold[id]);
+}
+async function goldSet(id, cells){
+  const g = S.gold[id];
+  if(!cells.length) return;
+  const keep = g.cells.map(c => ({...c}));
+  cells.forEach(ch => { const c = g.cells.find(x => x.key === ch.key); if(c && (!ch.on || c.state === 'ok')) c.on = ch.on; });
+  goldDraw(id);
+  try {
+    const x = await api('/companies/' + encodeURIComponent(id) + '/gold/cells', {method: 'POST', body: {cells}});
+    x.can = true; S.gold[id] = x; goldDraw(id);
+  } catch(e){ g.cells = keep; goldDraw(id); toast(e.message); }
+}
+function goldBranch(id, b){
+  const ok = S.gold[id].cells.filter(c => c.b === b && c.state === 'ok'), all = ok.every(c => c.on);
+  goldSet(id, ok.map(c => ({key: c.key, on: !all})));
+}
+function goldAll(id, on){
+  const g = S.gold[id];
+  goldSet(id, g.cells.filter(c => c.state === 'ok' && c.on !== on).map(c => ({key: c.key, on})));
+}
+function goldThrLbl(id, key, v){
+  const t = S.gold[id].teams.find(x => x.key === key), e = $('gthr_' + id + '_' + key);
+  if(t && e) e.textContent = goldThrTxt(+v, t.k);
+}
+async function goldThr(id, key, v){
+  const t = S.gold[id].teams.find(x => x.key === key);
+  try {
+    await api('/companies/' + encodeURIComponent(id) + '/gold/thresholds', {method: 'POST', body: {thresholds: {[key]: +v}}});
+    if(t) t.v = +v; toast(`Порог ${t ? t.n : ''}: ${v}%`);
+  } catch(e){ toast(e.message); if(t){ const r = document.querySelector(`input[aria-label="Порог золотого заказа, ${t.n}"]`); if(r) r.value = t.v; goldThrLbl(id, key, t.v); } }
+}
+
 
 /* ---------- Маршруты из API клиента (14.10.2026) ---------- */
 // План визитов по датам (RDB: /routes). Кнопка забирает «сегодня + 14 дней»,
@@ -1003,9 +1201,9 @@ function tabData(c){
     'Если источник отвечает ошибкой — проверьте адрес и соответствие полей. Не помогло — передайте техспециалисту.') : '';
   // 06.11.2026: «Полная загрузка» — заказы с 1-го числа прошлого месяца порциями (только API; для новых филиалов/людей в Структуре)
   const fullBusy = (S.run[c.company_id + ':full'] || {}).busy;
-  const fullCard = (src === 'api' && canMgr()) ? card(
+  const fullCard = ((src === 'api' || src === 'bigquery') && canMgr()) ? card(   // 17.11.2026: + BigQuery
     `<button style="width:100%" id="rf" ${fullBusy ? 'disabled' : ''} onclick="reloadFull('${esc(c.company_id)}')">${fullBusy ? 'Загружаю по частям…' : 'Полная загрузка'}</button>`,
-    '<b>Для новых компаний и филиалов:</b> загружает заказы за весь прошлый месяц и текущий — чтобы можно было закрыть прошлый период. Нажимают один раз после подключения (несколько минут). Для обычной работы не нужна: свежие данные подтягиваются сами каждый день.',
+    '<b>Для новых компаний и филиалов</b> — и после смены «Соответствия полей»: загружает заказы за весь прошлый месяц и текущий. Нажимают один раз (несколько минут). Для обычной работы не нужна: свежие данные подтягиваются сами каждый день.',
     'Сначала загрузите Структуру: агенты, которых в ней нет, пропускаются. Повторное нажатие безопасно.') : '';
   const pm = periodMonths();
   const closeCard = card(
