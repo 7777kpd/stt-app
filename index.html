@@ -879,13 +879,39 @@ function goldCard(pt) {
   const g = _gold, tt = _nrTt(pt), p = (g.points || {})[tt] || { days: 0, gold: 0, taken: [] }, nd = g.nodata;
   const gp = p.days ? Math.round(p.gold / p.days * 100) : null;
   const left = g.prio.filter(n => !p.taken.includes(n)), i = _rtPoints.indexOf(pt), open = _goldOpen['p' + tt];
-  const gTot = nd ? '<span class="gm-nd">данные ещё не пришли</span>' : `<span class="gm-tot"><b class="${_gCol(gp)}">${p.gold} из ${p.days} дн.</b></span>`;
+  const gOpen = _goldOpen['g' + tt];
+  const gTot = nd ? '<span class="gm-nd">данные ещё не пришли</span>' : `<span class="gm-tot" style="cursor:pointer" onclick="goldDays(${i})"><b class="${_gCol(gp)}">${p.gold} из ${p.days} ${p.days ? (gOpen ? '▴' : '▾') : ''}</b></span>`;
   const pTot = nd ? '<span class="gm-nd">данные ещё не пришли</span>' : `<span class="gm-tot"><b>${p.taken.length} из ${g.prio.length}</b></span>`;
   const lst = open && nd ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${g.prio.map(n => `<span class="gm-c">${_pbEsc(n)}</span>`).join('')}</div>`
     : open ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${left.map(n => `<span class="gm-c no">${_pbEsc(n)}</span>`).join('')}${p.taken.length ? (_goldOpen['t' + tt] ? p.taken.map(n => `<span class="gm-c ok">${_pbEsc(n)}</span>`).join('') : `<span class="gm-c ok" style="cursor:pointer" onclick="goldTk(${i})">+ ещё ${p.taken.length} взяли</span>`) : ''}</div>` : '';
-  return `<div class="gm-row"><b>ЗОЛОТОЙ ЗАКАЗ</b>${gTot}</div>
+  return `<div class="gm-row"><b>ЗОЛОТОЙ ЗАКАЗ</b>${gTot}</div>${gOpen ? goldDaysHtml(tt) : ''}
     <div class="gm-row"><b>ПРИОРИТЕТ</b>${pTot}</div>
     ${g.prio.length ? `<div class="gm-seg"><button onclick="goldPt(${i})"><span>${nd ? 'Список приоритета' : 'Осталось ' + left.length}</span><span>${open ? '▴' : '▾'}</span></button></div>${lst}` : ''}`;
+}
+// 24.11.2026: раскрытие «Золотой заказ N из M» — дни с заказом и что из золотого состава было в заказе
+let _goldDays = {};
+async function goldDays(i) {
+  const pt = _rtPoints[i]; if (!pt) return;
+  const tt = _nrTt(pt), k = 'g' + tt;
+  _goldOpen[k] = !_goldOpen[k];
+  _pbRedraw();
+  if (!_goldOpen[k] || _goldDays[tt]) return;
+  _goldDays[tt] = 'loading';
+  const q = new URLSearchParams(window.location.search), v = q.get('viewer'), c = q.get('cell');
+  try {
+    const r = await fetch(`${API}/api/agent/${_telegramId}/gold-days?tt=${encodeURIComponent(tt)}${v ? '&viewer=' + encodeURIComponent(v) : ''}${v && c ? '&cell=' + encodeURIComponent(c) : ''}`);
+    _goldDays[tt] = r.ok ? await r.json() : { days: [] };
+  } catch (e) { _goldDays[tt] = { days: [] }; }
+  _pbRedraw();
+}
+function goldDaysHtml(tt) {
+  const x = _goldDays[tt];
+  if (!x || x === 'loading') return '<div class="gm-nd" style="padding:6px 0">Загружаю…</div>';
+  if (!x.days.length) return '<div class="gm-nd" style="padding:6px 0">Заказов в этом месяце нет</div>';
+  return `<div style="margin-top:6px;border-top:1px dashed #E4DCD3">${x.days.map(d => `<div style="padding:7px 0;border-bottom:1px dashed #E4DCD3">
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700"><span style="display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#6D9A3A;color:#fff;font-size:${d.gold ? 17 : 12}px">${d.gold ? '⌖' : '✓'}</span>${d.d}
+        <span style="margin-left:auto;font-size:12px;color:var(--muted);font-weight:600">${d.gold ? 'золотой' : 'заказ'} · ${d.g ? 'золото ✓' : 'без золота'} · рядом ${d.n} из ${x.of}</span></div>
+      <div class="gm-list" style="border:0;margin-top:5px;padding:0 0 0 30px">${d.g ? `<span class="gm-c ok go">${_pbEsc(x.gold_item)}</span>` : `<span class="gm-c no go">Не было золота: ${_pbEsc(x.gold_item)}</span>`}${d.items.map(n => `<span class="gm-c ok">${_pbEsc(n)}</span>`).join('')}</div></div>`).join('')}</div>`;
 }
 function goldTog(k, v) { if (k === 'top') _goldOpen.top = _goldOpen.top === v ? null : v; else _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
 function goldTk(i) { const pt = _rtPoints[i]; if (!pt) return; const k = 't' + _nrTt(pt); _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
