@@ -637,11 +637,24 @@ function goldRows(id){
     if(!open) return;
     vis.forEach(c => {
       const pr = c.state === 'nodata' || c.state === 'gone' ? `<span class="tag s-off">${G_ST[c.state]}</span>` : (c.state === 'small' ? `<span class="tag s-test">${c.prio} · мало</span>` : `<b>${c.prio}</b> поз.`);
-      h += `<tr class="cl"><td class="${c.state === 'ok' ? '' : 'dis'}">${esc(c.t)}</td><td>${esc(c.c)}</td><td>${c.agents || (g.structure && g.structure.with_geo ? 0 : '—')}</td><td>${c.gold ? c.gold + ' поз.' : '—'}</td><td>${pr}</td>
+      h += `<tr class="cl"><td class="${c.state === 'ok' ? '' : 'dis'}">${esc(c.t)}</td><td>${esc(c.c)}</td><td>${c.agents ? `<a href="javascript:void 0" onclick="goldAg('${esc(id)}',${esc(JSON.stringify(c.key))})" style="color:var(--accent);font-weight:600">${c.agents} ${S.gag && S.gag.key === c.key ? '▾' : '›'}</a>` : (g.structure && g.structure.with_geo ? 0 : '—')}</td><td>${c.gold ? c.gold + ' поз.' : '—'}</td><td>${pr}</td>
         <td>${c.state === 'ok' ? goldSeg(id, [c.key], c.mode, can) : '<span class="small" style="margin:0">старый дашборд</span>'}</td></tr>`;
+      if(S.gag && S.gag.key === c.key) h += `<tr class="cl"><td colspan="6" style="background:var(--surface-2)">${S.gag.list === 'loading' ? '<span class="small">Загружаю…</span>' : (S.gag.list || []).map(a => `<div style="display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);position:sticky;left:0;max-width:340px"><span>${esc(a.n)}</span>${a.tid ? `<a target="_blank" href="${goldAgUrl(a.tid)}" style="font-weight:600;color:var(--accent)">Открыть новый дашборд ›</a>` : '<span class="small" style="margin:0">нет Telegram ID</span>'}</div>`).join('') || '<span class="small">Агентов нет</span>'}<p class="small" style="position:sticky;left:0;max-width:340px">Откроется так, как агент увидит его, когда ячейку переведут в «Агентам». Ячейка должна быть в «Просмотре».</p></td></tr>`;
     });
   });
   return h || '<tr><td colspan="6" class="small">Ничего не найдено.</td></tr>';
+}
+// 24.11.2026: агенты ячейки — «Открыть новый дашборд» для нашей команды и администратора клиента
+function goldAgUrl(tid){
+  const base = 'https://7777kpd.github.io/stt-app/index.html';
+  return base + '?id=' + encodeURIComponent(tid) + '&viewer=' + encodeURIComponent((S.me || {}).telegram_id || '') + (new URLSearchParams(location.search).get('dev') === '1' ? '&dev=1' : '');
+}
+async function goldAg(id, key){
+  if(S.gag && S.gag.key === key){ S.gag = null; goldDraw(id); return; }
+  S.gag = {key, list: 'loading'}; goldDraw(id);
+  try { const x = await api('/companies/' + encodeURIComponent(id) + '/gold-agents?cell=' + encodeURIComponent(key)); if(S.gag && S.gag.key === key) S.gag.list = x.agents; }
+  catch(e){ if(S.gag) S.gag.list = []; toast(e.message); }
+  goldDraw(id);
 }
 function goldDraw(id){
   const tb = $('gold_tb_' + id), cn = $('gold_cnt_' + id);
