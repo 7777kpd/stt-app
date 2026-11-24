@@ -871,7 +871,7 @@ function goldTop() {
   return `${g.preview ? `<div class="gm-prev">Просмотр: так увидит агент, когда ячейку «${_pbEsc(g.cell.t || g.cell.b)} · ${_pbEsc(g.cell.c)}» откроют агентам. Сейчас агент на прежнем дашборде.</div>` : ''}
   <div class="gm-mx"><div class="gm-t"><b>На начало дня</b><span>по ${t.route || 0} точкам маршрута${nd ? ' · данные ещё не пришли' : ''}</span></div>
    <div class="gm-two">
-    <div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${big(t.gold)}<div class="gm-bar"><i style="width:${nd ? 0 : t.gold || 0}%;background:${_gBar(t.gold)}"></i></div><button class="gm-tb" onclick="goldTog('top','gold')">Состав ${_goldOpen.top === 'gold' ? '▴' : '▾'}</button></div>
+    <div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${big(t.gold)}<div class="gm-bar"><i style="width:${nd ? 0 : t.gold || 0}%;background:${_gBar(t.gold)}"></i></div>${!nd && t.orders != null ? `<span style="font-size:12px;display:block;margin-top:5px">${t.gold_n} золотых из ${t.orders} заказов</span>` : ''}<button class="gm-tb" onclick="goldTog('top','gold')">Состав ${_goldOpen.top === 'gold' ? '▴' : '▾'}</button></div>
     <div><span class="gm-lbl">ПРИОРИТЕТ</span>${big(t.prio)}<div class="gm-bar"><i style="width:${nd ? 0 : t.prio || 0}%;background:${_gBar(t.prio)}"></i></div><button class="gm-tb" onclick="goldTog('top','prio')">Состав ${_goldOpen.top === 'prio' ? '▴' : '▾'}</button></div>
    </div>${list}</div>`;
 }
@@ -951,23 +951,30 @@ function goldItogCard(elId, kind, team) {
   // Итоги месяца — накопительно с 1-го числа
   const m = g.month || {}, w = g.where || {}, rk = (g.team || {}).rank || {};
   const top = `<div class="gm-mx" style="margin:0 0 12px"><div class="gm-t"><b>Месяц</b><span>${nd ? 'данные ещё не пришли — появятся после ночного расчёта' : 'вся база агента: ' + (m.base || 0) + ' точек · накопительно с 1-го числа'}</span></div>
-    <div class="gm-two"><div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${v(m.gold)}${bar(m.gold)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : 'дней с золотым заказом'}</span></div>
-    <div><span class="gm-lbl">ПРИОРИТЕТ</span>${v(m.prio)}${bar(m.prio)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : 'в среднем по точкам базы'}</span></div></div></div>`;
-  if (nd) { el.innerHTML = top; return; }
+    <div class="gm-two"><div><span class="gm-lbl">ЗОЛОТОЙ ЗАКАЗ</span>${v(m.gold)}${bar(m.gold)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : (m.gold_n != null ? m.gold_n + ' золотых из ' + (m.days || 0) + ' заказов' : 'заказов золотые')}</span></div>
+    <div><span class="gm-lbl">ПРИОРИТЕТ</span>${v(m.prio)}${bar(m.prio)}<span style="font-size:12px;display:block;margin-top:6px">${nd ? '' : 'точки взяли в среднем ' + (m.prio || 0) + '% списка'}</span></div></div></div>`;
+  if (nd) { el.innerHTML = `<details class="stt-card" style="border-left:3px solid #4E8B2E"><summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;"><span class="stt-card-head" style="margin:0"><span>🏅</span><span class="stt-card-title">Золотой заказ и приоритет</span></span><span style="font-size:12px;color:var(--muted)">нет данных ▶</span></summary><div style="padding-top:12px">${top}</div></details>`; return; }
   const lst = (arr, f, key) => {
     const open = _goldOpen[key], sh = open ? arr : arr.slice(0, 5);
     return sh.map(f).join('') + (arr.length > 5 ? `<div class="nr-lr na" style="cursor:pointer" onclick="_goldOpen['${key}']=!_goldOpen['${key}'];goldItogCard('gold-month','month')"><span class="nm">${open ? 'Свернуть' : '+ ещё ' + (arr.length - 5)}</span><span>${open ? '▴' : '▾'}</span></div>` : '');
   };
   const where = card('Где добрать', `
-    <div style="font-size:11px;font-weight:800;color:#B3342C;margin:6px 0 2px">ЗОЛОТОЙ ЗАКАЗ НИ РАЗУ · ${(w.no_gold || []).length}</div>
-    ${(w.no_gold || []).length ? lst(w.no_gold, x => `<div class="nr-lr"><span class="nm">${_pbEsc(x[0])}</span><span style="color:var(--muted);font-size:12px">${x[1]} дн. с заказом</span></div>`, 'wg') : '<div style="font-size:12.5px;color:var(--muted)">Таких точек нет</div>'}
-    <div style="font-size:11px;font-weight:800;color:#B3342C;margin:10px 0 2px;padding-top:8px;border-top:1px dashed #E4DCD3">ПРИОРИТЕТ МЕНЬШЕ 50% · ${(w.low_prio || []).length}</div>
-    ${(w.low_prio || []).length ? lst(w.low_prio, x => `<div class="nr-lr"><span class="nm">${_pbEsc(x[0])}</span><b class="gm-r">${x[1]} из ${w.size}</b></div>`, 'wp') : '<div style="font-size:12.5px;color:var(--muted)">Таких точек нет</div>'}`);
+    <div style="font-size:11px;font-weight:800;color:#B3342C;margin:6px 0 2px">НИ РАЗУ НЕ БЫЛО ЗОЛОТОГО ЗАКАЗА · ${(w.no_gold || []).length}</div>
+    ${(w.no_gold || []).length ? lst(w.no_gold, x => `<div class="nr-lr"><span class="nm">${_pbEsc(x[0])}</span><span style="color:var(--muted);font-size:12px">заказов ${x[1]}</span></div>`, 'wg') : '<div style="font-size:12.5px;color:var(--muted)">Таких точек нет</div>'}
+    <div style="font-size:11px;font-weight:800;color:#B3342C;margin:10px 0 2px;padding-top:8px;border-top:1px dashed #E4DCD3">ВЗЯЛИ МЕНЬШЕ ПОЛОВИНЫ ПРИОРИТЕТА · ${(w.low_prio || []).length}</div>
+    ${(w.low_prio || []).length ? lst(w.low_prio, x => `<div class="nr-lr"><span class="nm">${_pbEsc(x[0])}</span><b class="gm-r">взяли ${x[1]} из ${w.size}</b></div>`, 'wp') : '<div style="font-size:12.5px;color:var(--muted)">Таких точек нет</div>'}`);
   const weeks = (g.weeks || []).length ? card('Золотой заказ по неделям', `<div style="display:flex;gap:10px;align-items:flex-end;height:92px;margin-top:6px">${g.weeks.map(x => `<div style="flex:1;text-align:center;font-size:10.5px;color:var(--muted);display:flex;flex-direction:column;justify-content:flex-end;gap:3px;height:100%"><b style="font-size:12px;color:var(--ink)">${x.gold == null ? '—' : x.gold + '%'}</b><i style="display:block;border-radius:5px 5px 0 0;height:${Math.max(4, (x.gold || 0) * 0.8)}px;background:${_gBar(x.gold)};${x.cur ? 'opacity:.5' : ''}"></i>${x.w} нед${x.cur ? ' (идёт)' : ''}</div>`).join('')}</div>`) : '';
   const rr = x => x && x.place ? `<b class="${_gCol(x.val)}">${x.place} из ${x.of}</b>` : '<b style="color:var(--muted)">—</b>';
   const cellN = g.cell ? _pbEsc((g.cell.t || g.cell.b) + ' · ' + g.cell.c) : '';
   const rating = card('🏆 Место в ячейке', `<div class="nr-lr"><span class="nm">По золотому заказу · ${cellN}</span>${rr(rk.gold)}</div><div class="nr-lr"><span class="nm">По приоритету · ${cellN}</span>${rr(rk.prio)}</div>`);
-  el.innerHTML = top + where + weeks + rating;
+  // 24.11.2026: всё про золото и приоритет — одной свёрнутой плашкой, как другие карточки Итогов месяца
+  const sv = x => x == null ? '—' : `<span class="${_gCol(x)}">${x}%</span>`;
+  el.innerHTML = `<details class="stt-card" style="border-left:3px solid #4E8B2E">
+    <summary style="cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <span class="stt-card-head" style="margin:0"><span>🏅</span><span class="stt-card-title">Золото и приоритет</span></span>
+      <span style="display:flex;align-items:center;gap:8px;white-space:nowrap"><span style="font-size:17px;font-weight:700">${sv(m.gold)} · ${sv(m.prio)}</span><span style="font-size:13px;color:var(--muted);">▶</span></span>
+    </summary>
+    <div style="padding-top:12px">${top + where + weeks + rating}</div></details>`;
 }
 
 // «Визиты без заказа» — карточка в Итогах дня и Итогах месяца (GET /noorder)
