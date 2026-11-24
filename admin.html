@@ -467,9 +467,23 @@ function pbSetBlock(c){
     <p class="lbl" style="margin-top:14px">Когда напоминать</p>
     <select ${dis} onchange="S.pbe['${esc(id)}'].m=+this.value;render()">${PB_REM.map(([k, t]) => `<option value="${k}" ${+E.m === k ? 'selected' : ''}>${t}</option>`).join('')}</select>
     <p class="small">Только тем, у кого сегодня есть визиты без заказа и без причины.</p>
+    ${can ? `<p class="lbl" style="margin-top:14px">Старые отметки «Проблемы клиентов»</p>
+    <p class="small">Отметки, поставленные до перехода на причины отсутствия заказа. Удаляются насовсем, вернуть нельзя. Новые причины не затрагиваются.</p>
+    <div class="acts"><button class="danger" id="pbo_${esc(id)}" onclick="pbOldClear('${esc(id)}')">Удалить старые отметки…</button></div>` : ''}
     <p class="err" id="pb_err_${esc(id)}"></p>
     ${can ? `<div class="acts" style="margin-top:4px"><button class="pri" id="pb_s_${esc(id)}" ${dirty ? '' : 'disabled'} onclick="pbSave('${esc(id)}')">Сохранить</button><span class="small" id="pb_d_${esc(id)}" style="color:var(--warn)">${dirty ? 'Есть несохранённые изменения' : ''}</span></div>` : ''}
   `);
+}
+async function pbOldClear(id){
+  const b = $('pbo_' + id); if(b) b.disabled = true;
+  try {
+    const c = await api('/companies/' + encodeURIComponent(id) + '/problem-old');
+    if(!c.count){ toast('Старых отметок нет'); return; }
+    if(!confirm(`Удалить старые отметки «Проблемы клиентов»: ${c.count}?\n\nОни исчезнут из блока «Какие проблемы» у руководителей. Вернуть нельзя. Новые причины отсутствия заказа останутся.\n\nДействие попадёт в журнал.`)) return;
+    const r = await api('/companies/' + encodeURIComponent(id) + '/problem-old/clear', {method:'POST'});
+    toast(r.message);
+  } catch(e){ toast(e.message); }
+  finally { if(b) b.disabled = false; }
 }
 function pbDirty(id){
   const E = S.pbe[id], st = S.pbs[id], b = $('pb_s_' + id), d = $('pb_d_' + id);
@@ -1654,7 +1668,7 @@ function planBlock(c){
   const lines = (p.lines || []).map(t => `<div class="small" style="padding:3px 0">• ${esc(t)}</div>`).join('');
   const last = (p.last || []).map(x => `<div class="small" style="padding:4px 0;border-top:1px solid var(--line)">${fdt(x.at)} · ${esc(x.actor_name)} · ${esc(x.details)}</div>`).join('');
   const btn = p.pending && canCfg() ? `<div class="note warn" style="margin-top:10px"><b>${p.pending} ${p.pending === 1 ? 'изменение ждёт' : 'изменений ждут'} ${esc(p.pending_from)}.</b> Если клиент просит включить их сейчас — можно, но показатели этого месяца пересчитаются задним числом.
-      <div class="acts"><button class="danger" id="pl_now" onclick="planApplyNow('${esc(c.company_id)}')">Применить План сейчас</button></div></div>`
+      <div class="acts"><button class="danger" id="pl_now" onclick="planApplyNow('${esc(c.company_id)}')">Применить План сейчас (всем)</button><button id="pl_sel" onclick="planSelOpen('${esc(c.company_id)}')">Только для выбранных агентов…</button></div><div id="pl_sel_box"></div></div>`
     : p.pending ? `<p class="small" style="margin-top:8px">Применить раньше 1-го числа может владелец, менеджер СТТ или администратор клиента.</p>` : '';
   return `<div class="panel" style="padding:12px 16px;margin-top:12px"><strong style="font-weight:600">План посещений: изменения маршрутов</strong>
     <p class="small" style="margin:4px 0 8px">✅ Новая точка считается со дня, когда её добавили. ⏳ Смена дня визита и удаление точки — с 1-го числа следующего месяца; если файл пришёл 1–3 числа — с 1-го числа этого месяца. Так цифры прошедших дней не меняются задним числом.</p>
@@ -1696,6 +1710,30 @@ async function planWatch(id){
   try { const r = await api('/companies/' + encodeURIComponent(id) + '/plan-watch', {method:'POST'}); alert(r.message); }
   catch(e){ toast(e.message); }
   if(b){ b.disabled = false; b.textContent = 'Проверить плановые визиты сегодня'; }
+}
+async function planSelOpen(id){
+  const box = $('pl_sel_box'); if(!box) return;
+  box.innerHTML = '<p class="small">Загружаю агентов…</p>';
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id) + '/plan-pending-agents');
+    window._plAg = r.agents.map(x => x.agent);
+    box.innerHTML = r.agents.length
+      ? `<input id="pl_q" placeholder="Поиск агента" oninput="planSelFilter()" style="margin:8px 0;width:100%">
+         <div style="max-height:260px;overflow:auto">${r.agents.map((x, i) => `<label class="small pl_ag" style="display:block;padding:3px 0"><input type="checkbox" class="pl_cb" value="${i}"> ${esc(x.agent)} — смена дня ${x.changed}, убрано ${x.removed}</label>`).join('')}</div>
+         <div class="acts"><button class="danger" onclick="planSelApply('${esc(id)}')">Применить для отмеченных</button></div>`
+      : '<p class="small">Ни у одного агента нет ожидающих изменений.</p>';
+  } catch(e){ box.innerHTML = `<div class="note bad">${esc(e.message)}</div>`; }
+}
+function planSelFilter(){
+  const q = ($('pl_q').value || '').toLowerCase();
+  document.querySelectorAll('.pl_ag').forEach(l => { l.style.display = l.textContent.toLowerCase().includes(q) ? 'block' : 'none'; });
+}
+async function planSelApply(id){
+  const ags = [...document.querySelectorAll('.pl_cb:checked')].map(c => window._plAg[+c.value]);
+  if(!ags.length){ toast('Отметьте агентов'); return; }
+  if(!confirm(`Применить План с 1-го числа этого месяца для агентов: ${ags.length}?\n\nИх смена дней и удаления начнут действовать сразу, цифры месяца по ним пересчитаются. Остальные агенты не изменятся и дождутся 1-го числа.`)) return;
+  try { const r = await api('/companies/' + encodeURIComponent(id) + '/plan-apply-agents', {method:'POST', body: {agents: ags}}); toast(r.message); delete S.health[id]; await loadPlan(id); }
+  catch(e){ toast(e.message); }
 }
 async function planApplyNow(id){
   const p = S.plan[id] || {};
