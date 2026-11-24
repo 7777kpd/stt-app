@@ -596,6 +596,7 @@ function goldBlock(c){
         ${g.history.length ? `<div class="tw"><table style="min-width:520px"><thead><tr><th>Дата</th><th>Ячейка</th><th>Что изменено</th><th>Подтвердил</th></tr></thead><tbody>
           ${g.history.map(h => `<tr><td>${esc(fdt(h.at))}</td><td>${esc(h.cell)}</td><td>${esc(h.what)}</td><td>${esc(h.who)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="small">Изменений пока нет.</p>'}
       </details>
+      ${can ? `<details class="sub2" ${S.op['gsrc_' + id] ? 'open' : ''} ontoggle="S.op['gsrc_${esc(id)}']=this.open;if(this.open)goldSrcLoad('${esc(id)}')"><summary>Источник заказов, регионы и пересчёт</summary><div id="gsrc_${esc(id)}">${goldSrcHtml(id)}</div></details>` : ''}
       ${can ? `<details class="sub2" ${opAttr('gpeek_' + id)}><summary>Проверить представление заказов с товарами</summary>
         <div class="acts" style="margin-top:8px"><input id="gpk_${esc(id)}" style="flex:1;min-width:220px;width:auto" placeholder="проект.датасет.представление" value="${esc(S.gpk || 'optimal-cogency-432307-k1.DWH_Reports.Orders_Assortmant')}"><button onclick="goldPeek('${esc(id)}')">Прочитать 5 строк</button></div>
         <div id="gpk_out_${esc(id)}"></div></details>` : ''}
@@ -662,6 +663,50 @@ function goldMode(id, keys, mode){ goldSet(id, keys.map(k => ({key: k, mode})));
 function goldAll(id, mode){
   const g = S.gold[id];
   goldSet(id, g.cells.filter(c => c.state === 'ok' && c.mode !== mode).map(c => ({key: c.key, mode})));
+}
+S.gsrc = {};
+function goldSrcLoad(id){
+  if(S.gsrc[id] && S.gsrc[id] !== 'loading') return;
+  S.gsrc[id] = 'loading';
+  api('/companies/' + encodeURIComponent(id) + '/gold-source').then(x => { S.gsrc[id] = x; const e = $('gsrc_' + id); if(e) e.innerHTML = goldSrcHtml(id); })
+    .catch(e => { S.gsrc[id] = {error: e.message}; const el = $('gsrc_' + id); if(el) el.innerHTML = goldSrcHtml(id); });
+}
+function goldSrcHtml(id){
+  const x = S.gsrc[id];
+  if(!x) setTimeout(() => goldSrcLoad(id), 0);
+  if(!x || x === 'loading') return '<p class="small">Загружаю…</p>';
+  if(x.error) return `<p class="err">${esc(x.error)}</p>`;
+  const q = `'${esc(id)}'`;
+  const regs = (x.regions || []).map((r, i) => {
+    const opts = Object.entries(x.territories || {}).map(([b, ts]) => ts.map(t => `<option value="${esc(b + '|' + t)}" ${r.branch === b && r.territory === t ? 'selected' : ''}>${esc(b + ' · ' + t)}</option>`).join('')).join('');
+    return `<tr><td>${esc(r.filial)}</td><td>${esc(r.region)}</td><td><select data-i="${i}" class="gsrc-sel" style="min-width:220px"><option value="">— не входит —</option>${opts}</select></td></tr>`;
+  }).join('');
+  return `<div class="box" style="margin-top:8px;font-size:13px;color:var(--ink-2)">Расчёт идёт каждый рабочий вечер сразу после загрузки заказов (последние 3 дня). Ячейка агента — филиал и территория, где у него больше всего точек с заказами за месяц; регион клиента переводится в территорию справочника по таблице ниже.</div>
+    <p class="lbl" style="margin-top:10px">Представление заказов с товарами (BigQuery)</p>
+    <div class="acts" style="margin-top:0"><input id="gsrc_ref_${esc(id)}" style="flex:1;min-width:220px;width:auto" placeholder="проект.датасет.представление" value="${esc(x.source || '')}"><button onclick="goldSrcSave(${q},'source')">Сохранить</button></div>
+    <p class="small">Колонки: order_date, Agent, Code_shop, SKU, filial, Region. Агентов привязано к ячейкам: <b>${x.agents}</b>. Последний посчитанный день: <b>${x.last_day ? esc(fdt(x.last_day)) : 'ещё нет'}</b>.</p>
+    <div class="acts"><button class="pri" id="gsrc_run_${esc(id)}" onclick="goldRecalc(${q},false)">Пересчитать за месяц</button><button onclick="goldRecalc(${q},true)">Пересчитать прошлый месяц</button></div>
+    <div id="gsrc_res_${esc(id)}"></div>
+    <p class="lbl" style="margin-top:14px">Регион клиента → территория справочника</p>
+    ${regs ? `<div class="tw"><table style="min-width:520px"><thead><tr><th>Филиал (данные)</th><th>Регион (данные)</th><th>Территория справочника</th></tr></thead><tbody>${regs}</tbody></table></div>
+      <div class="acts"><button onclick="goldSrcSave(${q},'regions')">Сохранить регионы</button></div>` : '<p class="small">Регионы появятся после первого пересчёта.</p>'}`;
+}
+async function goldSrcSave(id, what){
+  const x = S.gsrc[id], body = {};
+  if(what === 'source') body.source = ($('gsrc_ref_' + id) || {}).value || '';
+  else body.regions = [...document.querySelectorAll('#gsrc_' + id + ' .gsrc-sel')].map(e => { const r = x.regions[+e.dataset.i], [b, t] = (e.value || '|').split('|'); return {filial: r.filial, region: r.region, branch: b || '', territory: t || ''}; });
+  try { S.gsrc[id] = await api('/companies/' + encodeURIComponent(id) + '/gold-source', {method: 'POST', body}); $('gsrc_' + id).innerHTML = goldSrcHtml(id); toast('Сохранено'); }
+  catch(e){ toast(e.message); }
+}
+async function goldRecalc(id, prev){
+  const out = $('gsrc_res_' + id), b = $('gsrc_run_' + id);
+  out.innerHTML = '<p class="small">Считаю… до нескольких минут, не закрывайте.</p>'; if(b) b.disabled = true;
+  try {
+    const r = await api('/companies/' + encodeURIComponent(id) + '/gold-recalc', {method: 'POST', body: {prev}});
+    out.innerHTML = r.ok ? `<div class="note">✅ ${esc(fdt(r.from))}–${esc(fdt(r.to))}: строк с позициями справочника ${r.rows}, агентов в ячейках ${r.agents}${r.agents_no_cell ? ', без ячейки ' + r.agents_no_cell : ''}, дней с заказом ${r.days}, из них золотых ${r.gold_days}.${r.unmapped_regions ? ' Регионов без территории: ' + r.unmapped_regions + ' — проверьте таблицу ниже.' : ''}</div>` : `<div class="note bad">${esc(r.error)}</div>`;
+    S.gsrc[id] = null; S.gold[id] = undefined; goldSrcLoad(id);
+  } catch(e){ out.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  if(b) b.disabled = false;
 }
 async function goldPeek(id){
   const inp = $('gpk_' + id), out = $('gpk_out_' + id);
