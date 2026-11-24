@@ -1091,10 +1091,12 @@ function renderVisits(pt) {
     off:  { bg: '#378ADD', icon: vgPin('#fff','13px') },
   };
 
+  // 24.11.2026: «Золотой заказ» — день с золотым заказом показываем мишенью (зелёный — по маршруту, синий — вне)
+  const gDays = (typeof goldOn === 'function' && goldOn()) ? (((_gold.points || {})[pt.tt || pt.address] || {}).gold_days || []) : [];
   let html = '<div class="visits-cells">';
   html += items.map(it => {
-    const s = STYLE[it.type];
-    return `<div class="v-cell"><div class="v-cell-icon" style="background:${s.bg}">${s.icon}</div><span class="v-cell-day">${dayToWd(it.day)}</span></div>`;
+    const s = STYLE[it.type], gd = it.type !== 'miss' && gDays.includes(it.day);
+    return `<div class="v-cell"><div class="v-cell-icon" style="background:${s.bg}${gd ? ';font-size:19px;line-height:1' : ''}">${gd ? '⌖' : s.icon}</div><span class="v-cell-day">${dayToWd(it.day)}</span></div>`;
   }).join('');
   // 13.10.2026: будущие плановые визиты — каждый своей серой клеткой с днём
   // недели (сколько визитов ещё впереди в этом месяце), вместо одной «ост.».
