@@ -126,7 +126,7 @@ body.gold-on .cat-card { display: none; }
 .gm-tb { font: inherit; font-weight: 700; font-size: 12px; margin-top: 8px; padding: 5px 10px; border-radius: 9px; border: 1.5px solid #E4DCD3; background: transparent; cursor: pointer; }
 .gm-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #E4DCD3; }
 .gm-c { font-size: 12px; font-weight: 800; padding: 5px 9px; border-radius: 9px; background: #ECE5DC; }
-.gm-c.ok { background: #E3EFD8; color: #3B6A1C; } .gm-c.no { background: #F8DCDA; color: #B3342C; } .gm-c.go::before { content: "★ "; }
+.gm-c.ok { background: #E3EFD8; color: #3B6A1C; } .gm-c.au { background: #F5C518; color: #3D2E00; letter-spacing: .04em; } .gm-c.au-no { background: #F8DCDA; color: #B3342C; letter-spacing: .04em; } .gm-c.no { background: #F8DCDA; color: #B3342C; } .gm-c.go::before { content: "★ "; }
 .gm-h { width: 100%; font-size: 12px; color: var(--muted); }
 .gm-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; letter-spacing: .06em; margin-top: 8px; }
 .gm-row > b { font-weight: 900; } .gm-tot b { border: 1.5px solid #2B2B2B; border-radius: 9px; padding: 2px 9px; font-size: 14px; letter-spacing: 0; }
@@ -857,6 +857,18 @@ function nrPick(i, iso, k) {
 // Вместо ряда категорий в карточке — золотой заказ «N из M дней» и приоритет «N из размера списка».
 // Пока ночного расчёта нет — «данные ещё не пришли», состав показан из справочника.
 // ============================================================
+// 24.11.2026: короткое название позиции — агент знает свой ассортимент: без ТМ, «Газ», веса и упаковки.
+// Полное название — во всплывающей подсказке (title).
+function _gShort(n) {
+  let t = String(n || '');
+  t = t.replace(/,\s*(?:Газ|Вакуум.*|Лоток.*|Відро.*)\s*$/i, '').replace(/,\s*Газ\s*$/i, '').replace(/\(\s*ТМ[^)]*\)/gi, '').replace(/(^|[\s,])ТМ\s+[^,()]+$/i, '')
+       .replace(/\((?:~|≈)?\s*\d[\d.,]*\s*(?:г|гр|кг|мл|л|шт)\)/gi, '').replace(/\((?:шт|кг|порц)\)/gi, '')
+       .replace(/,\s*(?:шт|кг)(?=[\s,]|$)/gi, '').replace(/\s\d[\d.,]*\s*(?:г|гр|кг|мл|л)(?=[\s,]|$)/gi, '')
+       .replace(/\s{2,}/g, ' ').replace(/[\s,]+$/, '')
+       .replace(/\s*,\s*(?:Газ|Вакуум.*|Лоток.*|Відро.*)\s*$/i, '').replace(/\s+,/g, ',').trim();
+  return t.length > 40 ? t.slice(0, 38).trim() + '…' : (t || String(n || ''));
+}
+function _gN(n) { return `<span title="${_pbEsc(n)}">${_pbEsc(_gShort(n))}</span>`; }
 let _gold = null, _goldOpen = {};
 const _gCol = v => v == null ? '' : v >= 75 ? 'gm-g' : v >= 50 ? 'gm-a' : 'gm-r';
 const _gBar = v => v == null ? '#ECE5DC' : v >= 75 ? '#4E8B2E' : v >= 50 ? '#D9A03A' : '#D2534C';
@@ -866,8 +878,8 @@ function goldTop() {
   const g = _gold, t = g.top || {}, nd = g.nodata;
   const big = v => nd || v == null ? '<span class="gm-big" style="font-size:15px;color:var(--muted)">нет данных</span>' : `<span class="gm-big ${_gCol(v)}">${v}%</span>`;
   const list = _goldOpen.top === 'gold'
-    ? `<div class="gm-list"><span class="gm-h">Золотой заказ: золото и рядом от ${g.need} из ${g.set.length}</span>${g.gold_item ? `<span class="gm-c go">${_pbEsc(g.gold_item)}</span>` : ''}${g.set.map(n => `<span class="gm-c">${_pbEsc(n)}</span>`).join('')}</div>`
-    : _goldOpen.top === 'prio' ? `<div class="gm-list"><span class="gm-h">Приоритет: список на месяц · ${g.prio.length} позиций</span>${g.prio.map(n => `<span class="gm-c">${_pbEsc(n)}</span>`).join('')}</div>` : '';
+    ? `<div class="gm-list"><span class="gm-h">Золотой заказ: золото и рядом от ${g.need} из ${g.set.length}</span>${g.gold_item ? `<span class="gm-c au">★ ${_gN(g.gold_item)}</span>` : ''}${g.set.map(n => `<span class="gm-c">${_gN(n)}</span>`).join('')}</div>`
+    : _goldOpen.top === 'prio' ? `<div class="gm-list"><span class="gm-h">Приоритет: список на месяц · ${g.prio.length} позиций</span>${g.prio.map(n => `<span class="gm-c">${_gN(n)}</span>`).join('')}</div>` : '';
   return `${g.preview ? `<div class="gm-prev">Просмотр: так увидит агент, когда ячейку «${_pbEsc(g.cell.t || g.cell.b)} · ${_pbEsc(g.cell.c)}» откроют агентам. Сейчас агент на прежнем дашборде.</div>` : ''}
   <div class="gm-mx"><div class="gm-t"><b>На начало дня</b><span>по ${t.route || 0} точкам маршрута${nd ? ' · данные ещё не пришли' : ''}</span></div>
    <div class="gm-two">
@@ -882,8 +894,8 @@ function goldCard(pt) {
   const gOpen = _goldOpen['g' + tt];
   const gTot = nd ? '<span class="gm-nd">данные ещё не пришли</span>' : `<span class="gm-tot" style="cursor:pointer" onclick="goldDays(${i})"><b class="${_gCol(gp)}">${p.gold} из ${p.days} ${p.days ? (gOpen ? '▴' : '▾') : ''}</b></span>`;
   const pTot = nd ? '<span class="gm-nd">данные ещё не пришли</span>' : `<span class="gm-tot"><b>${p.taken.length} из ${g.prio.length}</b></span>`;
-  const lst = open && nd ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${g.prio.map(n => `<span class="gm-c">${_pbEsc(n)}</span>`).join('')}</div>`
-    : open ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${left.map(n => `<span class="gm-c no">${_pbEsc(n)}</span>`).join('')}${p.taken.length ? (_goldOpen['t' + tt] ? p.taken.map(n => `<span class="gm-c ok">${_pbEsc(n)}</span>`).join('') : `<span class="gm-c ok" style="cursor:pointer" onclick="goldTk(${i})">+ ещё ${p.taken.length} взяли</span>`) : ''}</div>` : '';
+  const lst = open && nd ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${g.prio.map(n => `<span class="gm-c">${_gN(n)}</span>`).join('')}</div>`
+    : open ? `<div class="gm-list" style="border:0;margin-top:6px;padding-top:0">${left.map(n => `<span class="gm-c no">${_gN(n)}</span>`).join('')}${p.taken.length ? (_goldOpen['t' + tt] ? p.taken.map(n => `<span class="gm-c ok">${_gN(n)}</span>`).join('') : `<span class="gm-c ok" style="cursor:pointer" onclick="goldTk(${i})">+ ещё ${p.taken.length} взяли</span>`) : ''}</div>` : '';
   return `<div class="gm-row"><b>ЗОЛОТОЙ ЗАКАЗ</b>${gTot}</div>${gOpen ? goldDaysHtml(tt) : ''}
     <div class="gm-row"><b>ПРИОРИТЕТ</b>${pTot}</div>
     ${g.prio.length ? `<div class="gm-seg"><button onclick="goldPt(${i})"><span>${nd ? 'Список приоритета' : 'Осталось ' + left.length}</span><span>${open ? '▴' : '▾'}</span></button></div>${lst}` : ''}`;
@@ -911,7 +923,7 @@ function goldDaysHtml(tt) {
   return `<div style="margin-top:6px;border-top:1px dashed #E4DCD3">${x.days.map(d => `<div style="padding:7px 0;border-bottom:1px dashed #E4DCD3">
       <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700"><span style="display:grid;place-items:center;width:22px;height:22px;border-radius:6px;background:#6D9A3A;color:#fff;font-size:${d.gold ? 17 : 12}px">${d.gold ? '⌖' : '✓'}</span>${d.d}
         <span style="margin-left:auto;font-size:12px;color:var(--muted);font-weight:600">${d.gold ? 'золотой' : 'заказ'} · ${d.g ? 'золото ✓' : 'без золота'} · рядом ${d.n} из ${x.of}</span></div>
-      <div class="gm-list" style="border:0;margin-top:5px;padding:0 0 0 30px">${d.g ? `<span class="gm-c ok go">${_pbEsc(x.gold_item)}</span>` : `<span class="gm-c no go">Не было золота: ${_pbEsc(x.gold_item)}</span>`}${d.items.map(n => `<span class="gm-c ok">${_pbEsc(n)}</span>`).join('')}</div></div>`).join('')}</div>`;
+      <div class="gm-list" style="border:0;margin-top:5px;padding:0 0 0 30px">${d.g ? `<span class="gm-c au" title="${_pbEsc(x.gold_item)}">★ ЗОЛОТО</span>` : `<span class="gm-c au-no" title="${_pbEsc(x.gold_item)}">✕ НЕТ ЗОЛОТА</span>`}${d.items.map(n => `<span class="gm-c ok">${_gN(n)}</span>`).join('')}</div></div>`).join('')}</div>`;
 }
 function goldTog(k, v) { if (k === 'top') _goldOpen.top = _goldOpen.top === v ? null : v; else _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
 function goldTk(i) { const pt = _rtPoints[i]; if (!pt) return; const k = 't' + _nrTt(pt); _goldOpen[k] = !_goldOpen[k]; _pbRedraw(); }
